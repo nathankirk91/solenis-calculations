@@ -90,7 +90,7 @@ export function Polymer973Form({ lastResult, result }: Props) {
                 </Button>
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {detaLoadFields.map((field, index) => (
                   <div key={field.key} className="grid gap-2">
                     <div className="flex items-center justify-between gap-2">
@@ -101,7 +101,7 @@ export function Polymer973Form({ lastResult, result }: Props) {
                         <Button
                           variant="ghost"
                           size="xs"
-                          className="text-muted-foreground"
+                          className="h-auto px-1 py-0 text-muted-foreground"
                           {...form.remove.getButtonProps({
                             name: fields.detaLoads.name,
                             index,
