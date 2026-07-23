@@ -20,27 +20,23 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import {
-  ADIPIC_MASS_PARTS,
-  DETA_MASS_PARTS,
+  ADIPIC_BAG_COUNT,
+  ADIPIC_BAG_MAX_KG,
+  ADIPIC_BAG_MIN_KG,
+  ADIPIC_TO_DETA_MASS_RATIO,
+  DETA_LOAD_MAX_KG,
+  INITIAL_DETA_LOAD_FIELDS,
   type Polymer973Result,
 } from "~/lib/polymer-973";
-import {
-  polymer973Schema,
-  type Polymer973FormValues,
-} from "~/lib/polymer-973.schema";
+import { polymer973Schema } from "~/lib/polymer-973.schema";
 import { cn } from "~/lib/utils";
 
 type Props = {
   lastResult?: SubmissionResult<string[]> | null;
   result?: Polymer973Result | null;
-  defaultValues?: Partial<Polymer973FormValues>;
 };
 
-export function Polymer973Form({
-  lastResult,
-  result,
-  defaultValues,
-}: Props) {
+export function Polymer973Form({ lastResult, result }: Props) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
 
@@ -52,10 +48,13 @@ export function Polymer973Form({
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
     defaultValue: {
-      detaChargedKg: defaultValues?.detaChargedKg?.toString() ?? "",
-      adipicAcidKg: defaultValues?.adipicAcidKg?.toString() ?? "",
+      detaLoads: Array.from({ length: INITIAL_DETA_LOAD_FIELDS }, () => ""),
+      adipicBags: Array.from({ length: ADIPIC_BAG_COUNT }, () => ""),
     },
   });
+
+  const detaLoadFields = fields.detaLoads.getFieldList();
+  const adipicBagFields = fields.adipicBags.getFieldList();
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
@@ -63,52 +62,119 @@ export function Polymer973Form({
         <CardHeader>
           <CardTitle>Make-up DETA</CardTitle>
           <CardDescription>
-            After charging ~90% DETA and all Adipic Acid (bulk-bag actual), enter
-            both amounts. Target mass ratio Adipic:DETA = {ADIPIC_MASS_PARTS}:
-            {DETA_MASS_PARTS}.
+            Enter each DETA drum/IBC pallet load and each Adipic Acid pallet
+            weight (2 × ~500 kg bags). Ratio Adipic:DETA ={" "}
+            {ADIPIC_TO_DETA_MASS_RATIO.toFixed(10)}.
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor={fields.detaChargedKg.id}>
-                DETA already charged (kg)
-              </Label>
-              <Input
-                {...getInputProps(fields.detaChargedKg, { type: "number" })}
-                step="any"
-                min="0"
-                placeholder="e.g. 2875.7"
-              />
-              {fields.detaChargedKg.errors ? (
-                <p
-                  className="text-sm text-destructive"
-                  id={fields.detaChargedKg.errorId}
+          <CardContent className="grid gap-6">
+            <section className="grid gap-3">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h3 className="font-medium">DETA loads</h3>
+                  <p className="text-sm text-muted-foreground">
+                    One field per drum or IBC pallet. Max {DETA_LOAD_MAX_KG} kg
+                    each.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  {...form.insert.getButtonProps({
+                    name: fields.detaLoads.name,
+                    defaultValue: "",
+                  })}
                 >
-                  {fields.detaChargedKg.errors}
-                </p>
-              ) : null}
-            </div>
+                  Add DETA load
+                </Button>
+              </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor={fields.adipicAcidKg.id}>
-                Adipic Acid charged (kg)
-              </Label>
-              <Input
-                {...getInputProps(fields.adipicAcidKg, { type: "number" })}
-                step="any"
-                min="0"
-                placeholder="e.g. 4000"
-              />
-              {fields.adipicAcidKg.errors ? (
-                <p
-                  className="text-sm text-destructive"
-                  id={fields.adipicAcidKg.errorId}
-                >
-                  {fields.adipicAcidKg.errors}
+              <div className="grid gap-3">
+                {detaLoadFields.map((field, index) => (
+                  <div key={field.key} className="grid gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor={field.id}>
+                        DETA load {index + 1} (kg)
+                      </Label>
+                      {detaLoadFields.length > 1 ? (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-muted-foreground"
+                          {...form.remove.getButtonProps({
+                            name: fields.detaLoads.name,
+                            index,
+                          })}
+                        >
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
+                    <Input
+                      {...getInputProps(field, { type: "number" })}
+                      key={field.key}
+                      step="any"
+                      min="0"
+                      max={DETA_LOAD_MAX_KG}
+                      placeholder="e.g. 900"
+                    />
+                    {field.errors ? (
+                      <p className="text-sm text-destructive" id={field.errorId}>
+                        {field.errors}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              {fields.detaLoads.errors ? (
+                <p className="text-sm text-destructive">
+                  {fields.detaLoads.errors}
                 </p>
               ) : null}
-            </div>
+            </section>
+
+            <Separator />
+
+            <section className="grid gap-3">
+              <div>
+                <h3 className="font-medium">Adipic Acid pallets</h3>
+                <p className="text-sm text-muted-foreground">
+                  Fixed {ADIPIC_BAG_COUNT} pallets (2 × ~500 kg bulk bags each).
+                  Each pallet must be between {ADIPIC_BAG_MIN_KG} and{" "}
+                  {ADIPIC_BAG_MAX_KG} kg.
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {adipicBagFields.map((field, index) => (
+                  <div key={field.key} className="grid gap-2">
+                    <Label htmlFor={field.id}>
+                      Adipic Acid pallet {index + 1} (kg)
+                    </Label>
+                    <Input
+                      {...getInputProps(field, { type: "number" })}
+                      key={field.key}
+                      step="any"
+                      min={ADIPIC_BAG_MIN_KG}
+                      max={ADIPIC_BAG_MAX_KG}
+                      placeholder="e.g. 1000"
+                      required
+                    />
+                    {field.errors ? (
+                      <p className="text-sm text-destructive" id={field.errorId}>
+                        {field.errors}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              {fields.adipicBags.errors ? (
+                <p className="text-sm text-destructive">
+                  {fields.adipicBags.errors}
+                </p>
+              ) : null}
+            </section>
           </CardContent>
           <CardFooter className="justify-end gap-2">
             <Button type="submit" disabled={isSubmitting}>
@@ -169,8 +235,8 @@ export function Polymer973Form({
             </dl>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Enter DETA already charged and Adipic Acid charged to see the
-              extra DETA required.
+              Enter DETA loads and Adipic Acid pallet weights to see the extra
+              DETA required.
             </p>
           )}
         </CardContent>

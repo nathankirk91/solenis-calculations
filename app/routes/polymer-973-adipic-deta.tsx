@@ -43,7 +43,10 @@ export async function action({ request }: Route.ActionArgs) {
     );
   }
 
-  const outputs = calculatePolymer973ExtraDeta(submission.value);
+  const outputs = calculatePolymer973ExtraDeta({
+    detaChargedKg: submission.value.detaChargedKg,
+    adipicAcidKg: submission.value.adipicAcidKg,
+  });
 
   const prisma = getPrisma();
   if (prisma) {
@@ -88,9 +91,9 @@ export default function Polymer973AdipicDetaPage({
             Polymer 973 — Adipic Acid:DETA Ratio
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Charge ~90% DETA, then all Adipic Acid (bulk-bag actual). Enter both
-            amounts to calculate how much extra DETA is required to hit the
-            batch mass ratio.
+            Charge ~90% DETA via drums/IBCs, then Adipic Acid pallets (bulk-bag
+            actual weights). Enter each load to calculate how much extra DETA is
+            required.
           </p>
         </div>
 
