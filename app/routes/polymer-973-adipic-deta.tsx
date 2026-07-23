@@ -8,7 +8,7 @@ import { Polymer973Form } from "~/components/polymer-973-form";
 import { Badge } from "~/components/ui/badge";
 import { requireUser } from "~/lib/auth.server";
 import { getPrisma } from "~/lib/db.server";
-import { calculatePolymer973Charges } from "~/lib/polymer-973";
+import { calculatePolymer973ExtraDeta } from "~/lib/polymer-973";
 import { polymer973Schema } from "~/lib/polymer-973.schema";
 
 export function meta({}: Route.MetaArgs) {
@@ -17,7 +17,7 @@ export function meta({}: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Calculate Polymer 973 Adipic Acid and DETA charges from batch size or reactant mass.",
+        "Calculate extra DETA required after charging Adipic Acid for Polymer 973.",
     },
   ];
 }
@@ -43,7 +43,7 @@ export async function action({ request }: Route.ActionArgs) {
     );
   }
 
-  const outputs = calculatePolymer973Charges(submission.value);
+  const outputs = calculatePolymer973ExtraDeta(submission.value);
 
   const prisma = getPrisma();
   if (prisma) {
@@ -88,8 +88,9 @@ export default function Polymer973AdipicDetaPage({
             Polymer 973 — Adipic Acid:DETA Ratio
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Convert a known Adipic Acid charge, DETA charge, or total reactant
-            mass into paired plant charges at the target molar ratio.
+            Charge ~90% DETA, then all Adipic Acid (bulk-bag actual). Enter both
+            amounts to calculate how much extra DETA is required to hit the
+            batch mass ratio.
           </p>
         </div>
 
@@ -97,11 +98,6 @@ export default function Polymer973AdipicDetaPage({
           <Polymer973Form
             lastResult={actionData?.lastResult}
             result={actionData?.result}
-            defaultValues={
-              actionData?.result
-                ? undefined
-                : { basis: "total", amountKg: 1000, molarRatio: 1 }
-            }
           />
         </div>
       </main>

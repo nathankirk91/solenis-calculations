@@ -1,27 +1,24 @@
-/** Molecular weights (g/mol) for Polymer 973 reactants. */
-export const ADIPIC_ACID_MW = 146.14;
-export const DETA_MW = 103.17;
+/** Process mass ratio: Adipic Acid : DETA = 4000 : 3195.2 */
+export const ADIPIC_MASS_PARTS = 4000;
+export const DETA_MASS_PARTS = 3195.2;
 
-/** Default process target: 1.0 mol Adipic Acid : 1.0 mol DETA. */
-export const DEFAULT_MOLAR_RATIO = 1;
-
-export type ChargeBasis = "adipic" | "deta" | "total";
+/** kg DETA required per kg Adipic Acid */
+export const DETA_PER_ADIPIC =
+  DETA_MASS_PARTS / ADIPIC_MASS_PARTS;
 
 export type Polymer973Inputs = {
-  basis: ChargeBasis;
-  amountKg: number;
-  /** Moles of Adipic Acid per mole of DETA. */
-  molarRatio: number;
+  /** DETA already charged (typically ~90% of target). */
+  detaChargedKg: number;
+  /** Actual Adipic Acid charged (varies with bulk bags). */
+  adipicAcidKg: number;
 };
 
 export type Polymer973Result = {
   adipicAcidKg: number;
-  detaKg: number;
-  totalKg: number;
-  massRatioAdipicToDeta: number;
-  molarRatioAdipicToDeta: number;
-  adipicAcidKmol: number;
-  detaKmol: number;
+  detaChargedKg: number;
+  targetDetaKg: number;
+  extraDetaKg: number;
+  massRatioLabel: string;
 };
 
 function round(value: number, digits = 3): number {
@@ -30,60 +27,33 @@ function round(value: number, digits = 3): number {
 }
 
 /**
- * Polymer 973 Adipic Acid : DETA charge calculator.
+ * Polymer 973 make-up DETA calculator.
  *
- * Uses the target molar ratio (Adipic / DETA) and reactant molecular weights
- * to convert a known Adipic Acid charge, DETA charge, or total reactant mass
- * into the paired plant charges.
+ * Plant flow:
+ * 1. Charge ~90% of the DETA
+ * 2. Charge all Adipic Acid for the batch (bulk-bag actual mass)
+ * 3. Enter both amounts → calculate remaining DETA to hit the mass ratio
  */
-export function calculatePolymer973Charges(
+export function calculatePolymer973ExtraDeta(
   inputs: Polymer973Inputs,
 ): Polymer973Result {
-  const { basis, amountKg, molarRatio } = inputs;
+  const { detaChargedKg, adipicAcidKg } = inputs;
 
-  if (!(amountKg > 0)) {
-    throw new Error("Amount must be greater than zero.");
+  if (!(adipicAcidKg > 0)) {
+    throw new Error("Adipic Acid amount must be greater than zero.");
   }
-  if (!(molarRatio > 0)) {
-    throw new Error("Molar ratio must be greater than zero.");
-  }
-
-  // Mass of Adipic Acid required per kg of DETA at the target molar ratio.
-  const adipicPerDetaKg =
-    (molarRatio * ADIPIC_ACID_MW) / DETA_MW;
-
-  let adipicAcidKg: number;
-  let detaKg: number;
-
-  switch (basis) {
-    case "adipic":
-      adipicAcidKg = amountKg;
-      detaKg = amountKg / adipicPerDetaKg;
-      break;
-    case "deta":
-      detaKg = amountKg;
-      adipicAcidKg = amountKg * adipicPerDetaKg;
-      break;
-    case "total":
-      detaKg = amountKg / (1 + adipicPerDetaKg);
-      adipicAcidKg = amountKg - detaKg;
-      break;
-    default: {
-      const _exhaustive: never = basis;
-      throw new Error(`Unsupported basis: ${_exhaustive}`);
-    }
+  if (!(detaChargedKg >= 0)) {
+    throw new Error("DETA charged cannot be negative.");
   }
 
-  const adipicAcidKmol = adipicAcidKg / ADIPIC_ACID_MW;
-  const detaKmol = detaKg / DETA_MW;
+  const targetDetaKg = adipicAcidKg * DETA_PER_ADIPIC;
+  const extraDetaKg = targetDetaKg - detaChargedKg;
 
   return {
     adipicAcidKg: round(adipicAcidKg),
-    detaKg: round(detaKg),
-    totalKg: round(adipicAcidKg + detaKg),
-    massRatioAdipicToDeta: round(adipicAcidKg / detaKg, 4),
-    molarRatioAdipicToDeta: round(adipicAcidKmol / detaKmol, 4),
-    adipicAcidKmol: round(adipicAcidKmol, 4),
-    detaKmol: round(detaKmol, 4),
+    detaChargedKg: round(detaChargedKg),
+    targetDetaKg: round(targetDetaKg),
+    extraDetaKg: round(extraDetaKg),
+    massRatioLabel: `${ADIPIC_MASS_PARTS} : ${DETA_MASS_PARTS}`,
   };
 }

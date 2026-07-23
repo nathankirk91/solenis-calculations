@@ -77,13 +77,14 @@ The React Router Vercel preset lives in `react-router.config.ts`.
 
 ### Polymer 973 formula
 
-Uses molecular weights Adipic Acid `146.14 g/mol` and DETA `103.17 g/mol` with a target molar ratio (default `1.0` Adipic : `1.0` DETA) to convert:
+Plant flow: charge ~90% DETA, then all Adipic Acid (bulk-bag actual mass). Enter both amounts to get the remaining DETA.
 
-- total reactant mass, or
-- Adipic Acid charge, or
-- DETA charge
+Mass ratio **Adipic : DETA = 4000 : 3195.2**
 
-into paired plant charges and mass/molar ratios.
+```
+target DETA (kg) = Adipic Acid (kg) × (3195.2 / 4000)
+extra DETA (kg)  = target DETA − DETA already charged
+```
 
 ## Scripts
 

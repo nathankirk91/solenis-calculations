@@ -20,7 +20,7 @@ async function main() {
     update: {
       title: "Polymer 973 — Adipic Acid:DETA Ratio",
       description:
-        "Calculate Adipic Acid and DETA charges from a batch size or either reactant mass.",
+        "After charging ~90% DETA and all Adipic Acid, calculate the extra DETA required.",
       category: "polymer",
       href: "/calculations/polymer-973-adipic-deta",
       isAvailable: true,
@@ -31,7 +31,7 @@ async function main() {
       slug: "polymer-973-adipic-deta",
       title: "Polymer 973 — Adipic Acid:DETA Ratio",
       description:
-        "Calculate Adipic Acid and DETA charges from a batch size or either reactant mass.",
+        "After charging ~90% DETA and all Adipic Acid, calculate the extra DETA required.",
       category: "polymer",
       href: "/calculations/polymer-973-adipic-deta",
       isAvailable: true,
