@@ -1,4 +1,5 @@
 import "dotenv/config";
+import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../generated/prisma/client";
@@ -37,6 +38,25 @@ async function main() {
       sortOrder: 1,
     },
   });
+
+  const email = (process.env.SEED_USER_EMAIL ?? "admin@solenis.local").toLowerCase();
+  const password = process.env.SEED_USER_PASSWORD ?? "changeme";
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  await prisma.user.upsert({
+    where: { email },
+    update: {
+      passwordHash,
+      name: "Admin",
+    },
+    create: {
+      email,
+      passwordHash,
+      name: "Admin",
+    },
+  });
+
+  console.log(`Seeded user ${email}`);
 }
 
 main()

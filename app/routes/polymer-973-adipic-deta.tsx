@@ -6,6 +6,7 @@ import type { Route } from "./+types/polymer-973-adipic-deta";
 import { AppHeader } from "~/components/app-header";
 import { Polymer973Form } from "~/components/polymer-973-form";
 import { Badge } from "~/components/ui/badge";
+import { requireUser } from "~/lib/auth.server";
 import { getPrisma } from "~/lib/db.server";
 import { calculatePolymer973Charges } from "~/lib/polymer-973";
 import { polymer973Schema } from "~/lib/polymer-973.schema";
@@ -21,7 +22,17 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
+export async function loader({ request }: Route.LoaderArgs) {
+  const user = await requireUser(
+    request,
+    "/calculations/polymer-973-adipic-deta",
+  );
+  return { user };
+}
+
 export async function action({ request }: Route.ActionArgs) {
+  await requireUser(request, "/calculations/polymer-973-adipic-deta");
+
   const formData = await request.formData();
   const submission = parseWithZod(formData, { schema: polymer973Schema });
 
@@ -56,11 +67,12 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Polymer973AdipicDetaPage({
+  loaderData,
   actionData,
 }: Route.ComponentProps) {
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_oklch(0.97_0.02_220),_transparent_55%),linear-gradient(180deg,_oklch(0.99_0.01_220),_oklch(0.96_0.015_200))]">
-      <AppHeader />
+      <AppHeader user={loaderData.user} />
       <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="mb-3 flex flex-wrap items-center gap-2">
