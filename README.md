@@ -4,8 +4,8 @@ Plant calculation tools for Solenis production processes.
 
 ## Stack
 
-- **React Router 8** (SSR framework mode)
-- **Supabase** (Postgres catalog + calculation run history)
+- **React Router 8** (framework mode + Vite SSR)
+- **Prisma 7** ORM against **Supabase Postgres**
 - **Vercel** (`@vercel/react-router` preset)
 - **Tailwind CSS 4** + **shadcn/ui**
 - **Conform** + **Zod** for forms
@@ -14,19 +14,30 @@ Plant calculation tools for Solenis production processes.
 
 ```bash
 cp .env.example .env
+# Fill in DATABASE_URL + DIRECT_URL from Supabase → Project Settings → Database
 npm install
+npx prisma migrate deploy
+npm run db:seed
 npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173).
 
-### Supabase
+Without `DATABASE_URL`, the app still boots and uses a local fallback calculation catalog.
+
+### Database (Supabase + Prisma)
 
 1. Create a Supabase project.
-2. Run `supabase/migrations/001_initial.sql` in the SQL editor.
-3. Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` (and optionally `SUPABASE_SERVICE_ROLE_KEY`) in `.env` and in the Vercel project env.
+2. Copy the **pooled** connection string (port `6543`, append `?pgbouncer=true`) into `DATABASE_URL`.
+3. Copy the **direct/session** connection string (port `5432`) into `DIRECT_URL`.
+4. Apply schema and seed:
 
-Without Supabase configured, the app still runs using a local fallback calculation catalog.
+```bash
+npx prisma migrate deploy
+npm run db:seed
+```
+
+Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` / `npm run db:generate`.
 
 ### Vercel
 
@@ -36,7 +47,7 @@ npx vercel env pull .env
 npm run build
 ```
 
-The React Router Vercel preset is configured in `react-router.config.ts`.
+Set `DATABASE_URL` and `DIRECT_URL` on the Vercel project. The React Router Vercel preset lives in `react-router.config.ts`.
 
 ## Calculators
 
@@ -56,7 +67,11 @@ into paired plant charges and mass/molar ratios.
 
 ## Scripts
 
-- `npm run dev` — local development
+- `npm run dev` — local development (React Router + Vite)
 - `npm run build` — production build
 - `npm run start` — serve production build
 - `npm run typecheck` — typegen + TypeScript
+- `npm run db:migrate` — create/apply migrations in development
+- `npm run db:deploy` — apply migrations in CI/production
+- `npm run db:seed` — seed calculation catalog
+- `npm run db:studio` — open Prisma Studio

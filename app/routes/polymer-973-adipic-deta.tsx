@@ -6,9 +6,9 @@ import type { Route } from "./+types/polymer-973-adipic-deta";
 import { AppHeader } from "~/components/app-header";
 import { Polymer973Form } from "~/components/polymer-973-form";
 import { Badge } from "~/components/ui/badge";
+import { getPrisma } from "~/lib/db.server";
 import { calculatePolymer973Charges } from "~/lib/polymer-973";
 import { polymer973Schema } from "~/lib/polymer-973.schema";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -34,13 +34,19 @@ export async function action({ request }: Route.ActionArgs) {
 
   const outputs = calculatePolymer973Charges(submission.value);
 
-  const supabase = getSupabaseServerClient();
-  if (supabase) {
-    await supabase.from("calculation_runs").insert({
-      calculation_id: "polymer-973-adipic-deta",
-      inputs: submission.value,
-      outputs,
-    });
+  const prisma = getPrisma();
+  if (prisma) {
+    try {
+      await prisma.calculationRun.create({
+        data: {
+          calculationId: "polymer-973-adipic-deta",
+          inputs: submission.value,
+          outputs,
+        },
+      });
+    } catch {
+      // Persistence is best-effort; calculation result still returns to the UI.
+    }
   }
 
   return {

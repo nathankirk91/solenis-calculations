@@ -6,7 +6,7 @@ import {
   FALLBACK_CALCULATIONS,
   type CalculationCard,
 } from "~/lib/calculations";
-import { getSupabaseServerClient } from "~/lib/supabase.server";
+import { getPrisma } from "~/lib/db.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -19,32 +19,47 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader() {
-  const supabase = getSupabaseServerClient();
+  const prisma = getPrisma();
 
-  if (!supabase) {
+  if (!prisma) {
     return { calculations: FALLBACK_CALCULATIONS, source: "fallback" as const };
   }
 
-  const { data, error } = await supabase
-    .from("calculations")
-    .select("id, slug, title, description, category, href, is_available")
-    .order("sort_order", { ascending: true });
+  try {
+    const rows = await prisma.calculation.findMany({
+      orderBy: { sortOrder: "asc" },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        description: true,
+        category: true,
+        href: true,
+        isAvailable: true,
+      },
+    });
 
-  if (error || !data?.length) {
+    if (!rows.length) {
+      return {
+        calculations: FALLBACK_CALCULATIONS,
+        source: "fallback" as const,
+      };
+    }
+
+    const calculations: CalculationCard[] = rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      href: row.href,
+      isAvailable: row.isAvailable,
+    }));
+
+    return { calculations, source: "prisma" as const };
+  } catch {
     return { calculations: FALLBACK_CALCULATIONS, source: "fallback" as const };
   }
-
-  const calculations: CalculationCard[] = data.map((row) => ({
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    description: row.description,
-    category: row.category,
-    href: row.href,
-    isAvailable: row.is_available,
-  }));
-
-  return { calculations, source: "supabase" as const };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {

@@ -1,0 +1,39 @@
+// Prisma schema for Solenis Calculations (Supabase Postgres)
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Calculation {
+  id          String   @id
+  slug        String   @unique
+  title       String
+  description String
+  category    String   @default("general")
+  href        String
+  isAvailable Boolean  @default(true) @map("is_available")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  runs        CalculationRun[]
+
+  @@map("calculations")
+}
+
+model CalculationRun {
+  id            String      @id @default(cuid())
+  calculationId String      @map("calculation_id")
+  calculation   Calculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+  inputs        Json
+  outputs       Json
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([calculationId])
+  @@index([createdAt(sort: Desc)])
+  @@map("calculation_runs")
+}
