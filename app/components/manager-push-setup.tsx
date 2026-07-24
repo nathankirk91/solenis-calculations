@@ -106,7 +106,7 @@ export function ManagerPushSetup({
         if (!cancelled) {
           setStatus("needs-install");
           setMessage(
-            "On iPhone/iPad: tap Share → Add to Home Screen, open Solenis Calc from the home screen icon, then return here and enable notifications.",
+            "On iPhone/iPad: tap Share → Add to Home Screen, open Springvale Solenis from the home screen icon, then return here and enable notifications.",
           );
         }
         return;
@@ -296,7 +296,7 @@ export function ManagerPushSetup({
         <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
           <li>Open this site in Safari on your iPhone/iPad.</li>
           <li>Tap Share, then Add to Home Screen.</li>
-          <li>Open Solenis Calc from the new home screen icon.</li>
+          <li>Open Springvale Solenis from the new home screen icon.</li>
           <li>Return to Settings and tap Enable on this device.</li>
         </ol>
       ) : null}
