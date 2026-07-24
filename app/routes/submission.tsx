@@ -24,7 +24,7 @@ const POLL_MS = 60_000;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Submission | Solenis Calculations" },
+    { title: "Submission | Springvale Solenis" },
     {
       name: "description",
       content: "Waiting for management approval of a submitted calculation.",

@@ -16,7 +16,7 @@ const product = POLYMER_973;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: `${product.title} | Solenis Calculations` },
+    { title: `${product.title} | Springvale Solenis` },
     {
       name: "description",
       content: `Calculate extra DETA required after charging Adipic Acid for ${product.shortName}.`,

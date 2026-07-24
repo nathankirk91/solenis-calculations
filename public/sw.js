@@ -16,7 +16,7 @@ self.addEventListener("push", function (event) {
   const title = data.title || "Springvale Solenis";
   const message =
     data.message || "A calculation is waiting for approval.";
-  const icon = data.icon || "/icon-192.png";
+  const icon = data.icon || "/brand/icon-192.png";
   const url = data.url || "/approvals";
 
   event.waitUntil(
