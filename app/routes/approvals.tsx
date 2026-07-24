@@ -151,14 +151,37 @@ export default function ApprovalsPage({
                       value={`${run.outputs.targetDetaKg ?? "—"} kg`}
                     />
                     <Stat
-                      label="DETA charged"
-                      value={`${run.outputs.detaChargedKg ?? "—"} kg`}
+                      label="DETA total"
+                      value={`${run.loads.detaChargedKg} kg`}
                     />
                     <Stat
-                      label="Adipic charged"
-                      value={`${run.outputs.adipicAcidKg ?? "—"} kg`}
+                      label="Adipic total"
+                      value={`${run.loads.adipicAcidKg} kg`}
                     />
                   </dl>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <LoadBreakdown
+                      title="DETA loads (IBC / pallet)"
+                      emptyLabel="No DETA loads recorded."
+                      totalLabel="DETA total"
+                      totalKg={run.loads.detaChargedKg}
+                      rows={run.loads.detaLoads.map((kg, index) => ({
+                        label: `DETA load ${index + 1}`,
+                        kg,
+                      }))}
+                    />
+                    <LoadBreakdown
+                      title="Adipic Acid mix"
+                      emptyLabel="No Adipic Acid weights recorded."
+                      totalLabel="Adipic total"
+                      totalKg={run.loads.adipicAcidKg}
+                      rows={run.loads.adipicBags.map((kg, index) => ({
+                        label: `Adipic ${index + 1}`,
+                        kg,
+                      }))}
+                    />
+                  </div>
 
                   <Separator />
 
@@ -223,6 +246,45 @@ function Stat({
       >
         {value}
       </dd>
+    </div>
+  );
+}
+
+function LoadBreakdown({
+  title,
+  emptyLabel,
+  totalLabel,
+  totalKg,
+  rows,
+}: {
+  title: string;
+  emptyLabel: string;
+  totalLabel: string;
+  totalKg: number;
+  rows: Array<{ label: string; kg: number }>;
+}) {
+  return (
+    <div className="rounded-lg border border-border/70 bg-background/50 p-4">
+      <h3 className="font-medium">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <ul className="mt-3 grid gap-2">
+          {rows.map((row) => (
+            <li
+              key={row.label}
+              className="flex items-center justify-between gap-3 text-sm"
+            >
+              <span className="text-muted-foreground">{row.label}</span>
+              <span className="font-medium tabular-nums">{row.kg} kg</span>
+            </li>
+          ))}
+          <li className="mt-1 flex items-center justify-between gap-3 border-t border-border/60 pt-2 text-sm font-semibold">
+            <span>{totalLabel}</span>
+            <span className="tabular-nums">{totalKg} kg</span>
+          </li>
+        </ul>
+      )}
     </div>
   );
 }

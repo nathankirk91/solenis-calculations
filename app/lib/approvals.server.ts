@@ -1,4 +1,11 @@
 import { getPrisma } from "~/lib/db.server";
+import {
+  parsePendingRunLoads,
+  type PendingRunLoads,
+} from "~/lib/pending-run-loads";
+
+export type { PendingRunLoads };
+export { parsePendingRunLoads };
 
 export type PendingRunSummary = {
   id: string;
@@ -14,7 +21,7 @@ export type PendingRunSummary = {
     adipicAcidKg?: number;
     massRatioLabel?: string;
   };
-  inputs: Record<string, unknown>;
+  loads: PendingRunLoads;
 };
 
 export async function countPendingRuns(): Promise<number> {
@@ -52,7 +59,7 @@ export async function listPendingRuns(): Promise<PendingRunSummary[]> {
     operatorName: row.operator?.name ?? null,
     submittedByEmail: row.submittedBy?.email ?? null,
     outputs: (row.outputs ?? {}) as PendingRunSummary["outputs"],
-    inputs: (row.inputs ?? {}) as Record<string, unknown>,
+    loads: parsePendingRunLoads(row.inputs),
   }));
 }
 
