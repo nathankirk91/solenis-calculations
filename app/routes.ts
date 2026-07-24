@@ -9,6 +9,7 @@ export default [
   route("history", "routes/history.tsx"),
   route("settings", "routes/settings.tsx"),
   route("push/subscribe", "routes/push-subscribe.tsx"),
+  route("submissions/:runId", "routes/submission.tsx"),
   route(
     "calculations/polymer-973-adipic-deta",
     "routes/polymer-973-adipic-deta.tsx",

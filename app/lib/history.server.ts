@@ -60,3 +60,40 @@ export async function listCalculationHistory(
     loads: parsePendingRunLoads(row.inputs),
   }));
 }
+
+export async function getCalculationRunById(
+  id: string,
+): Promise<CalculationHistoryItem | null> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return null;
+  }
+
+  const row = await prisma.calculationRun.findUnique({
+    where: { id },
+    include: {
+      calculation: { select: { title: true, href: true } },
+      operator: { select: { name: true } },
+      reviewedBy: { select: { name: true, email: true } },
+    },
+  });
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    status: row.status,
+    createdAt: row.createdAt,
+    reviewedAt: row.reviewedAt,
+    reviewNote: row.reviewNote,
+    calculationTitle: row.calculation.title,
+    calculationHref: row.calculation.href,
+    operatorName: row.operator?.name ?? null,
+    reviewedByName: row.reviewedBy?.name ?? null,
+    reviewedByEmail: row.reviewedBy?.email ?? null,
+    outputs: (row.outputs ?? {}) as CalculationHistoryItem["outputs"],
+    loads: parsePendingRunLoads(row.inputs),
+  };
+}
