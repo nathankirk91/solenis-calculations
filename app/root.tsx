@@ -12,9 +12,9 @@ import "./app.css";
 
 export const links: Route.LinksFunction = () => [
   { rel: "manifest", href: "/manifest.webmanifest" },
-  { rel: "icon", href: "/favicon.ico", sizes: "any" },
-  { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
-  { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+  { rel: "icon", href: "/favicon.ico?v=2", sizes: "any" },
+  { rel: "icon", href: "/icon.svg?v=2", type: "image/svg+xml" },
+  { rel: "apple-touch-icon", href: "/apple-touch-icon.png?v=2" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -23,7 +23,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#00CC99" />
+        <meta name="theme-color" content="#072635" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Springvale Solenis" />
         <Meta />
@@ -59,8 +59,10 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-16">
-      <h1 className="font-heading text-3xl font-semibold">{message}</h1>
+    <main className="app-shell mx-auto w-full max-w-3xl px-4 py-16">
+      <h1 className="font-heading text-3xl font-semibold text-brand-navy">
+        {message}
+      </h1>
       <p className="mt-2 text-muted-foreground">{details}</p>
       {stack ? (
         <pre className="mt-6 w-full overflow-x-auto rounded-lg bg-muted p-4 text-sm">

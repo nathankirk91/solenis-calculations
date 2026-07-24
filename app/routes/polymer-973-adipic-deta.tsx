@@ -43,7 +43,7 @@ export default function Polymer973AdipicDetaPage({
   actionData,
 }: Route.ComponentProps) {
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_oklch(0.97_0.02_220),_transparent_55%),linear-gradient(180deg,_oklch(0.99_0.01_220),_oklch(0.96_0.015_200))]">
+    <div className="app-shell">
       <AppHeader
         user={loaderData.user}
         pendingCount={loaderData.pendingCount}

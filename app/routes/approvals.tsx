@@ -81,7 +81,7 @@ export default function ApprovalsPage({
   const { user, pending } = loaderData;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_oklch(0.97_0.02_220),_transparent_55%),linear-gradient(180deg,_oklch(0.99_0.01_220),_oklch(0.96_0.015_200))]">
+    <div className="app-shell">
       <AppHeader user={user} pendingCount={pending.length} />
       <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
