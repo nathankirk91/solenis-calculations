@@ -80,10 +80,10 @@ The React Router Vercel preset lives in `react-router.config.ts`.
 
 Plant flow: charge ~90% DETA via drum/IBC pallets, then Adipic Acid, and enter each load weight to get the remaining DETA.
 
-| Product | Mass ratio (Adipic:DETA) | Adipic fields | Adipic max | Initial DETA fields |
+| Product | Mass ratio (Adipic:DETA) | Adipic fields | Adipic validation | Initial DETA fields |
 |---|---|---|---|---|
-| Polymer 973 | `4000 / 3195.2` → `1.2518778167` | 4 (950–1020 kg) | 1020 kg | 4 |
-| Polymer AN04 | `5500 / 3899` → `1.4106181072` | 6 | 480 kg | 5 |
+| Polymer 973 | `4000 / 3195.2` → `1.2518778167` | 4 | 950–1020 kg | 4 |
+| Polymer AN04 | `5500 / 3899` → `1.4106181072` | 6 | min 480 kg | 5 |
 
 ```
 target DETA (kg) = Adipic Acid (kg) × (DETA parts / Adipic parts)

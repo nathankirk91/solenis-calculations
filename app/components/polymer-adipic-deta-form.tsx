@@ -161,8 +161,8 @@ export function PolymerAdipicDetaForm({
                       key={field.key}
                       step="any"
                       min={product.adipicFieldMinKg}
-                      max={product.adipicFieldMaxKg}
-                      placeholder={`e.g. ${Math.min(product.adipicFieldMaxKg, 1000)}`}
+                      max={product.adipicFieldMaxKg ?? undefined}
+                      placeholder={`e.g. ${product.adipicFieldMinKg || 1000}`}
                       required
                     />
                     {field.errors ? (

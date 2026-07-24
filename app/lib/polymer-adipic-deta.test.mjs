@@ -12,7 +12,8 @@ const {
 assert.equal(getAdipicToDetaMassRatio(POLYMER_973).toFixed(10), "1.2518778167");
 assert.equal(getAdipicToDetaMassRatio(POLYMER_AN04).toFixed(10), "1.4106181072");
 assert.equal(POLYMER_AN04.adipicFieldCount, 6);
-assert.equal(POLYMER_AN04.adipicFieldMaxKg, 480);
+assert.equal(POLYMER_AN04.adipicFieldMinKg, 480);
+assert.equal(POLYMER_AN04.adipicFieldMaxKg, null);
 assert.equal(POLYMER_AN04.initialDetaLoadFields, 5);
 assert.equal(POLYMER_973.adipicFieldCount, 4);
 assert.equal(POLYMER_973.initialDetaLoadFields, 4);

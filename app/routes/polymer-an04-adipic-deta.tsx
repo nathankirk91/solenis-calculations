@@ -93,7 +93,7 @@ export default function PolymerAn04AdipicDetaPage({
             {product.title}
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Charge ~90% DETA via drums/IBCs, then Adipic Acid mix weights (max
+            Charge ~90% DETA via drums/IBCs, then Adipic Acid mix weights (min
             480 kg each). Enter each load to calculate how much extra DETA is
             required.
           </p>

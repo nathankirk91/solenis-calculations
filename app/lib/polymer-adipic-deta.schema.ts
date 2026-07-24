@@ -41,10 +41,12 @@ export function createPolymerAdipicDetaSchema(
     );
   }
 
-  adipicBagField = adipicBagField.max(
-    product.adipicFieldMaxKg,
-    `Max ${product.adipicFieldMaxKg} kg.`,
-  );
+  if (product.adipicFieldMaxKg != null) {
+    adipicBagField = adipicBagField.max(
+      product.adipicFieldMaxKg,
+      `Max ${product.adipicFieldMaxKg} kg.`,
+    );
+  }
 
   return z
     .object({

@@ -17,8 +17,8 @@ export type PolymerAdipicDetaProduct = {
   adipicFieldCount: number;
   /** Minimum kg allowed per Adipic Acid field. */
   adipicFieldMinKg: number;
-  /** Maximum kg allowed per Adipic Acid field. */
-  adipicFieldMaxKg: number;
+  /** Maximum kg allowed per Adipic Acid field, or null for no upper limit. */
+  adipicFieldMaxKg: number | null;
   /** Number of DETA load fields shown on first load. */
   initialDetaLoadFields: number;
   /** Short helper copy under the Adipic section. */
@@ -58,11 +58,11 @@ export const POLYMER_AN04: PolymerAdipicDetaProduct = {
   adipicMassParts: 5500,
   detaMassParts: 3899,
   adipicFieldCount: 6,
-  adipicFieldMinKg: 0,
-  adipicFieldMaxKg: 480,
+  adipicFieldMinKg: 480,
+  adipicFieldMaxKg: null,
   initialDetaLoadFields: 5,
   adipicFieldHelp:
-    "Fixed 6 Adipic Acid mix weights. Each field must be at most 480 kg.",
+    "Fixed 6 Adipic Acid mix weights. Each field must be at least 480 kg.",
 };
 
 export const POLYMER_ADIPIC_DETA_PRODUCTS = [POLYMER_973, POLYMER_AN04] as const;
