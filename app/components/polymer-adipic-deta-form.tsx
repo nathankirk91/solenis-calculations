@@ -122,24 +122,12 @@ export function PolymerAdipicDetaForm({
             <Separator />
 
             <section className="grid gap-3">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h3 className="font-medium">DETA loads</h3>
-                  <p className="text-sm text-muted-foreground">
-                    One field per drum or IBC pallet. Max {DETA_LOAD_MAX_KG} kg
-                    each.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  {...form.insert.getButtonProps({
-                    name: fields.detaLoads.name,
-                    defaultValue: "",
-                  })}
-                >
-                  Add DETA load
-                </Button>
+              <div>
+                <h3 className="font-medium">DETA loads</h3>
+                <p className="text-sm text-muted-foreground">
+                  One field per drum or IBC pallet. Max {DETA_LOAD_MAX_KG} kg
+                  each.
+                </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -184,6 +172,18 @@ export function PolymerAdipicDetaForm({
                   {fields.detaLoads.errors}
                 </p>
               ) : null}
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  {...form.insert.getButtonProps({
+                    name: fields.detaLoads.name,
+                    defaultValue: "",
+                  })}
+                >
+                  Add DETA load
+                </Button>
+              </div>
             </section>
 
             <Separator />
