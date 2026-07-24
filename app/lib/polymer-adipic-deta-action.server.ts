@@ -94,8 +94,9 @@ export async function handlePolymerAdipicDetaSubmit(args: {
 
   if (runId) {
     const approvalsUrl = `${getAppBaseUrl(request)}/approvals`;
-    // Fire-and-forget: never block or fail the operator submit on Teams issues.
-    void notifyTeamsPendingApproval({
+    // Must await on Vercel serverless — fire-and-forget is frozen before fetch completes.
+    // notifyTeamsPendingApproval never throws, so submit still succeeds on Teams failures.
+    const teamsResult = await notifyTeamsPendingApproval({
       calculationTitle: product.title,
       operatorName: operator.name,
       extraDetaKg: outputs.extraDetaKg,
@@ -107,6 +108,9 @@ export async function handlePolymerAdipicDetaSubmit(args: {
       approvalsUrl,
       submittedAt: new Date(),
     });
+    if (!teamsResult.sent) {
+      console.warn("Teams notification skipped/failed:", teamsResult.reason);
+    }
   }
 
   return {

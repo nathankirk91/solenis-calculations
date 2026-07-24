@@ -19,6 +19,7 @@ export function buildTeamsApprovalPayload(notification: TeamsApprovalNotificatio
   const submittedAt = notification.submittedAt.toLocaleString("en-AU", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Australia/Melbourne",
   });
 
   const detaBreakdown = notification.detaLoads
@@ -149,6 +150,7 @@ export async function notifyTeamsPendingApproval(
 ): Promise<{ sent: boolean; reason?: string }> {
   const webhookUrl = process.env.TEAMS_WEBHOOK_URL?.trim();
   if (!webhookUrl) {
+    console.warn("Teams notification skipped: TEAMS_WEBHOOK_URL is not set");
     return { sent: false, reason: "TEAMS_WEBHOOK_URL is not set" };
   }
 

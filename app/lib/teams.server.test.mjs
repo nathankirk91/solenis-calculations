@@ -34,9 +34,9 @@ assert.equal(
   facts.facts.find((fact) => fact.title === "Operator")?.value,
   "Operator A",
 );
-assert.ok(
-  !facts.facts.some((fact) => fact.title === "Submitted by"),
-  "Submitted by should not appear in Teams facts",
+assert.equal(
+  facts.facts.find((fact) => fact.title === "Submitted")?.value,
+  "24 July 2026, 11:00 am",
 );
 
 assert.equal(
