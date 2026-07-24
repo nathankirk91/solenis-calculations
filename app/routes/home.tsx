@@ -85,15 +85,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const { calculations, user, pendingCount } = loaderData;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_oklch(0.97_0.02_220),_transparent_55%),linear-gradient(180deg,_oklch(0.99_0.01_220),_oklch(0.96_0.015_200))]">
+    <div className="app-shell">
       <AppHeader user={user} pendingCount={pendingCount} />
       <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <section className="mb-10 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <p className="mb-3 text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
+          <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-brand uppercase">
             Solenis
           </p>
-          <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Calculations
+          <h1 className="font-heading text-4xl font-semibold tracking-tight text-brand-navy sm:text-5xl">
+            Springvale Calculations
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
             Pick a calculator to open its dedicated page. Submissions go to

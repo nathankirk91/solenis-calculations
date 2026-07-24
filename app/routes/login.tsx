@@ -84,13 +84,15 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,_oklch(0.97_0.02_220),_transparent_55%),linear-gradient(180deg,_oklch(0.99_0.01_220),_oklch(0.96_0.015_200))] px-4">
-      <Card className="w-full max-w-md">
+    <div className="flex app-shell items-center justify-center px-4">
+      <Card className="w-full max-w-md border-border/80 shadow-sm">
         <CardHeader>
-          <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
+          <p className="text-xs font-semibold tracking-[0.2em] text-brand uppercase">
             Solenis
           </p>
-          <CardTitle className="text-2xl">Sign in</CardTitle>
+          <CardTitle className="font-heading text-2xl text-brand-navy">
+            Springvale sign in
+          </CardTitle>
           <CardDescription>
             Use your email and password to access plant calculators.
           </CardDescription>
