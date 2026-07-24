@@ -1,21 +1,18 @@
-import { parseWithZod } from "@conform-to/zod/v4";
-import { data, Link } from "react-router";
+import { Link } from "react-router";
 
 import type { Route } from "./+types/polymer-an04-adipic-deta";
 
 import { AppHeader } from "~/components/app-header";
 import { PolymerAdipicDetaForm } from "~/components/polymer-adipic-deta-form";
 import { Badge } from "~/components/ui/badge";
+import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
-import { getPrisma } from "~/lib/db.server";
-import {
-  POLYMER_AN04,
-  calculatePolymerAdipicDetaExtra,
-} from "~/lib/polymer-adipic-deta";
-import { createPolymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
+import { listActiveOperators } from "~/lib/operators.server";
+import { handlePolymerAdipicDetaSubmit } from "~/lib/polymer-adipic-deta-action.server";
+import { POLYMER_AN04 } from "~/lib/polymer-adipic-deta";
+import { canReviewRuns } from "~/lib/roles";
 
 const product = POLYMER_AN04;
-const schema = createPolymerAdipicDetaSchema(product);
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -29,46 +26,16 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request, product.href);
-  return { user };
+  const [operators, pendingCount] = await Promise.all([
+    listActiveOperators(),
+    canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
+  ]);
+  return { user, operators, pendingCount };
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireUser(request, product.href);
-
-  const formData = await request.formData();
-  const submission = parseWithZod(formData, { schema });
-
-  if (submission.status !== "success") {
-    return data(
-      { result: null, lastResult: submission.reply() },
-      { status: submission.status === "error" ? 400 : 200 },
-    );
-  }
-
-  const outputs = calculatePolymerAdipicDetaExtra(product, {
-    detaChargedKg: submission.value.detaChargedKg,
-    adipicAcidKg: submission.value.adipicAcidKg,
-  });
-
-  const prisma = getPrisma();
-  if (prisma) {
-    try {
-      await prisma.calculationRun.create({
-        data: {
-          calculationId: product.id,
-          inputs: submission.value,
-          outputs,
-        },
-      });
-    } catch {
-      // Persistence is best-effort; calculation result still returns to the UI.
-    }
-  }
-
-  return {
-    result: outputs,
-    lastResult: submission.reply(),
-  };
+  const user = await requireUser(request, product.href);
+  return handlePolymerAdipicDetaSubmit({ request, user, product });
 }
 
 export default function PolymerAn04AdipicDetaPage({
@@ -77,7 +44,10 @@ export default function PolymerAn04AdipicDetaPage({
 }: Route.ComponentProps) {
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_oklch(0.97_0.02_220),_transparent_55%),linear-gradient(180deg,_oklch(0.99_0.01_220),_oklch(0.96_0.015_200))]">
-      <AppHeader user={loaderData.user} />
+      <AppHeader
+        user={loaderData.user}
+        pendingCount={loaderData.pendingCount}
+      />
       <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -94,16 +64,18 @@ export default function PolymerAn04AdipicDetaPage({
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Charge ~90% DETA via drums/IBCs, then Adipic Acid mix weights (min
-            480 kg each). Enter each load to calculate how much extra DETA is
-            required.
+            480 kg each). Submit for management approval before vessel charge.
           </p>
         </div>
 
         <div className="animate-in fade-in slide-in-from-bottom-3 duration-500 delay-100">
           <PolymerAdipicDetaForm
             product={product}
+            operators={loaderData.operators}
             lastResult={actionData?.lastResult}
             result={actionData?.result}
+            status={actionData?.status}
+            formError={actionData?.formError}
           />
         </div>
       </main>

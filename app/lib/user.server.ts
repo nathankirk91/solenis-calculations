@@ -1,11 +1,13 @@
 import bcrypt from "bcryptjs";
 
 import { getPrisma } from "~/lib/db.server";
+import type { UserRole } from "~/lib/roles";
 
 export type AuthUser = {
   id: string;
   email: string;
   name: string | null;
+  role: UserRole;
 };
 
 export async function verifyLogin(
@@ -31,13 +33,33 @@ export async function verifyLogin(
     throw new Error("Invalid email or password.");
   }
 
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-  };
+  return toAuthUser(user);
+}
+
+export async function findAuthUserById(id: string): Promise<AuthUser | null> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return null;
+  }
+
+  const user = await prisma.user.findUnique({ where: { id } });
+  return user ? toAuthUser(user) : null;
 }
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
+}
+
+function toAuthUser(user: {
+  id: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+}): AuthUser {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  };
 }

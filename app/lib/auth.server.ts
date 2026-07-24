@@ -7,7 +7,12 @@ import {
   getSession,
   sessionStorage,
 } from "~/lib/session.server";
-import { verifyLogin, type AuthUser } from "~/lib/user.server";
+import { canReviewRuns, type UserRole } from "~/lib/roles";
+import {
+  findAuthUserById,
+  verifyLogin,
+  type AuthUser,
+} from "~/lib/user.server";
 
 export const authenticator = new Authenticator<AuthUser>();
 
@@ -29,21 +34,26 @@ export { sessionStorage };
 
 export async function getUser(request: Request): Promise<AuthUser | null> {
   const session = await getSession(request.headers.get("Cookie"));
-  const user = session.get("user");
-  return (user as AuthUser | undefined) ?? null;
+  const sessionUser = session.get("user") as AuthUser | undefined;
+  if (!sessionUser?.id) {
+    return null;
+  }
+
+  // Refresh from DB so role changes apply without forcing a re-login.
+  const fresh = await findAuthUserById(sessionUser.id);
+  return fresh ?? sessionUser;
 }
 
 export async function requireUser(
   request: Request,
   returnTo?: string,
 ): Promise<AuthUser> {
-  const session = await getSession(request.headers.get("Cookie"));
-  const user = session.get("user") as AuthUser | undefined;
-
+  const user = await getUser(request);
   if (user) {
     return user;
   }
 
+  const session = await getSession(request.headers.get("Cookie"));
   if (returnTo) {
     session.set("returnTo", returnTo);
   }
@@ -53,6 +63,29 @@ export async function requireUser(
       "Set-Cookie": await commitSession(session),
     },
   });
+}
+
+export async function requireRole(
+  request: Request,
+  roles: UserRole[],
+  returnTo?: string,
+): Promise<AuthUser> {
+  const user = await requireUser(request, returnTo);
+  if (!roles.includes(user.role)) {
+    throw redirect("/");
+  }
+  return user;
+}
+
+export async function requireReviewer(
+  request: Request,
+  returnTo = "/approvals",
+): Promise<AuthUser> {
+  const user = await requireUser(request, returnTo);
+  if (!canReviewRuns(user.role)) {
+    throw redirect("/");
+  }
+  return user;
 }
 
 export async function createUserSession(request: Request, user: AuthUser) {

@@ -1,13 +1,18 @@
 import { Form, Link } from "react-router";
 
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { canReviewRuns } from "~/lib/roles";
 import type { AuthUser } from "~/lib/user.server";
 
 type Props = {
   user?: AuthUser | null;
+  pendingCount?: number;
 };
 
-export function AppHeader({ user }: Props) {
+export function AppHeader({ user, pendingCount = 0 }: Props) {
+  const showApprovals = user ? canReviewRuns(user.role) : false;
+
   return (
     <header className="border-b border-border/60 bg-background/80 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -25,10 +30,26 @@ export function AppHeader({ user }: Props) {
             <Link to="/">All calculators</Link>
           </Button>
 
+          {showApprovals ? (
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <Link to="/approvals">
+                Approvals
+                {pendingCount > 0 ? (
+                  <Badge variant="secondary" className="tabular-nums">
+                    {pendingCount}
+                  </Badge>
+                ) : null}
+              </Link>
+            </Button>
+          ) : null}
+
           {user ? (
             <>
               <span className="hidden text-sm text-muted-foreground sm:inline">
-                {user.email}
+                {user.name ?? user.email}
+                <span className="ml-1 text-xs uppercase tracking-wide opacity-70">
+                  ({user.role.toLowerCase()})
+                </span>
               </span>
               <Form method="post" action="/logout">
                 <Button type="submit" variant="outline" size="sm">

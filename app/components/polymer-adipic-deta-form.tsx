@@ -1,12 +1,14 @@
 import {
   getFormProps,
   getInputProps,
+  getSelectProps,
   useForm,
   type SubmissionResult,
 } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import { Form, useNavigation } from "react-router";
 
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -26,18 +28,25 @@ import {
   type PolymerAdipicDetaResult,
 } from "~/lib/polymer-adipic-deta";
 import { createPolymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
+import type { OperatorOption } from "~/lib/operators.server";
 import { cn } from "~/lib/utils";
 
 type Props = {
   product: PolymerAdipicDetaProduct;
+  operators: OperatorOption[];
   lastResult?: SubmissionResult<string[]> | null;
   result?: PolymerAdipicDetaResult | null;
+  status?: "PENDING" | null;
+  formError?: string | null;
 };
 
 export function PolymerAdipicDetaForm({
   product,
+  operators,
   lastResult,
   result,
+  status,
+  formError,
 }: Props) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
@@ -52,6 +61,7 @@ export function PolymerAdipicDetaForm({
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
     defaultValue: {
+      operatorId: "",
       detaLoads: Array.from(
         { length: product.initialDetaLoadFields },
         () => "",
@@ -69,12 +79,48 @@ export function PolymerAdipicDetaForm({
         <CardHeader>
           <CardTitle>Make-up DETA</CardTitle>
           <CardDescription>
-            Enter each DETA drum/IBC pallet load and each Adipic Acid weight.
-            Ratio Adipic:DETA = {massRatio.toFixed(10)}.
+            Select the operator, enter DETA loads and Adipic Acid weights, then
+            submit for management approval. Ratio Adipic:DETA ={" "}
+            {massRatio.toFixed(10)}.
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
           <CardContent className="grid gap-6">
+            <section className="grid gap-2">
+              <Label htmlFor={fields.operatorId.id}>
+                Operator / who is doing this operation
+              </Label>
+              <select
+                {...getSelectProps(fields.operatorId)}
+                key={fields.operatorId.key}
+                className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+                required
+              >
+                <option value="">Select operator…</option>
+                {operators.map((operator) => (
+                  <option key={operator.id} value={operator.id}>
+                    {operator.name}
+                  </option>
+                ))}
+              </select>
+              {fields.operatorId.errors ? (
+                <p
+                  className="text-sm text-destructive"
+                  id={fields.operatorId.errorId}
+                >
+                  {fields.operatorId.errors}
+                </p>
+              ) : null}
+              {operators.length === 0 ? (
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  No active operators are configured. Ask an admin to seed the
+                  operator list.
+                </p>
+              ) : null}
+            </section>
+
+            <Separator />
+
             <section className="grid gap-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
@@ -179,10 +225,17 @@ export function PolymerAdipicDetaForm({
                 </p>
               ) : null}
             </section>
+
+            {formError ? (
+              <p className="text-sm text-destructive">{formError}</p>
+            ) : null}
           </CardContent>
           <CardFooter className="justify-end gap-2">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Calculating…" : "Calculate extra DETA"}
+            <Button
+              type="submit"
+              disabled={isSubmitting || operators.length === 0}
+            >
+              {isSubmitting ? "Submitting…" : "Submit for approval"}
             </Button>
           </CardFooter>
         </Form>
@@ -190,10 +243,15 @@ export function PolymerAdipicDetaForm({
 
       <Card className="bg-muted/30">
         <CardHeader>
-          <CardTitle>Results</CardTitle>
+          <CardTitle className="flex flex-wrap items-center gap-2">
+            Results
+            {status === "PENDING" ? (
+              <Badge variant="secondary">Pending approval</Badge>
+            ) : null}
+          </CardTitle>
           <CardDescription>
             Total DETA required for the Adipic charge, and the remaining DETA to
-            add.
+            add. Managers review pending submissions before vessel charge.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -215,6 +273,12 @@ export function PolymerAdipicDetaForm({
                 <p className="text-sm text-amber-700 dark:text-amber-400">
                   DETA already charged is above target by{" "}
                   {Math.abs(result.extraDetaKg)} kg for this Adipic amount.
+                </p>
+              ) : null}
+              {status === "PENDING" ? (
+                <p className="text-sm text-muted-foreground">
+                  Submitted for management approval. Do not add DETA to the
+                  vessel until a manager approves this run.
                 </p>
               ) : null}
               <Separator />
@@ -239,8 +303,8 @@ export function PolymerAdipicDetaForm({
             </dl>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Enter DETA loads and Adipic Acid weights to see the extra DETA
-              required.
+              Enter the operator, DETA loads, and Adipic Acid weights to
+              calculate and submit for approval.
             </p>
           )}
         </CardContent>

@@ -10,15 +10,48 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  OPERATOR
+  MANAGER
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum CalculationRunStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("calculation_run_status")
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String   @map("password_hash")
   name         String?
+  role         UserRole @default(OPERATOR)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  submittedRuns CalculationRun[] @relation("SubmittedBy")
+  reviewedRuns  CalculationRun[] @relation("ReviewedBy")
+
   @@map("users")
+}
+
+model Operator {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  runs      CalculationRun[]
+
+  @@index([isActive, sortOrder])
+  @@map("operators")
 }
 
 model Calculation {
@@ -37,14 +70,24 @@ model Calculation {
 }
 
 model CalculationRun {
-  id            String      @id @default(cuid())
-  calculationId String      @map("calculation_id")
-  calculation   Calculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
-  inputs        Json
-  outputs       Json
-  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  id               String                @id @default(cuid())
+  calculationId    String                @map("calculation_id")
+  calculation      Calculation           @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+  operatorId       String?               @map("operator_id")
+  operator         Operator?             @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  submittedById    String?               @map("submitted_by_id")
+  submittedBy      User?                 @relation("SubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  status           CalculationRunStatus  @default(PENDING)
+  inputs           Json
+  outputs          Json
+  reviewedById     String?               @map("reviewed_by_id")
+  reviewedBy       User?                 @relation("ReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?             @map("reviewed_at") @db.Timestamptz(6)
+  reviewNote       String?               @map("review_note")
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([calculationId])
+  @@index([status, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@map("calculation_runs")
 }

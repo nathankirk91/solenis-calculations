@@ -50,6 +50,9 @@ export function createPolymerAdipicDetaSchema(
 
   return z
     .object({
+      operatorId: z
+        .string({ error: "Select who is doing this operation." })
+        .min(1, "Select who is doing this operation."),
       detaLoads: z.array(detaLoadField).min(1, "Add at least one DETA load."),
       adipicBags: z
         .array(adipicBagField)
@@ -65,6 +68,7 @@ export function createPolymerAdipicDetaSchema(
       const adipicAcidKg = sumLoads(adipicBags);
 
       return {
+        operatorId: value.operatorId,
         detaLoads,
         adipicBags,
         detaChargedKg,

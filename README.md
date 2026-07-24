@@ -23,7 +23,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). Sign in with the seeded user (defaults: `admin@solenis.local` / `changeme`).
+Open [http://localhost:5173](http://localhost:5173). Sign in with a seeded account (see Auth below).
 
 Without `DATABASE_URL`, login cannot verify users against Prisma. Calculators require authentication.
 
@@ -47,11 +47,30 @@ Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` 
 - `/login` — email/password form
 - `/logout` — clears the session cookie
 - Home and calculator routes require a signed-in user
+- `/approvals` — managers and admin review pending runs
+
+Roles:
+
+| Role | Purpose |
+|---|---|
+| `OPERATOR` | Shared plant-floor login; submits calculations |
+| `MANAGER` | Personal email login; approves/rejects |
+| `ADMIN` | One admin account; same review access as manager |
 
 Seed credentials (override with env):
 
-- `SEED_USER_EMAIL` (default `admin@solenis.local`)
-- `SEED_USER_PASSWORD` (default `changeme`)
+- `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (also accepts legacy `SEED_USER_*`)
+- `SEED_OPERATOR_EMAIL` / `SEED_OPERATOR_PASSWORD` (shared operator login)
+- Optional `SEED_MANAGER_EMAIL` / `SEED_MANAGER_PASSWORD` / `SEED_MANAGER_NAME`
+
+Seed also creates placeholder operator names (`Operator A`–`D`) for the calculator dropdown.
+
+### Approval workflow
+
+1. Operator selects who is running the batch, enters weights, and clicks **Submit for approval**.
+2. The run is stored as `PENDING`.
+3. A manager/admin opens **Approvals**, reviews the numbers, and **Approves** or **Rejects**.
+4. Notifications (Teams/email) are intentionally deferred.
 
 ### Vercel
 
