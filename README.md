@@ -76,7 +76,7 @@ Seed also creates placeholder operator names (`Operator A`–`D`) for the calcul
 
 Optional env:
 
-- `APP_BASE_URL` — canonical site URL for push notification deep links (recommended on Vercel)
+- `APP_BASE_URL` — canonical site URL for push notification deep links (default / recommended: `https://solenis-calculations.vercel.app`)
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — Web Push for managers
 
 ### Manager phone setup
@@ -99,7 +99,7 @@ Set these on the Vercel project:
 - `DATABASE_URL` (required for login + persistence)
 - `DIRECT_URL` (optional on Vercel; needed for local/CI migrations)
 - `SESSION_SECRET` (required for secure cookies)
-- `APP_BASE_URL` (optional; deep links in push notifications)
+- `APP_BASE_URL` (recommended: `https://solenis-calculations.vercel.app`)
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (optional; manager phone push)
 
 The React Router Vercel preset lives in `react-router.config.ts`.
