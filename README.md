@@ -72,13 +72,11 @@ Seed also creates placeholder operator names (`Operator A`–`D`) for the calcul
 1. Operator selects who is running the batch, enters weights, and clicks **Submit for approval**.
 2. The run is stored as `PENDING`.
 3. A manager/admin opens **Approvals**, reviews the numbers, and **Approves** or **Rejects**.
-4. If `TEAMS_WEBHOOK_URL` is set, a Teams channel card is posted on submit (best-effort; submit still succeeds if Teams fails).
-5. Managers/admin can enable **phone push notifications** on `/approvals` (requires VAPID env keys).
+4. Managers/admin can enable **phone push notifications** on `/approvals` (requires VAPID env keys).
 
 Optional env:
 
-- `TEAMS_WEBHOOK_URL` — Teams Incoming Webhook / Workflows URL
-- `APP_BASE_URL` — canonical site URL for the “Open approvals” button (recommended on Vercel)
+- `APP_BASE_URL` — canonical site URL for push notification deep links (recommended on Vercel)
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — Web Push for managers
 
 ### Manager phone setup
@@ -101,8 +99,7 @@ Set these on the Vercel project:
 - `DATABASE_URL` (required for login + persistence)
 - `DIRECT_URL` (optional on Vercel; needed for local/CI migrations)
 - `SESSION_SECRET` (required for secure cookies)
-- `TEAMS_WEBHOOK_URL` (optional; Teams notify on pending submit)
-- `APP_BASE_URL` (optional; approvals link in Teams cards)
+- `APP_BASE_URL` (optional; deep links in push notifications)
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (optional; manager phone push)
 
 The React Router Vercel preset lives in `react-router.config.ts`.
