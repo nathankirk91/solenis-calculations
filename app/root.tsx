@@ -58,6 +58,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let message = "Oops!";
   let details = "An unexpected error occurred.";
   let stack: string | undefined;
+  let isChunkError = false;
 
   if (isRouteErrorResponse(error)) {
     message = error.status === 404 ? "404" : "Error";
@@ -65,9 +66,23 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       error.status === 404
         ? "The requested page could not be found."
         : error.statusText || details;
-  } else if (import.meta.env.DEV && error && error instanceof Error) {
-    details = error.message;
-    stack = error.stack;
+  } else if (error instanceof Error) {
+    isChunkError =
+      /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(
+        error.message,
+      );
+    details = isChunkError
+      ? "The app was updated. Reloading to fetch the latest version…"
+      : import.meta.env.DEV
+        ? error.message
+        : details;
+    stack = import.meta.env.DEV ? error.stack : undefined;
+  }
+
+  if (isChunkError && typeof window !== "undefined") {
+    queueMicrotask(() => {
+      window.location.reload();
+    });
   }
 
   return (
@@ -76,6 +91,15 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         {message}
       </h1>
       <p className="mt-2 text-muted-foreground">{details}</p>
+      {isChunkError ? (
+        <button
+          type="button"
+          className="mt-6 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+          onClick={() => window.location.reload()}
+        >
+          Reload now
+        </button>
+      ) : null}
       {stack ? (
         <pre className="mt-6 w-full overflow-x-auto rounded-lg bg-muted p-4 text-sm">
           <code>{stack}</code>
