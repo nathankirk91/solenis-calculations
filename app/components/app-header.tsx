@@ -31,6 +31,12 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
             <Link to="/">All calculators</Link>
           </Button>
 
+          {user ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/history">History</Link>
+            </Button>
+          ) : null}
+
           {showApprovals ? (
             <Button asChild variant="ghost" size="sm" className="gap-2">
               <Link to="/approvals">

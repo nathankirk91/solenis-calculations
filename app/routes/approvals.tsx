@@ -20,6 +20,7 @@ import {
   rejectRun,
 } from "~/lib/approvals.server";
 import { requireReviewer } from "~/lib/auth.server";
+import { formatMelbourneDateTime } from "~/lib/datetime";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -115,7 +116,10 @@ export default function ApprovalsPage({
           </Card>
         ) : (
           <div className="grid gap-4">
-            {pending.map((run, index) => (
+            {pending.map((run, index) => {
+              const submittedAt = formatMelbourneDateTime(run.createdAt);
+
+              return (
               <Card
                 key={run.id}
                 className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500"
@@ -132,8 +136,7 @@ export default function ApprovalsPage({
                         {run.submittedByEmail
                           ? ` · Submitted via ${run.submittedByEmail}`
                           : null}
-                        {" · "}
-                        {run.createdAt.toLocaleString()}
+                        {submittedAt ? ` · ${submittedAt}` : null}
                       </CardDescription>
                     </div>
                     <Badge>Pending</Badge>
@@ -215,7 +218,8 @@ export default function ApprovalsPage({
                   </Form>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

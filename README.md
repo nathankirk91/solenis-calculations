@@ -48,6 +48,8 @@ Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` 
 - `/logout` — clears the session cookie
 - Home and calculator routes require a signed-in user
 - `/approvals` — managers and admin review pending runs
+- `/history` — operators, managers, and admin view past submissions and approval status
+- `/operators` — managers and admin add/remove operator names
 
 Roles:
 
