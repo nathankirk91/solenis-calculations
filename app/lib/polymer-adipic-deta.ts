@@ -1,8 +1,4 @@
-export const ADIPIC_BAG_COUNT = 4;
-export const ADIPIC_BAG_MIN_KG = 950;
-export const ADIPIC_BAG_MAX_KG = 1020;
 export const DETA_LOAD_MAX_KG = 1000;
-export const INITIAL_DETA_LOAD_FIELDS = 4;
 
 export type PolymerAdipicDetaProduct = {
   id: string;
@@ -17,6 +13,16 @@ export type PolymerAdipicDetaProduct = {
   adipicMassParts: number;
   /** Mass parts for DETA in the process ratio. */
   detaMassParts: number;
+  /** Fixed number of Adipic Acid weight fields. */
+  adipicFieldCount: number;
+  /** Minimum kg allowed per Adipic Acid field. */
+  adipicFieldMinKg: number;
+  /** Maximum kg allowed per Adipic Acid field. */
+  adipicFieldMaxKg: number;
+  /** Number of DETA load fields shown on first load. */
+  initialDetaLoadFields: number;
+  /** Short helper copy under the Adipic section. */
+  adipicFieldHelp: string;
 };
 
 export const POLYMER_973: PolymerAdipicDetaProduct = {
@@ -31,6 +37,12 @@ export const POLYMER_973: PolymerAdipicDetaProduct = {
   sortOrder: 1,
   adipicMassParts: 4000,
   detaMassParts: 3195.2,
+  adipicFieldCount: 4,
+  adipicFieldMinKg: 950,
+  adipicFieldMaxKg: 1020,
+  initialDetaLoadFields: 4,
+  adipicFieldHelp:
+    "Fixed 4 pallets (2 × ~500 kg bulk bags each). Each pallet must be between 950 and 1020 kg.",
 };
 
 export const POLYMER_AN04: PolymerAdipicDetaProduct = {
@@ -45,9 +57,24 @@ export const POLYMER_AN04: PolymerAdipicDetaProduct = {
   sortOrder: 2,
   adipicMassParts: 5500,
   detaMassParts: 3899,
+  adipicFieldCount: 6,
+  adipicFieldMinKg: 0,
+  adipicFieldMaxKg: 480,
+  initialDetaLoadFields: 5,
+  adipicFieldHelp:
+    "Fixed 6 Adipic Acid mix weights. Each field must be at most 480 kg.",
 };
 
 export const POLYMER_ADIPIC_DETA_PRODUCTS = [POLYMER_973, POLYMER_AN04] as const;
+
+/** @deprecated Prefer product.adipicFieldCount — kept for Polymer 973 imports. */
+export const ADIPIC_BAG_COUNT = POLYMER_973.adipicFieldCount;
+/** @deprecated Prefer product.adipicFieldMinKg */
+export const ADIPIC_BAG_MIN_KG = POLYMER_973.adipicFieldMinKg;
+/** @deprecated Prefer product.adipicFieldMaxKg */
+export const ADIPIC_BAG_MAX_KG = POLYMER_973.adipicFieldMaxKg;
+/** @deprecated Prefer product.initialDetaLoadFields */
+export const INITIAL_DETA_LOAD_FIELDS = POLYMER_973.initialDetaLoadFields;
 
 export type PolymerAdipicDetaInputs = {
   detaChargedKg: number;
@@ -81,7 +108,7 @@ export function getAdipicToDetaMassRatio(
  *
  * Plant flow:
  * 1. Charge ~90% of the DETA via drums/IBCs
- * 2. Charge Adipic Acid (4 pallets of bulk bags; weights vary)
+ * 2. Charge Adipic Acid (product-specific field counts/weights)
  * 3. Enter both → calculate remaining DETA to hit the mass ratio
  */
 export function calculatePolymerAdipicDetaExtra(

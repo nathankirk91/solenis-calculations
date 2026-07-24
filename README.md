@@ -76,14 +76,17 @@ The React Router Vercel preset lives in `react-router.config.ts`.
 | Polymer 973 — Adipic Acid:DETA Ratio | `/calculations/polymer-973-adipic-deta` |
 | Polymer AN04 — Adipic Acid:DETA Ratio | `/calculations/polymer-an04-adipic-deta` |
 
-### Polymer 973 formula
+### Polymer Adipic:DETA formula
 
-Plant flow: charge ~90% DETA via drum/IBC pallets, then Adipic Acid (4 pallets of 2 × ~500 kg bags). Enter each load weight to get the remaining DETA.
+Plant flow: charge ~90% DETA via drum/IBC pallets, then Adipic Acid, and enter each load weight to get the remaining DETA.
 
-Mass ratio **Adipic:DETA = 1.2518778167** (`4000 / 3195.2`)
+| Product | Mass ratio (Adipic:DETA) | Adipic fields | Adipic max | Initial DETA fields |
+|---|---|---|---|---|
+| Polymer 973 | `4000 / 3195.2` → `1.2518778167` | 4 (950–1020 kg) | 1020 kg | 4 |
+| Polymer AN04 | `5500 / 3899` → `1.4106181072` | 6 | 480 kg | 5 |
 
 ```
-target DETA (kg) = Adipic Acid (kg) × (3195.2 / 4000)
+target DETA (kg) = Adipic Acid (kg) × (DETA parts / Adipic parts)
 extra DETA (kg)  = target DETA − DETA already charged
 ```
 

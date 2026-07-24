@@ -20,16 +20,12 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import {
-  ADIPIC_BAG_COUNT,
-  ADIPIC_BAG_MAX_KG,
-  ADIPIC_BAG_MIN_KG,
   DETA_LOAD_MAX_KG,
-  INITIAL_DETA_LOAD_FIELDS,
   getAdipicToDetaMassRatio,
   type PolymerAdipicDetaProduct,
   type PolymerAdipicDetaResult,
 } from "~/lib/polymer-adipic-deta";
-import { polymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
+import { createPolymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
 import { cn } from "~/lib/utils";
 
 type Props = {
@@ -46,17 +42,21 @@ export function PolymerAdipicDetaForm({
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
   const massRatio = getAdipicToDetaMassRatio(product);
+  const schema = createPolymerAdipicDetaSchema(product);
 
   const [form, fields] = useForm({
     lastResult: lastResult ?? undefined,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: polymerAdipicDetaSchema });
+      return parseWithZod(formData, { schema });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
     defaultValue: {
-      detaLoads: Array.from({ length: INITIAL_DETA_LOAD_FIELDS }, () => ""),
-      adipicBags: Array.from({ length: ADIPIC_BAG_COUNT }, () => ""),
+      detaLoads: Array.from(
+        { length: product.initialDetaLoadFields },
+        () => "",
+      ),
+      adipicBags: Array.from({ length: product.adipicFieldCount }, () => ""),
     },
   });
 
@@ -69,9 +69,8 @@ export function PolymerAdipicDetaForm({
         <CardHeader>
           <CardTitle>Make-up DETA</CardTitle>
           <CardDescription>
-            Enter each DETA drum/IBC pallet load and each Adipic Acid pallet
-            weight (2 × ~500 kg bags). Ratio Adipic:DETA ={" "}
-            {massRatio.toFixed(10)}.
+            Enter each DETA drum/IBC pallet load and each Adipic Acid weight.
+            Ratio Adipic:DETA = {massRatio.toFixed(10)}.
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
@@ -145,11 +144,9 @@ export function PolymerAdipicDetaForm({
 
             <section className="grid gap-3">
               <div>
-                <h3 className="font-medium">Adipic Acid pallets</h3>
+                <h3 className="font-medium">Adipic Acid mix</h3>
                 <p className="text-sm text-muted-foreground">
-                  Fixed {ADIPIC_BAG_COUNT} pallets (2 × ~500 kg bulk bags each).
-                  Each pallet must be between {ADIPIC_BAG_MIN_KG} and{" "}
-                  {ADIPIC_BAG_MAX_KG} kg.
+                  {product.adipicFieldHelp}
                 </p>
               </div>
 
@@ -157,15 +154,15 @@ export function PolymerAdipicDetaForm({
                 {adipicBagFields.map((field, index) => (
                   <div key={field.key} className="grid gap-2">
                     <Label htmlFor={field.id}>
-                      Adipic Acid pallet {index + 1} (kg)
+                      Adipic Acid {index + 1} (kg)
                     </Label>
                     <Input
                       {...getInputProps(field, { type: "number" })}
                       key={field.key}
                       step="any"
-                      min={ADIPIC_BAG_MIN_KG}
-                      max={ADIPIC_BAG_MAX_KG}
-                      placeholder="e.g. 1000"
+                      min={product.adipicFieldMinKg}
+                      max={product.adipicFieldMaxKg}
+                      placeholder={`e.g. ${Math.min(product.adipicFieldMaxKg, 1000)}`}
                       required
                     />
                     {field.errors ? (
@@ -242,8 +239,8 @@ export function PolymerAdipicDetaForm({
             </dl>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Enter DETA loads and Adipic Acid pallet weights to see the extra
-              DETA required.
+              Enter DETA loads and Adipic Acid weights to see the extra DETA
+              required.
             </p>
           )}
         </CardContent>

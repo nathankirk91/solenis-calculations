@@ -12,9 +12,10 @@ import {
   POLYMER_973,
   calculatePolymerAdipicDetaExtra,
 } from "~/lib/polymer-adipic-deta";
-import { polymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
+import { createPolymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
 
 const product = POLYMER_973;
+const schema = createPolymerAdipicDetaSchema(product);
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -35,7 +36,7 @@ export async function action({ request }: Route.ActionArgs) {
   await requireUser(request, product.href);
 
   const formData = await request.formData();
-  const submission = parseWithZod(formData, { schema: polymerAdipicDetaSchema });
+  const submission = parseWithZod(formData, { schema });
 
   if (submission.status !== "success") {
     return data(

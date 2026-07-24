@@ -12,9 +12,10 @@ import {
   POLYMER_AN04,
   calculatePolymerAdipicDetaExtra,
 } from "~/lib/polymer-adipic-deta";
-import { polymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
+import { createPolymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
 
 const product = POLYMER_AN04;
+const schema = createPolymerAdipicDetaSchema(product);
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -35,7 +36,7 @@ export async function action({ request }: Route.ActionArgs) {
   await requireUser(request, product.href);
 
   const formData = await request.formData();
-  const submission = parseWithZod(formData, { schema: polymerAdipicDetaSchema });
+  const submission = parseWithZod(formData, { schema });
 
   if (submission.status !== "success") {
     return data(
@@ -92,8 +93,8 @@ export default function PolymerAn04AdipicDetaPage({
             {product.title}
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Charge ~90% DETA via drums/IBCs, then Adipic Acid pallets (bulk-bag
-            actual weights). Enter each load to calculate how much extra DETA is
+            Charge ~90% DETA via drums/IBCs, then Adipic Acid mix weights (max
+            480 kg each). Enter each load to calculate how much extra DETA is
             required.
           </p>
         </div>
