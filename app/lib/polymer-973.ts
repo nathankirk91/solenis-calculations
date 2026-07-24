@@ -12,7 +12,7 @@ export const ADIPIC_BAG_COUNT = 4;
 export const ADIPIC_BAG_MIN_KG = 950;
 export const ADIPIC_BAG_MAX_KG = 1020;
 export const DETA_LOAD_MAX_KG = 1000;
-export const INITIAL_DETA_LOAD_FIELDS = 3;
+export const INITIAL_DETA_LOAD_FIELDS = 4;
 
 export type Polymer973Inputs = {
   /** DETA already charged (sum of drum/IBC pallet loads). */
