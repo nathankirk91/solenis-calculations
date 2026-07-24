@@ -74,6 +74,7 @@ The React Router Vercel preset lives in `react-router.config.ts`.
 | Calculator | Route |
 |---|---|
 | Polymer 973 — Adipic Acid:DETA Ratio | `/calculations/polymer-973-adipic-deta` |
+| Polymer AN04 — Adipic Acid:DETA Ratio | `/calculations/polymer-an04-adipic-deta` |
 
 ### Polymer 973 formula
 

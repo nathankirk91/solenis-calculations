@@ -8,4 +8,8 @@ export default [
     "calculations/polymer-973-adipic-deta",
     "routes/polymer-973-adipic-deta.tsx",
   ),
+  route(
+    "calculations/polymer-an04-adipic-deta",
+    "routes/polymer-an04-adipic-deta.tsx",
+  ),
 ] satisfies RouteConfig;

@@ -1,3 +1,5 @@
+import { POLYMER_ADIPIC_DETA_PRODUCTS } from "~/lib/polymer-adipic-deta";
+
 export type CalculationCard = {
   id: string;
   slug: string;
@@ -9,15 +11,13 @@ export type CalculationCard = {
 };
 
 /** Fallback catalog used when Supabase is not configured yet. */
-export const FALLBACK_CALCULATIONS: CalculationCard[] = [
-  {
-    id: "polymer-973-adipic-deta",
-    slug: "polymer-973-adipic-deta",
-    title: "Polymer 973 — Adipic Acid:DETA Ratio",
-    description:
-      "After charging ~90% DETA and all Adipic Acid, calculate the extra DETA required.",
+export const FALLBACK_CALCULATIONS: CalculationCard[] =
+  POLYMER_ADIPIC_DETA_PRODUCTS.map((product) => ({
+    id: product.id,
+    slug: product.slug,
+    title: product.title,
+    description: product.description,
     category: "Polymer",
-    href: "/calculations/polymer-973-adipic-deta",
+    href: product.href,
     isAvailable: true,
-  },
-];
+  }));

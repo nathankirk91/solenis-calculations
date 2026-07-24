@@ -1,7 +1,7 @@
 import { parseWithZod } from "@conform-to/zod/v4";
 import { data, Link } from "react-router";
 
-import type { Route } from "./+types/polymer-973-adipic-deta";
+import type { Route } from "./+types/polymer-an04-adipic-deta";
 
 import { AppHeader } from "~/components/app-header";
 import { PolymerAdipicDetaForm } from "~/components/polymer-adipic-deta-form";
@@ -9,12 +9,12 @@ import { Badge } from "~/components/ui/badge";
 import { requireUser } from "~/lib/auth.server";
 import { getPrisma } from "~/lib/db.server";
 import {
-  POLYMER_973,
+  POLYMER_AN04,
   calculatePolymerAdipicDetaExtra,
 } from "~/lib/polymer-adipic-deta";
 import { polymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
 
-const product = POLYMER_973;
+const product = POLYMER_AN04;
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -70,7 +70,7 @@ export async function action({ request }: Route.ActionArgs) {
   };
 }
 
-export default function Polymer973AdipicDetaPage({
+export default function PolymerAn04AdipicDetaPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
