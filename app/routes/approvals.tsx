@@ -3,6 +3,7 @@ import { data, Form, Link } from "react-router";
 import type { Route } from "./+types/approvals";
 
 import { AppHeader } from "~/components/app-header";
+import { ManagerPushSetup } from "~/components/manager-push-setup";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -21,6 +22,10 @@ import {
 } from "~/lib/approvals.server";
 import { requireReviewer } from "~/lib/auth.server";
 import { formatMelbourneDateTime } from "~/lib/datetime";
+import {
+  getVapidPublicKey,
+  userHasPushSubscription,
+} from "~/lib/push.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -34,8 +39,12 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireReviewer(request);
-  const pending = await listPendingRuns();
-  return { user, pending };
+  const [pending, vapidPublicKey, pushSubscribed] = await Promise.all([
+    listPendingRuns(),
+    Promise.resolve(getVapidPublicKey()),
+    userHasPushSubscription(user.id),
+  ]);
+  return { user, pending, vapidPublicKey, pushSubscribed };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -78,7 +87,7 @@ export default function ApprovalsPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { user, pending } = loaderData;
+  const { user, pending, vapidPublicKey, pushSubscribed } = loaderData;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_oklch(0.97_0.02_220),_transparent_55%),linear-gradient(180deg,_oklch(0.99_0.01_220),_oklch(0.96_0.015_200))]">
@@ -103,6 +112,13 @@ export default function ApprovalsPage({
           {actionData && "error" in actionData && actionData.error ? (
             <p className="mt-3 text-sm text-destructive">{actionData.error}</p>
           ) : null}
+        </div>
+
+        <div className="mb-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+          <ManagerPushSetup
+            vapidPublicKey={vapidPublicKey}
+            initiallySubscribed={pushSubscribed}
+          />
         </div>
 
         {pending.length === 0 ? (

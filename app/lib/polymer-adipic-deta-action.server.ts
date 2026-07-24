@@ -14,6 +14,7 @@ import {
   getAppBaseUrl,
   notifyTeamsPendingApproval,
 } from "~/lib/teams.server";
+import { notifyManagersPush } from "~/lib/push.server";
 import type { AuthUser } from "~/lib/user.server";
 
 export type PolymerSubmitActionData = {
@@ -94,9 +95,7 @@ export async function handlePolymerAdipicDetaSubmit(args: {
 
   if (runId) {
     const approvalsUrl = `${getAppBaseUrl(request)}/approvals`;
-    // Must await on Vercel serverless — fire-and-forget is frozen before fetch completes.
-    // notifyTeamsPendingApproval never throws, so submit still succeeds on Teams failures.
-    const teamsResult = await notifyTeamsPendingApproval({
+    const notification = {
       calculationTitle: product.title,
       operatorName: operator.name,
       extraDetaKg: outputs.extraDetaKg,
@@ -107,9 +106,24 @@ export async function handlePolymerAdipicDetaSubmit(args: {
       adipicBags: submission.value.adipicBags,
       approvalsUrl,
       submittedAt: new Date(),
-    });
+    };
+
+    // Must await on Vercel serverless — fire-and-forget is frozen before fetch completes.
+    const [teamsResult, pushResult] = await Promise.all([
+      notifyTeamsPendingApproval(notification),
+      notifyManagersPush({
+        title: "Calculation pending approval",
+        message: `${product.shortName}: Extra DETA ${outputs.extraDetaKg} kg (${operator.name})`,
+        url: approvalsUrl,
+        tag: `pending-${runId}`,
+      }),
+    ]);
+
     if (!teamsResult.sent) {
       console.warn("Teams notification skipped/failed:", teamsResult.reason);
+    }
+    if (pushResult.sent === 0 && pushResult.reason) {
+      console.warn("Web push skipped/failed:", pushResult.reason);
     }
   }
 
