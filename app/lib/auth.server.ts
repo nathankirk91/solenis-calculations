@@ -8,6 +8,7 @@ import {
   sessionStorage,
 } from "~/lib/session.server";
 import {
+  canManageManagers,
   canManageOperators,
   canReviewRuns,
   type UserRole,
@@ -98,6 +99,17 @@ export async function requireOperatorManager(
 ): Promise<AuthUser> {
   const user = await requireUser(request, returnTo);
   if (!canManageOperators(user.role)) {
+    throw redirect("/");
+  }
+  return user;
+}
+
+export async function requireAdmin(
+  request: Request,
+  returnTo = "/managers",
+): Promise<AuthUser> {
+  const user = await requireUser(request, returnTo);
+  if (!canManageManagers(user.role)) {
     throw redirect("/");
   }
   return user;

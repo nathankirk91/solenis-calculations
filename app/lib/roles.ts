@@ -13,3 +13,7 @@ export function canReviewRuns(role: UserRole): boolean {
 export function canManageOperators(role: UserRole): boolean {
   return isManagerOrAdmin(role);
 }
+
+export function canManageManagers(role: UserRole): boolean {
+  return role === "ADMIN";
+}

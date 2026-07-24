@@ -4,7 +4,11 @@ import { MenuIcon, XIcon } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { canManageOperators, canReviewRuns } from "~/lib/roles";
+import {
+  canManageManagers,
+  canManageOperators,
+  canReviewRuns,
+} from "~/lib/roles";
 import type { AuthUser } from "~/lib/user.server";
 import { cn } from "~/lib/utils";
 
@@ -25,6 +29,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
   const menuId = useId();
   const showApprovals = user ? canReviewRuns(user.role) : false;
   const showOperators = user ? canManageOperators(user.role) : false;
+  const showManagers = user ? canManageManagers(user.role) : false;
 
   useEffect(() => {
     setOpen(false);
@@ -62,6 +67,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
         ]
       : []),
     ...(showOperators ? [{ to: "/operators", label: "Operators" }] : []),
+    ...(showManagers ? [{ to: "/managers", label: "Managers" }] : []),
     ...(showApprovals ? [{ to: "/settings", label: "Settings" }] : []),
   ];
 
