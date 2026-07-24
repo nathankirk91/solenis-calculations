@@ -16,7 +16,7 @@ self.addEventListener("push", function (event) {
   const title = data.title || "Solenis Calculations";
   const message =
     data.message || "A calculation is waiting for approval.";
-  const icon = data.icon || "/favicon.ico";
+  const icon = data.icon || "/icon-192.png";
   const url = data.url || "/approvals";
 
   event.waitUntil(
