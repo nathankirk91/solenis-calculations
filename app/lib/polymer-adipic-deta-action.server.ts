@@ -1,6 +1,6 @@
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { SubmissionResult } from "@conform-to/react";
-import { data } from "react-router";
+import { data, redirect } from "react-router";
 
 import { createPendingCalculationRun } from "~/lib/approvals.server";
 import { getActiveOperatorById } from "~/lib/operators.server";
@@ -90,26 +90,33 @@ export async function handlePolymerAdipicDetaSubmit(args: {
     );
   }
 
-  if (runId) {
-    const approvalsUrl = `${getAppBaseUrl(request)}/approvals`;
-
-    // Must await on Vercel serverless — fire-and-forget is frozen before fetch completes.
-    const pushResult = await notifyManagersPush({
-      title: "Calculation pending approval",
-      message: `${product.shortName}: Extra DETA ${outputs.extraDetaKg} kg (${operator.name})`,
-      url: approvalsUrl,
-      tag: `pending-${runId}`,
-    });
-
-    if (pushResult.sent === 0 && pushResult.reason) {
-      console.warn("Web push skipped/failed:", pushResult.reason);
-    }
+  if (!runId) {
+    return data(
+      {
+        result: outputs,
+        runId: null,
+        status: null,
+        lastResult: submission.reply(),
+        formError:
+          "Calculated successfully, but could not save for approval. Try again.",
+      } satisfies PolymerSubmitActionData,
+      { status: 500 },
+    );
   }
 
-  return {
-    result: outputs,
-    runId,
-    status: runId ? ("PENDING" as const) : null,
-    lastResult: submission.reply(),
-  } satisfies PolymerSubmitActionData;
+  const approvalsUrl = `${getAppBaseUrl(request)}/approvals`;
+
+  // Must await on Vercel serverless — fire-and-forget is frozen before fetch completes.
+  const pushResult = await notifyManagersPush({
+    title: "Calculation pending approval",
+    message: `${product.shortName}: Extra DETA ${outputs.extraDetaKg} kg (${operator.name})`,
+    url: approvalsUrl,
+    tag: `pending-${runId}`,
+  });
+
+  if (pushResult.sent === 0 && pushResult.reason) {
+    console.warn("Web push skipped/failed:", pushResult.reason);
+  }
+
+  throw redirect(`/submissions/${runId}`);
 }
