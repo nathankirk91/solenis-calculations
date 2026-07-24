@@ -43,9 +43,8 @@ export const POLYMER_AN04: PolymerAdipicDetaProduct = {
   href: "/calculations/polymer-an04-adipic-deta",
   category: "polymer",
   sortOrder: 2,
-  // Same mass ratio as 973 unless a product-specific ratio is provided later.
-  adipicMassParts: 4000,
-  detaMassParts: 3195.2,
+  adipicMassParts: 5500,
+  detaMassParts: 3899,
 };
 
 export const POLYMER_ADIPIC_DETA_PRODUCTS = [POLYMER_973, POLYMER_AN04] as const;

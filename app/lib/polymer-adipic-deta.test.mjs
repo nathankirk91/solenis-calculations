@@ -10,23 +10,39 @@ const {
 } = await import("./polymer-adipic-deta.ts");
 
 assert.equal(getAdipicToDetaMassRatio(POLYMER_973).toFixed(10), "1.2518778167");
+assert.equal(getAdipicToDetaMassRatio(POLYMER_AN04).toFixed(10), "1.4106181072");
 assert.equal(sumLoads([900, 900, 800]), 2600);
 assert.equal(sumLoads([1000, 1000, 1000, 1000]), 4000);
 
-const full = calculatePolymerAdipicDetaExtra(POLYMER_973, {
+const full973 = calculatePolymerAdipicDetaExtra(POLYMER_973, {
   adipicAcidKg: 4000,
   detaChargedKg: 0,
 });
-assert.equal(full.targetDetaKg, 3195);
-assert.equal(full.extraDetaKg, 3195);
-assert.equal(full.massRatioLabel, "1.2518778167");
+assert.equal(full973.targetDetaKg, 3195);
+assert.equal(full973.extraDetaKg, 3195);
+assert.equal(full973.massRatioLabel, "1.2518778167");
 
-const ninety = calculatePolymerAdipicDetaExtra(POLYMER_973, {
+const ninety973 = calculatePolymerAdipicDetaExtra(POLYMER_973, {
   adipicAcidKg: 4000,
   detaChargedKg: 2876,
 });
-assert.equal(ninety.targetDetaKg, 3195);
-assert.equal(ninety.extraDetaKg, 319);
+assert.equal(ninety973.targetDetaKg, 3195);
+assert.equal(ninety973.extraDetaKg, 319);
+
+const fullAn04 = calculatePolymerAdipicDetaExtra(POLYMER_AN04, {
+  adipicAcidKg: 5500,
+  detaChargedKg: 0,
+});
+assert.equal(fullAn04.targetDetaKg, 3899);
+assert.equal(fullAn04.extraDetaKg, 3899);
+assert.equal(fullAn04.massRatioLabel, "1.4106181072");
+
+const ninetyAn04 = calculatePolymerAdipicDetaExtra(POLYMER_AN04, {
+  adipicAcidKg: 5500,
+  detaChargedKg: 3510,
+});
+assert.equal(ninetyAn04.targetDetaKg, 3899);
+assert.equal(ninetyAn04.extraDetaKg, 389);
 
 const adipic = 995 + 1002 + 988 + 1010;
 const deta = 900 + 850 + 920;
