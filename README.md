@@ -54,8 +54,8 @@ Roles:
 | Role | Purpose |
 |---|---|
 | `OPERATOR` | Shared plant-floor login; submits calculations |
-| `MANAGER` | Personal email login; approves/rejects |
-| `ADMIN` | One admin account; same review access as manager |
+| `MANAGER` | Personal email login; approves/rejects; manages operator names |
+| `ADMIN` | One admin account; same review and operator management as manager |
 
 Seed credentials (override with env):
 
@@ -63,7 +63,7 @@ Seed credentials (override with env):
 - `SEED_OPERATOR_EMAIL` / `SEED_OPERATOR_PASSWORD` (shared operator login)
 - Optional `SEED_MANAGER_EMAIL` / `SEED_MANAGER_PASSWORD` / `SEED_MANAGER_NAME`
 
-Seed also creates placeholder operator names (`Operator A`–`D`) for the calculator dropdown.
+Seed also creates placeholder operator names (`Operator A`–`D`) for the calculator dropdown. Managers can add/remove operators at `/operators`.
 
 ### Approval workflow
 

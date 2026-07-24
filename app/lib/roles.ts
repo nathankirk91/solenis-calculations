@@ -9,3 +9,7 @@ export function isManagerOrAdmin(role: UserRole): boolean {
 export function canReviewRuns(role: UserRole): boolean {
   return isManagerOrAdmin(role);
 }
+
+export function canManageOperators(role: UserRole): boolean {
+  return isManagerOrAdmin(role);
+}

@@ -7,7 +7,11 @@ import {
   getSession,
   sessionStorage,
 } from "~/lib/session.server";
-import { canReviewRuns, type UserRole } from "~/lib/roles";
+import {
+  canManageOperators,
+  canReviewRuns,
+  type UserRole,
+} from "~/lib/roles";
 import {
   findAuthUserById,
   verifyLogin,
@@ -83,6 +87,17 @@ export async function requireReviewer(
 ): Promise<AuthUser> {
   const user = await requireUser(request, returnTo);
   if (!canReviewRuns(user.role)) {
+    throw redirect("/");
+  }
+  return user;
+}
+
+export async function requireOperatorManager(
+  request: Request,
+  returnTo = "/operators",
+): Promise<AuthUser> {
+  const user = await requireUser(request, returnTo);
+  if (!canManageOperators(user.role)) {
     throw redirect("/");
   }
   return user;

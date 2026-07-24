@@ -2,7 +2,7 @@ import { Form, Link } from "react-router";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { canReviewRuns } from "~/lib/roles";
+import { canManageOperators, canReviewRuns } from "~/lib/roles";
 import type { AuthUser } from "~/lib/user.server";
 
 type Props = {
@@ -12,6 +12,7 @@ type Props = {
 
 export function AppHeader({ user, pendingCount = 0 }: Props) {
   const showApprovals = user ? canReviewRuns(user.role) : false;
+  const showOperators = user ? canManageOperators(user.role) : false;
 
   return (
     <header className="border-b border-border/60 bg-background/80 backdrop-blur-sm">
@@ -40,6 +41,12 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
                   </Badge>
                 ) : null}
               </Link>
+            </Button>
+          ) : null}
+
+          {showOperators ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/operators">Operators</Link>
             </Button>
           ) : null}
 
