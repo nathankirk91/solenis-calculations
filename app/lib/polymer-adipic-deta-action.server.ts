@@ -10,6 +10,10 @@ import {
   type PolymerAdipicDetaResult,
 } from "~/lib/polymer-adipic-deta";
 import { createPolymerAdipicDetaSchema } from "~/lib/polymer-adipic-deta.schema";
+import {
+  getAppBaseUrl,
+  notifyTeamsPendingApproval,
+} from "~/lib/teams.server";
 import type { AuthUser } from "~/lib/user.server";
 
 export type PolymerSubmitActionData = {
@@ -86,6 +90,24 @@ export async function handlePolymerAdipicDetaSubmit(args: {
       } satisfies PolymerSubmitActionData,
       { status: 500 },
     );
+  }
+
+  if (runId) {
+    const approvalsUrl = `${getAppBaseUrl(request)}/approvals`;
+    // Fire-and-forget: never block or fail the operator submit on Teams issues.
+    void notifyTeamsPendingApproval({
+      calculationTitle: product.title,
+      operatorName: operator.name,
+      submittedByEmail: user.email,
+      extraDetaKg: outputs.extraDetaKg,
+      targetDetaKg: outputs.targetDetaKg,
+      detaChargedKg: outputs.detaChargedKg,
+      adipicAcidKg: outputs.adipicAcidKg,
+      detaLoads: submission.value.detaLoads,
+      adipicBags: submission.value.adipicBags,
+      approvalsUrl,
+      submittedAt: new Date(),
+    });
   }
 
   return {

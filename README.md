@@ -70,7 +70,12 @@ Seed also creates placeholder operator names (`Operator A`–`D`) for the calcul
 1. Operator selects who is running the batch, enters weights, and clicks **Submit for approval**.
 2. The run is stored as `PENDING`.
 3. A manager/admin opens **Approvals**, reviews the numbers, and **Approves** or **Rejects**.
-4. Notifications (Teams/email) are intentionally deferred.
+4. If `TEAMS_WEBHOOK_URL` is set, a Teams channel card is posted on submit (best-effort; submit still succeeds if Teams fails).
+
+Optional env:
+
+- `TEAMS_WEBHOOK_URL` — Teams Incoming Webhook / Workflows URL
+- `APP_BASE_URL` — canonical site URL for the “Open approvals” button (recommended on Vercel)
 
 ### Vercel
 
@@ -85,6 +90,8 @@ Set these on the Vercel project:
 - `DATABASE_URL` (required for login + persistence)
 - `DIRECT_URL` (optional on Vercel; needed for local/CI migrations)
 - `SESSION_SECRET` (required for secure cookies)
+- `TEAMS_WEBHOOK_URL` (optional; Teams notify on pending submit)
+- `APP_BASE_URL` (optional; approvals link in Teams cards)
 
 The React Router Vercel preset lives in `react-router.config.ts`.
 
