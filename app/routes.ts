@@ -6,6 +6,7 @@ export default [
   route("logout", "routes/logout.tsx"),
   route("approvals", "routes/approvals.tsx"),
   route("operators", "routes/operators.tsx"),
+  route("managers", "routes/managers.tsx"),
   route("history", "routes/history.tsx"),
   route("settings", "routes/settings.tsx"),
   route("push/subscribe", "routes/push-subscribe.tsx"),
