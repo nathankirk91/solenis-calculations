@@ -24,7 +24,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Operators | Solenis Calculations" },
+    { title: "Operators | Springvale Solenis" },
     {
       name: "description",
       content: "Add or remove plant operators for calculation submissions.",

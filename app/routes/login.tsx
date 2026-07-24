@@ -28,7 +28,7 @@ const loginSchema = z.object({
 });
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "Sign in | Solenis Calculations" }];
+  return [{ title: "Sign in | Springvale Solenis" }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {

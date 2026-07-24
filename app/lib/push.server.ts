@@ -123,7 +123,7 @@ async function sendPushToSubscriptions(
     message: payload.message,
     url: payload.url,
     tag: payload.tag,
-    icon: payload.icon || "/icon-192.png",
+    icon: payload.icon || "/brand/icon-192.png",
   });
 
   let sent = 0;

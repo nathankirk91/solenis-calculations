@@ -23,7 +23,7 @@ import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "History | Solenis Calculations" },
+    { title: "History | Springvale Solenis" },
     {
       name: "description",
       content:

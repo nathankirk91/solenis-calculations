@@ -24,7 +24,7 @@ import { formatMelbourneDateTime } from "~/lib/datetime";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Approvals | Solenis Calculations" },
+    { title: "Approvals | Springvale Solenis" },
     {
       name: "description",
       content: "Review pending calculation runs before vessel charge.",

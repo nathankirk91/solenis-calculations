@@ -23,7 +23,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Settings | Solenis Calculations" },
+    { title: "Settings | Springvale Solenis" },
     {
       name: "description",
       content: "Manager settings for push notifications.",
@@ -52,7 +52,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const result = await notifyUserPush(user.id, {
-    title: "Solenis Calculations test",
+    title: "Springvale Solenis test",
     message: "Push notifications are working on this device.",
     url: `${getAppBaseUrl(request)}/settings`,
     tag: `test-${user.id}-${Date.now()}`,

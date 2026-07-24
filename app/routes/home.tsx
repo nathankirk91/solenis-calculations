@@ -13,7 +13,7 @@ import { canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Solenis Calculations" },
+    { title: "Springvale Solenis" },
     {
       name: "description",
       content: "Plant calculation tools for Solenis production processes.",

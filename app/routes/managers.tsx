@@ -20,7 +20,7 @@ import { createManager, listManagers } from "~/lib/user.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Managers | Solenis Calculations" },
+    { title: "Managers | Springvale Solenis" },
     {
       name: "description",
       content: "Add manager accounts that can approve plant calculations.",

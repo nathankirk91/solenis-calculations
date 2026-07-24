@@ -12,9 +12,21 @@ import "./app.css";
 
 export const links: Route.LinksFunction = () => [
   { rel: "manifest", href: "/manifest.webmanifest" },
-  { rel: "icon", href: "/favicon.ico?v=2", sizes: "any" },
-  { rel: "icon", href: "/icon.svg?v=2", type: "image/svg+xml" },
-  { rel: "apple-touch-icon", href: "/apple-touch-icon.png?v=2" },
+  {
+    rel: "icon",
+    href: "/brand/favicon-32.png",
+    type: "image/png",
+    sizes: "32x32",
+  },
+  {
+    rel: "icon",
+    href: "/brand/favicon-16.png",
+    type: "image/png",
+    sizes: "16x16",
+  },
+  { rel: "icon", href: "/brand/icon.svg", type: "image/svg+xml" },
+  { rel: "shortcut icon", href: "/brand/favicon.ico" },
+  { rel: "apple-touch-icon", href: "/brand/apple-touch-icon.png" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
