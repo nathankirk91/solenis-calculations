@@ -7,7 +7,6 @@ const { buildTeamsApprovalPayload, getAppBaseUrl } = await import(
 const payload = buildTeamsApprovalPayload({
   calculationTitle: "Polymer 973 — Adipic Acid:DETA Ratio",
   operatorName: "Operator A",
-  submittedByEmail: "springvale@solenis.com",
   extraDetaKg: 319,
   targetDetaKg: 3195,
   detaChargedKg: 2876,
@@ -34,6 +33,10 @@ assert.ok(facts);
 assert.equal(
   facts.facts.find((fact) => fact.title === "Operator")?.value,
   "Operator A",
+);
+assert.ok(
+  !facts.facts.some((fact) => fact.title === "Submitted by"),
+  "Submitted by should not appear in Teams facts",
 );
 
 assert.equal(

@@ -1,7 +1,6 @@
 export type TeamsApprovalNotification = {
   calculationTitle: string;
   operatorName: string;
-  submittedByEmail: string;
   extraDetaKg: number;
   targetDetaKg: number;
   detaChargedKg: number;
@@ -66,7 +65,6 @@ export function buildTeamsApprovalPayload(notification: TeamsApprovalNotificatio
               type: "FactSet",
               facts: [
                 { title: "Operator", value: notification.operatorName },
-                { title: "Submitted by", value: notification.submittedByEmail },
                 { title: "Submitted", value: submittedAt },
                 {
                   title: "Extra DETA",

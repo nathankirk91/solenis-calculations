@@ -98,7 +98,6 @@ export async function handlePolymerAdipicDetaSubmit(args: {
     void notifyTeamsPendingApproval({
       calculationTitle: product.title,
       operatorName: operator.name,
-      submittedByEmail: user.email,
       extraDetaKg: outputs.extraDetaKg,
       targetDetaKg: outputs.targetDetaKg,
       detaChargedKg: outputs.detaChargedKg,
