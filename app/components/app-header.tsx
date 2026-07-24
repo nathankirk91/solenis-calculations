@@ -56,6 +56,12 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
             </Button>
           ) : null}
 
+          {showApprovals ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/settings">Settings</Link>
+            </Button>
+          ) : null}
+
           {user ? (
             <>
               <span className="hidden text-sm text-muted-foreground sm:inline">

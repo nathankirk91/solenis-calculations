@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { Form, useNavigation } from "react-router";
 
 import { Button } from "~/components/ui/button";
 
 type Props = {
   vapidPublicKey: string | null;
   initiallySubscribed: boolean;
+  testResult?: string | null;
+  testError?: string | null;
 };
 
 type Status =
@@ -33,7 +36,14 @@ async function registerServiceWorker() {
 export function ManagerPushSetup({
   vapidPublicKey,
   initiallySubscribed,
+  testResult,
+  testError,
 }: Props) {
+  const navigation = useNavigation();
+  const isTesting =
+    navigation.state !== "idle" &&
+    navigation.formData?.get("intent") === "test-push";
+
   const [status, setStatus] = useState<Status>("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,11 +60,11 @@ export function ManagerPushSetup({
         !("Notification" in window)
       ) {
         if (!cancelled) {
-          setStatus(vapidPublicKey ? "unsupported" : "unsupported");
+          setStatus("unsupported");
           setMessage(
             vapidPublicKey
               ? "Push notifications are not supported in this browser."
-              : "Push notifications are not configured on the server yet.",
+              : "Push notifications are not configured on the server yet (VAPID keys missing).",
           );
         }
         return;
@@ -178,42 +188,67 @@ export function ManagerPushSetup({
   }
 
   if (status === "loading") {
-    return null;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Checking notification support…
+      </p>
+    );
   }
 
   return (
-    <div className="rounded-lg border border-border/70 bg-background/60 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-medium">Phone push notifications</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Enable on this device (or install the app to your phone home screen)
-            to get notified when a calculation is submitted for approval.
-          </p>
-          {message ? (
-            <p className="mt-2 text-sm text-muted-foreground">{message}</p>
-          ) : null}
-        </div>
-        <div className="shrink-0">
-          {status === "subscribed" ? (
+    <div className="grid gap-4">
+      <div>
+        <h2 className="font-medium">Phone push notifications</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Enable on this phone or computer, then use Send test notification to
+          confirm it works. Install the site to your home screen for the best
+          phone experience.
+        </p>
+      </div>
+
+      {message ? (
+        <p className="text-sm text-muted-foreground">{message}</p>
+      ) : null}
+      {testResult ? (
+        <p className="text-sm text-emerald-700 dark:text-emerald-400">
+          {testResult}
+        </p>
+      ) : null}
+      {testError ? (
+        <p className="text-sm text-destructive">{testError}</p>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        {status === "subscribed" ? (
+          <>
             <Button
               type="button"
               variant="outline"
-              disabled={busy}
+              disabled={busy || isTesting}
               onClick={() => void disablePush()}
             >
               {busy ? "Updating…" : "Disable on this device"}
             </Button>
-          ) : (
-            <Button
-              type="button"
-              disabled={busy || status === "unsupported" || status === "denied"}
-              onClick={() => void enablePush()}
-            >
-              {busy ? "Enabling…" : "Enable on this device"}
-            </Button>
-          )}
-        </div>
+            <Form method="post">
+              <Button
+                type="submit"
+                name="intent"
+                value="test-push"
+                disabled={busy || isTesting}
+              >
+                {isTesting ? "Sending…" : "Send test notification"}
+              </Button>
+            </Form>
+          </>
+        ) : (
+          <Button
+            type="button"
+            disabled={busy || status === "unsupported" || status === "denied"}
+            onClick={() => void enablePush()}
+          >
+            {busy ? "Enabling…" : "Enable on this device"}
+          </Button>
+        )}
       </div>
     </div>
   );

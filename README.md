@@ -49,6 +49,7 @@ Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` 
 - Home and calculator routes require a signed-in user
 - `/approvals` — managers and admin review pending runs
 - `/history` — operators, managers, and admin view past submissions and approval status
+- `/settings` — managers and admin enable/test phone push notifications
 - `/operators` — managers and admin add/remove operator names
 
 Roles:
@@ -81,10 +82,11 @@ Optional env:
 
 ### Manager phone setup
 
-1. Open `/approvals` on the phone browser (Chrome/Safari) while signed in as manager/admin.
-2. Optionally install to home screen via the browser share/menu (uses `manifest.webmanifest`).
+1. Sign in as manager/admin and open **Settings**.
+2. Optionally install the site to your phone home screen.
 3. Tap **Enable on this device** and allow notifications.
-4. New pending calculations will push a notification that opens Approvals.
+4. Tap **Send test notification** to confirm it arrives.
+5. New pending calculations will then push a notification that opens Approvals.
 
 ### Vercel
 

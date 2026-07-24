@@ -100,33 +100,22 @@ export async function userHasPushSubscription(userId: string): Promise<boolean> 
   return count > 0;
 }
 
-/**
- * Best-effort push to all manager/admin subscriptions. Never throws.
- */
-export async function notifyManagersPush(
+async function sendPushToSubscriptions(
+  subscriptions: Array<{
+    id: string;
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+  }>,
   payload: PushPayload,
 ): Promise<{ sent: number; failed: number; reason?: string }> {
-  const config = configureWebPush();
-  if (!config) {
-    console.warn("Web push skipped: VAPID keys are not set");
-    return { sent: 0, failed: 0, reason: "VAPID keys are not set" };
-  }
-
   const prisma = getPrisma();
   if (!prisma) {
     return { sent: 0, failed: 0, reason: "Database is not configured" };
   }
 
-  const subscriptions = await prisma.pushSubscription.findMany({
-    where: {
-      user: {
-        role: { in: ["MANAGER", "ADMIN"] },
-      },
-    },
-  });
-
   if (subscriptions.length === 0) {
-    return { sent: 0, failed: 0, reason: "No manager push subscriptions" };
+    return { sent: 0, failed: 0, reason: "No push subscriptions" };
   }
 
   const body = JSON.stringify({
@@ -161,7 +150,6 @@ export async function notifyManagersPush(
             ? Number((error as { statusCode?: number }).statusCode)
             : null;
 
-        // Gone / expired subscriptions should be cleaned up.
         if (statusCode === 404 || statusCode === 410) {
           await prisma.pushSubscription
             .delete({ where: { id: subscription.id } })
@@ -174,4 +162,56 @@ export async function notifyManagersPush(
   );
 
   return { sent, failed };
+}
+
+/**
+ * Send a push to one user's devices (used for Settings test notifications).
+ */
+export async function notifyUserPush(
+  userId: string,
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number; reason?: string }> {
+  const config = configureWebPush();
+  if (!config) {
+    return { sent: 0, failed: 0, reason: "VAPID keys are not set" };
+  }
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return { sent: 0, failed: 0, reason: "Database is not configured" };
+  }
+
+  const subscriptions = await prisma.pushSubscription.findMany({
+    where: { userId },
+  });
+
+  return sendPushToSubscriptions(subscriptions, payload);
+}
+
+/**
+ * Best-effort push to all manager/admin subscriptions. Never throws.
+ */
+export async function notifyManagersPush(
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number; reason?: string }> {
+  const config = configureWebPush();
+  if (!config) {
+    console.warn("Web push skipped: VAPID keys are not set");
+    return { sent: 0, failed: 0, reason: "VAPID keys are not set" };
+  }
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return { sent: 0, failed: 0, reason: "Database is not configured" };
+  }
+
+  const subscriptions = await prisma.pushSubscription.findMany({
+    where: {
+      user: {
+        role: { in: ["MANAGER", "ADMIN"] },
+      },
+    },
+  });
+
+  return sendPushToSubscriptions(subscriptions, payload);
 }
