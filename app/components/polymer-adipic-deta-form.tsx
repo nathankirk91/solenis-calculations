@@ -85,7 +85,7 @@ export function PolymerAdipicDetaForm({
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
-          <CardContent className="grid gap-6">
+          <CardContent className="grid gap-6 pb-6">
             <section className="grid gap-2">
               <Label htmlFor={fields.operatorId.id}>
                 Operator / who is doing this operation
