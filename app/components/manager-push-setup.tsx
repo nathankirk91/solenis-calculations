@@ -13,6 +13,7 @@ type Props = {
 type Status =
   | "loading"
   | "unsupported"
+  | "needs-install"
   | "denied"
   | "ready"
   | "subscribed"
@@ -27,6 +28,28 @@ function urlBase64ToUint8Array(base64String: string) {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
+}
+
+function isIosDevice() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const ua = window.navigator.userAgent;
+  const iOS = /iPad|iPhone|iPod/.test(ua);
+  const iPadOs =
+    window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1;
+  return iOS || iPadOs;
+}
+
+function isStandaloneDisplay() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    // iOS Safari legacy standalone flag
+    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)
+  );
 }
 
 async function registerServiceWorker() {
@@ -52,19 +75,50 @@ export function ManagerPushSetup({
     let cancelled = false;
 
     async function init() {
+      if (!vapidPublicKey) {
+        if (!cancelled) {
+          setStatus("unsupported");
+          setMessage(
+            "Push notifications are not configured on the server yet (VAPID keys missing on Vercel).",
+          );
+        }
+        return;
+      }
+
       if (
-        !vapidPublicKey ||
         typeof window === "undefined" ||
         !("serviceWorker" in navigator) ||
-        !("PushManager" in window) ||
         !("Notification" in window)
       ) {
         if (!cancelled) {
           setStatus("unsupported");
+          setMessage("Push notifications are not supported in this browser.");
+        }
+        return;
+      }
+
+      const ios = isIosDevice();
+      const standalone = isStandaloneDisplay();
+      const hasPushManager = "PushManager" in window;
+
+      // iOS only supports Web Push for apps added to the Home Screen.
+      if (ios && !standalone) {
+        if (!cancelled) {
+          setStatus("needs-install");
           setMessage(
-            vapidPublicKey
-              ? "Push notifications are not supported in this browser."
-              : "Push notifications are not configured on the server yet (VAPID keys missing).",
+            "On iPhone/iPad: tap Share → Add to Home Screen, open Solenis Calc from the home screen icon, then return here and enable notifications.",
+          );
+        }
+        return;
+      }
+
+      if (!hasPushManager) {
+        if (!cancelled) {
+          setStatus(ios ? "needs-install" : "unsupported");
+          setMessage(
+            ios
+              ? "Open this site from your Home Screen app icon, then enable notifications."
+              : "Push notifications are not supported in this browser.",
           );
         }
         return;
@@ -77,7 +131,7 @@ export function ManagerPushSetup({
           if (!cancelled) {
             setStatus("denied");
             setMessage(
-              "Notifications are blocked in browser settings for this site.",
+              "Notifications are blocked for this site. In browser settings, allow notifications for solenis-calculations.vercel.app, then try again.",
             );
           }
           return;
@@ -87,7 +141,11 @@ export function ManagerPushSetup({
         const existing = await registration.pushManager.getSubscription();
         if (!cancelled) {
           setStatus(existing || initiallySubscribed ? "subscribed" : "ready");
-          setMessage(null);
+          setMessage(
+            permission === "default"
+              ? "Tap Enable on this device — your browser will ask for notification permission."
+              : null,
+          );
         }
       } catch (error) {
         if (!cancelled) {
@@ -109,22 +167,49 @@ export function ManagerPushSetup({
 
   async function enablePush() {
     if (!vapidPublicKey) {
+      setMessage(
+        "Push notifications are not configured on the server yet (VAPID keys missing on Vercel).",
+      );
       return;
     }
 
     setBusy(true);
-    setMessage(null);
+    setMessage(
+      "Your browser should now ask for notification permission. Choose Allow.",
+    );
 
     try {
+      if (!("Notification" in window)) {
+        throw new Error("Notifications API is not available in this browser.");
+      }
+
+      // Must be called directly from the user gesture.
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setStatus("denied");
-        setMessage("Notification permission was not granted.");
+        setMessage(
+          permission === "denied"
+            ? "Permission denied. Allow notifications for this site in browser settings, then try again."
+            : "Notification permission was not granted.",
+        );
         return;
+      }
+
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error(
+          isIosDevice()
+            ? "Open the app from your Home Screen icon first, then enable notifications."
+            : "PushManager is not available in this browser.",
+        );
       }
 
       const registration = await registerServiceWorker();
       await navigator.serviceWorker.ready;
+
+      // Wait briefly for the active worker on some mobile browsers.
+      if (!registration.active) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
 
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -145,7 +230,9 @@ export function ManagerPushSetup({
       }
 
       setStatus("subscribed");
-      setMessage("This device will receive approval push notifications.");
+      setMessage(
+        "Permission granted. This device will receive approval push notifications.",
+      );
     } catch (error) {
       setStatus("error");
       setMessage(
@@ -201,10 +288,18 @@ export function ManagerPushSetup({
         <h2 className="font-medium">Phone push notifications</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Enable on this phone or computer, then use Send test notification to
-          confirm it works. Install the site to your home screen for the best
-          phone experience.
+          confirm it works.
         </p>
       </div>
+
+      {status === "needs-install" ? (
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+          <li>Open this site in Safari on your iPhone/iPad.</li>
+          <li>Tap Share, then Add to Home Screen.</li>
+          <li>Open Solenis Calc from the new home screen icon.</li>
+          <li>Return to Settings and tap Enable on this device.</li>
+        </ol>
+      ) : null}
 
       {message ? (
         <p className="text-sm text-muted-foreground">{message}</p>
@@ -243,13 +338,28 @@ export function ManagerPushSetup({
         ) : (
           <Button
             type="button"
-            disabled={busy || status === "unsupported" || status === "denied"}
+            disabled={
+              busy ||
+              status === "unsupported" ||
+              (status === "needs-install" && isIosDevice() && !isStandaloneDisplay())
+            }
             onClick={() => void enablePush()}
           >
-            {busy ? "Enabling…" : "Enable on this device"}
+            {busy
+              ? "Waiting for permission…"
+              : status === "denied"
+                ? "Try enable again"
+                : "Enable on this device"}
           </Button>
         )}
       </div>
+
+      {status !== "subscribed" && status !== "unsupported" ? (
+        <p className="text-xs text-muted-foreground">
+          Enabling asks your browser/OS for notification access. You must tap
+          Allow on that prompt.
+        </p>
+      ) : null}
     </div>
   );
 }
