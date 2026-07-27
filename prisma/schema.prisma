@@ -1,4 +1,4 @@
-// Prisma schema for Solenis Calculations (Supabase Postgres)
+// Prisma schema for Solenis Springvale (Supabase Postgres)
 // https://pris.ly/d/prisma-schema
 
 generator client {
@@ -26,6 +26,21 @@ enum CalculationRunStatus {
   @@map("calculation_run_status")
 }
 
+enum InspectionRunStatus {
+  PASSED
+  NEEDS_ATTENTION
+
+  @@map("inspection_run_status")
+}
+
+enum InspectionQuestionType {
+  YES_NO
+  TEXT
+  RADIO
+
+  @@map("inspection_question_type")
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -35,21 +50,23 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  submittedRuns     CalculationRun[]  @relation("SubmittedBy")
-  reviewedRuns      CalculationRun[]  @relation("ReviewedBy")
-  pushSubscriptions PushSubscription[]
+  submittedRuns           CalculationRun[]  @relation("SubmittedBy")
+  reviewedRuns            CalculationRun[]  @relation("ReviewedBy")
+  submittedInspectionRuns InspectionRun[]   @relation("InspectionSubmittedBy")
+  pushSubscriptions       PushSubscription[]
 
   @@map("users")
 }
 
 model Operator {
-  id        String   @id @default(cuid())
-  name      String
-  isActive  Boolean  @default(true) @map("is_active")
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  runs      CalculationRun[]
+  id             String   @id @default(cuid())
+  name           String
+  isActive       Boolean  @default(true) @map("is_active")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  runs           CalculationRun[]
+  inspectionRuns InspectionRun[]
 
   @@index([isActive, sortOrder])
   @@map("operators")
@@ -91,6 +108,65 @@ model CalculationRun {
   @@index([status, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@map("calculation_runs")
+}
+
+model Inspection {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  description    String   @default("")
+  category       String   @default("general")
+  href           String
+  equipmentLabel String?  @map("equipment_label")
+  isAvailable    Boolean  @default(true) @map("is_available")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  runs           InspectionRun[]
+  questions      InspectionQuestion[]
+
+  @@map("inspections")
+}
+
+model InspectionQuestion {
+  id              String                  @id @default(cuid())
+  inspectionId    String                  @map("inspection_id")
+  inspection      Inspection              @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  label           String
+  helpText        String?                 @map("help_text")
+  sectionTitle    String?                 @map("section_title")
+  type            InspectionQuestionType
+  options         Json?
+  attentionValues Json?                   @map("attention_values")
+  required        Boolean                 @default(true)
+  isActive        Boolean                 @default(true) @map("is_active")
+  sortOrder       Int                     @default(0) @map("sort_order")
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([inspectionId, isActive, sortOrder])
+  @@map("inspection_questions")
+}
+
+model InspectionRun {
+  id            String               @id @default(cuid())
+  inspectionId  String               @map("inspection_id")
+  inspection    Inspection           @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  operatorId    String?              @map("operator_id")
+  operator      Operator?            @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  submittedById String?              @map("submitted_by_id")
+  submittedBy   User?                @relation("InspectionSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  status        InspectionRunStatus
+  equipmentRef  String?              @map("equipment_ref")
+  responses     Json
+  summary       Json
+  notes         String?
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([inspectionId])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("inspection_runs")
 }
 
 model PushSubscription {

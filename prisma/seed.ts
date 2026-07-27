@@ -2,7 +2,8 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { PrismaClient } from "../generated/prisma/client";
+import { PrismaClient, Prisma } from "../generated/prisma/client";
+import { INSPECTION_DEFINITIONS } from "../app/lib/inspections";
 import { POLYMER_ADIPIC_DETA_PRODUCTS } from "../app/lib/polymer-adipic-deta";
 
 const connectionString = process.env.DATABASE_URL;
@@ -71,6 +72,65 @@ async function main() {
     });
   }
 
+  for (const inspection of INSPECTION_DEFINITIONS) {
+    await prisma.inspection.upsert({
+      where: { id: inspection.id },
+      update: {
+        title: inspection.title,
+        description: inspection.description,
+        category: inspection.category,
+        href: inspection.href,
+        equipmentLabel: inspection.equipmentLabel ?? null,
+        isAvailable: true,
+        sortOrder: inspection.sortOrder,
+      },
+      create: {
+        id: inspection.id,
+        slug: inspection.slug,
+        title: inspection.title,
+        description: inspection.description,
+        category: inspection.category,
+        href: inspection.href,
+        equipmentLabel: inspection.equipmentLabel ?? null,
+        isAvailable: true,
+        sortOrder: inspection.sortOrder,
+      },
+    });
+
+    for (const question of inspection.questions) {
+      await prisma.inspectionQuestion.upsert({
+        where: { id: question.id },
+        update: {
+          inspectionId: inspection.id,
+          label: question.label,
+          helpText: question.helpText ?? null,
+          sectionTitle: question.sectionTitle ?? null,
+          type: question.type,
+          options:
+            question.type === "RADIO" ? question.options : Prisma.DbNull,
+          attentionValues: question.attentionValues,
+          required: question.required,
+          isActive: true,
+          sortOrder: question.sortOrder,
+        },
+        create: {
+          id: question.id,
+          inspectionId: inspection.id,
+          label: question.label,
+          helpText: question.helpText ?? null,
+          sectionTitle: question.sectionTitle ?? null,
+          type: question.type,
+          options:
+            question.type === "RADIO" ? question.options : Prisma.DbNull,
+          attentionValues: question.attentionValues,
+          required: question.required,
+          isActive: true,
+          sortOrder: question.sortOrder,
+        },
+      });
+    }
+  }
+
   const adminEmail = (
     process.env.SEED_ADMIN_EMAIL ??
     process.env.SEED_USER_EMAIL ??
@@ -135,6 +195,9 @@ async function main() {
   }
 
   console.log(`Seeded ${POLYMER_ADIPIC_DETA_PRODUCTS.length} calculations`);
+  console.log(
+    `Seeded ${INSPECTION_DEFINITIONS.length} inspections with questions`,
+  );
   console.log(`Seeded ${DEFAULT_OPERATORS.length} operators`);
 }
 
