@@ -14,6 +14,7 @@ import {
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
 import { formatMelbourneDateTime } from "~/lib/datetime";
+import type { InspectionAnswerRecord } from "~/lib/inspections";
 import { getInspectionRunById } from "~/lib/inspections.server";
 import { canReviewRuns } from "~/lib/roles";
 import { cn } from "~/lib/utils";
@@ -74,8 +75,8 @@ export default function InspectionSubmissionPage({
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             {needsAttention
-              ? "One or more checklist items were marked for follow-up. Managers have been notified."
-              : "All checked items passed. This record is saved in history."}
+              ? "One or more answers were flagged for follow-up. Managers have been notified."
+              : "This inspection passed. The record is saved in history."}
           </p>
         </div>
 
@@ -105,14 +106,16 @@ export default function InspectionSubmissionPage({
             </div>
           </CardHeader>
           <CardContent className="grid gap-6">
-            <dl className="grid gap-3 sm:grid-cols-3">
-              <Stat label="OK" value={String(run.summary.okCount)} />
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <Stat
+                label="Answered"
+                value={String(run.summary.answeredCount)}
+              />
               <Stat
                 label="Needs attention"
                 value={String(run.summary.attentionCount)}
                 emphasize={run.summary.attentionCount > 0}
               />
-              <Stat label="N/A" value={String(run.summary.naCount)} />
             </dl>
 
             {run.summary.attentionItems.length > 0 ? (
@@ -123,10 +126,13 @@ export default function InspectionSubmissionPage({
                 <ul className="mt-2 grid gap-1 text-sm text-amber-950/90">
                   {run.summary.attentionItems.map((item) => (
                     <li key={item.itemId}>
-                      <span className="text-amber-800/70">
-                        {item.sectionTitle}:
-                      </span>{" "}
+                      {item.sectionTitle ? (
+                        <span className="text-amber-800/70">
+                          {item.sectionTitle}:{" "}
+                        </span>
+                      ) : null}
                       {item.label}
+                      {item.answer ? ` — ${item.answer}` : null}
                     </li>
                   ))}
                 </ul>
@@ -134,22 +140,26 @@ export default function InspectionSubmissionPage({
             ) : null}
 
             <div className="grid gap-4">
-              {groupBySection(run.responseRows).map((group) => (
+              {groupAnswersBySection(run.answers).map((group) => (
                 <div
-                  key={group.title}
+                  key={group.title ?? "general"}
                   className="rounded-lg border border-border/70 bg-background/50 p-4"
                 >
-                  <h3 className="font-medium">{group.title}</h3>
+                  {group.title ? (
+                    <h3 className="font-medium">{group.title}</h3>
+                  ) : (
+                    <h3 className="font-medium">Answers</h3>
+                  )}
                   <ul className="mt-3 grid gap-2">
                     {group.rows.map((row) => (
                       <li
-                        key={row.itemId}
+                        key={row.questionId}
                         className="flex flex-wrap items-start justify-between gap-2 text-sm"
                       >
                         <span className="text-muted-foreground">
                           {row.label}
                         </span>
-                        <ResultBadge result={row.result} />
+                        <AnswerBadge answer={row.answer} flagged={row.flagged} />
                       </li>
                     ))}
                   </ul>
@@ -212,47 +222,41 @@ function Stat({
   );
 }
 
-function ResultBadge({
-  result,
+function AnswerBadge({
+  answer,
+  flagged,
 }: {
-  result: "ok" | "attention" | "na";
+  answer: string;
+  flagged: boolean;
 }) {
-  const label =
-    result === "ok" ? "OK" : result === "attention" ? "Needs attention" : "N/A";
-
   return (
     <Badge
       variant="outline"
       className={cn(
-        "shrink-0",
-        result === "ok" && "border-emerald-600/40 text-emerald-700",
-        result === "attention" && "border-amber-600/40 text-amber-800",
+        "max-w-full shrink-0 whitespace-normal text-left",
+        flagged
+          ? "border-amber-600/40 text-amber-800"
+          : "border-emerald-600/40 text-emerald-700",
       )}
     >
-      {label}
+      {answer || "—"}
     </Badge>
   );
 }
 
-function groupBySection(
-  rows: Array<{
-    itemId: string;
-    label: string;
-    sectionTitle: string;
-    result: "ok" | "attention" | "na";
-  }>,
-) {
+function groupAnswersBySection(rows: InspectionAnswerRecord[]) {
   const groups: Array<{
-    title: string;
-    rows: typeof rows;
+    title: string | null;
+    rows: InspectionAnswerRecord[];
   }> = [];
 
   for (const row of rows) {
-    const existing = groups.find((group) => group.title === row.sectionTitle);
+    const title = row.sectionTitle;
+    const existing = groups.find((group) => group.title === title);
     if (existing) {
       existing.rows.push(row);
     } else {
-      groups.push({ title: row.sectionTitle, rows: [row] });
+      groups.push({ title, rows: [row] });
     }
   }
 

@@ -83,17 +83,19 @@ export async function loader({ request }: Route.LoaderArgs) {
         }))
       : FALLBACK_CALCULATIONS;
 
-    const inspections: InspectionCard[] = inspectionRows.length
-      ? inspectionRows.map((row) => ({
-          id: row.id,
-          slug: row.slug,
-          title: row.title,
-          description: row.description,
-          category: row.category,
-          href: row.href,
-          isAvailable: row.isAvailable,
-        }))
-      : FALLBACK_INSPECTIONS;
+    const inspections: InspectionCard[] = (
+      inspectionRows.length
+        ? inspectionRows.map((row) => ({
+            id: row.id,
+            slug: row.slug,
+            title: row.title,
+            description: row.description,
+            category: row.category,
+            href: row.href,
+            isAvailable: row.isAvailable,
+          }))
+        : FALLBACK_INSPECTIONS
+    ).filter((row) => row.isAvailable);
 
     return {
       user,

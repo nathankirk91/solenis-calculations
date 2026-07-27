@@ -1,15 +1,10 @@
 import { z } from "zod";
 
 import {
-  listInspectionItems,
-  summarizeInspectionResponses,
+  buildAnswersFromResponses,
+  summarizeInspectionAnswers,
   type InspectionDefinition,
-  type InspectionItemResult,
 } from "~/lib/inspections";
-
-const resultEnum = z.enum(["ok", "attention", "na"], {
-  error: "Select OK, Needs attention, or N/A.",
-});
 
 function emptyToUndefined(value: unknown) {
   if (value === "" || value === null || value === undefined) {
@@ -19,10 +14,33 @@ function emptyToUndefined(value: unknown) {
 }
 
 export function createInspectionSchema(definition: InspectionDefinition) {
-  const items = listInspectionItems(definition);
-  const responseShape = Object.fromEntries(
-    items.map((item) => [item.id, resultEnum]),
-  ) as Record<string, typeof resultEnum>;
+  const responseShape: Record<string, z.ZodType<string | undefined>> = {};
+
+  for (const question of definition.questions) {
+    if (question.type === "TEXT") {
+      let field = z.preprocess(
+        emptyToUndefined,
+        z
+          .string()
+          .trim()
+          .max(2000, "Keep the answer under 2000 characters.")
+          .optional(),
+      );
+      responseShape[question.id] = field;
+    } else if (question.type === "YES_NO") {
+      responseShape[question.id] = z.enum(["Yes", "No"], {
+        error: "Select Yes or No.",
+      });
+    } else {
+      const options = question.options;
+      responseShape[question.id] =
+        options.length > 0
+          ? z.enum(options as [string, ...string[]], {
+              error: "Select an option.",
+            })
+          : z.string().min(1, "Select an option.");
+    }
+  }
 
   return z
     .object({
@@ -57,25 +75,34 @@ export function createInspectionSchema(definition: InspectionDefinition) {
         });
       }
 
-      for (const item of items) {
-        if (!value.responses[item.id]) {
+      for (const question of definition.questions) {
+        const answer = value.responses[question.id];
+        if (question.required && (answer == null || String(answer).trim() === "")) {
           ctx.addIssue({
             code: "custom",
-            message: "Select a result for this item.",
-            path: ["responses", item.id],
+            message:
+              question.type === "TEXT"
+                ? "Enter an answer."
+                : "Select an answer.",
+            path: ["responses", question.id],
           });
         }
       }
     })
     .transform((value) => {
-      const responses = value.responses as Record<string, InspectionItemResult>;
-      const summary = summarizeInspectionResponses(definition, responses);
+      const responses: Record<string, string> = {};
+      for (const question of definition.questions) {
+        responses[question.id] = String(value.responses[question.id] ?? "");
+      }
+      const answers = buildAnswersFromResponses(definition, responses);
+      const summary = summarizeInspectionAnswers(answers);
 
       return {
         operatorId: value.operatorId,
         equipmentRef: value.equipmentRef ?? null,
         notes: value.notes ?? null,
         responses,
+        answers,
         summary,
       };
     });

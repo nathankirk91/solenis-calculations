@@ -21,10 +21,11 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { createInspectionSchema } from "~/lib/inspection.schema";
-import type {
-  InspectionDefinition,
-  InspectionItemResult,
-  InspectionSummary,
+import {
+  YES_NO_OPTIONS,
+  groupQuestionsBySection,
+  type InspectionDefinition,
+  type InspectionSummary,
 } from "~/lib/inspections";
 import type { OperatorOption } from "~/lib/operators.server";
 import { cn } from "~/lib/utils";
@@ -38,15 +39,6 @@ type Props = {
   formError?: string | null;
 };
 
-const RESULT_OPTIONS: Array<{
-  value: InspectionItemResult;
-  label: string;
-}> = [
-  { value: "ok", label: "OK" },
-  { value: "attention", label: "Needs attention" },
-  { value: "na", label: "N/A" },
-];
-
 export function InspectionChecklistForm({
   definition,
   operators,
@@ -58,11 +50,10 @@ export function InspectionChecklistForm({
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
   const schema = createInspectionSchema(definition);
+  const sections = groupQuestionsBySection(definition.questions);
 
   const defaultResponses = Object.fromEntries(
-    definition.sections.flatMap((section) =>
-      section.items.map((item) => [item.id, ""]),
-    ),
+    definition.questions.map((question) => [question.id, ""]),
   );
 
   const [form, fields] = useForm({
@@ -88,7 +79,7 @@ export function InspectionChecklistForm({
         <CardHeader>
           <CardTitle>Checklist</CardTitle>
           <CardDescription>
-            Mark every item, then submit to record this inspection.
+            Answer each question, then submit to record this inspection.
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
@@ -136,61 +127,107 @@ export function InspectionChecklistForm({
               </section>
             ) : null}
 
-            {definition.sections.map((section) => (
-              <section key={section.id} className="grid gap-4">
-                <h3 className="font-heading text-lg font-semibold text-brand-navy">
-                  {section.title}
-                </h3>
+            {definition.questions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                This inspection has no questions yet. Ask a manager to add some.
+              </p>
+            ) : null}
+
+            {sections.map((section, sectionIndex) => (
+              <section
+                key={section.title ?? `section-${sectionIndex}`}
+                className="grid gap-4"
+              >
+                {section.title ? (
+                  <h3 className="font-heading text-lg font-semibold text-brand-navy">
+                    {section.title}
+                  </h3>
+                ) : null}
                 <ul className="grid gap-4">
-                  {section.items.map((item) => {
-                    const field = responseFields[item.id];
+                  {section.questions.map((question) => {
+                    const field = responseFields[question.id];
                     if (!field) {
                       return null;
                     }
 
+                    const choices =
+                      question.type === "YES_NO"
+                        ? [...YES_NO_OPTIONS]
+                        : question.type === "RADIO"
+                          ? question.options
+                          : [];
+
                     return (
                       <li
-                        key={item.id}
+                        key={question.id}
                         className="rounded-lg border border-border/70 bg-background/40 p-4"
                       >
                         <p className="text-sm font-medium text-brand-navy">
-                          {item.label}
+                          {question.label}
+                          {question.required ? null : (
+                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                              Optional
+                            </span>
+                          )}
                         </p>
-                        {item.help ? (
+                        {question.helpText ? (
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {item.help}
+                            {question.helpText}
                           </p>
                         ) : null}
-                        <fieldset className="mt-3">
-                          <legend className="sr-only">{item.label}</legend>
-                          <div className="flex flex-wrap gap-2">
-                            {RESULT_OPTIONS.map((option) => {
-                              const optionId = `${field.id}-${option.value}`;
-                              return (
-                                <label
-                                  key={option.value}
-                                  htmlFor={optionId}
-                                  className={cn(
-                                    "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[:checked]:border-brand/50 has-[:checked]:bg-brand/10",
-                                    option.value === "attention" &&
-                                      "has-[:checked]:border-amber-500/50 has-[:checked]:bg-amber-50",
-                                  )}
-                                >
-                                  <input
-                                    {...getInputProps(field, {
-                                      type: "radio",
-                                      value: option.value,
-                                    })}
-                                    id={optionId}
-                                    key={`${field.key}-${option.value}`}
-                                    className="size-4 accent-[var(--brand-navy)]"
-                                  />
-                                  {option.label}
-                                </label>
-                              );
-                            })}
+
+                        {question.type === "TEXT" ? (
+                          <div className="mt-3">
+                            <textarea
+                              id={field.id}
+                              name={field.name}
+                              key={field.key}
+                              defaultValue={
+                                typeof field.initialValue === "string"
+                                  ? field.initialValue
+                                  : ""
+                              }
+                              rows={3}
+                              className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+                              placeholder="Enter details…"
+                              aria-invalid={Boolean(field.errors)}
+                            />
                           </div>
-                        </fieldset>
+                        ) : (
+                          <fieldset className="mt-3">
+                            <legend className="sr-only">{question.label}</legend>
+                            <div className="flex flex-wrap gap-2">
+                              {choices.map((option) => {
+                                const optionId = `${field.id}-${option}`;
+                                const flagsAttention =
+                                  question.attentionValues.includes(option);
+                                return (
+                                  <label
+                                    key={option}
+                                    htmlFor={optionId}
+                                    className={cn(
+                                      "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[:checked]:border-brand/50 has-[:checked]:bg-brand/10",
+                                      flagsAttention &&
+                                        "has-[:checked]:border-amber-500/50 has-[:checked]:bg-amber-50",
+                                    )}
+                                  >
+                                    <input
+                                      {...getInputProps(field, {
+                                        type: "radio",
+                                        value: option,
+                                      })}
+                                      id={optionId}
+                                      key={`${field.key}-${option}`}
+                                      className="size-4 accent-[var(--brand-navy)]"
+                                    />
+                                    {option}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </fieldset>
+                        )}
+
                         {field.errors ? (
                           <p className="mt-2 text-sm text-destructive">
                             {field.errors.join(" ")}
@@ -230,13 +267,15 @@ export function InspectionChecklistForm({
               <p className="text-sm text-destructive">{formError}</p>
             ) : null}
             {form.errors ? (
-              <p className="text-sm text-destructive">
-                {form.errors.join(" ")}
-              </p>
+              <p className="text-sm text-destructive">{form.errors.join(" ")}</p>
             ) : null}
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+            <Button
+              type="submit"
+              disabled={isSubmitting || definition.questions.length === 0}
+              className="w-full sm:w-auto"
+            >
               {isSubmitting ? "Saving…" : "Submit inspection"}
             </Button>
           </CardFooter>
@@ -247,7 +286,7 @@ export function InspectionChecklistForm({
         <CardHeader>
           <CardTitle>Result</CardTitle>
           <CardDescription>
-            After submit, the checklist is stored with a pass or needs-attention
+            After submit, answers are stored with a pass or needs-attention
             outcome.
           </CardDescription>
         </CardHeader>
@@ -267,14 +306,16 @@ export function InspectionChecklistForm({
                   {status === "PASSED" ? "Passed" : "Needs attention"}
                 </Badge>
               </div>
-              <dl className="grid gap-3 sm:grid-cols-3">
-                <Stat label="OK" value={String(summary.okCount)} />
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <Stat
+                  label="Answered"
+                  value={String(summary.answeredCount)}
+                />
                 <Stat
                   label="Attention"
                   value={String(summary.attentionCount)}
                   emphasize={summary.attentionCount > 0}
                 />
-                <Stat label="N/A" value={String(summary.naCount)} />
               </dl>
               {summary.attentionItems.length > 0 ? (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-50/80 p-3">
@@ -283,7 +324,10 @@ export function InspectionChecklistForm({
                   </p>
                   <ul className="mt-2 grid gap-1 text-sm text-amber-950/90">
                     {summary.attentionItems.map((item) => (
-                      <li key={item.itemId}>• {item.label}</li>
+                      <li key={item.itemId}>
+                        • {item.label}
+                        {item.answer ? ` (${item.answer})` : null}
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -291,8 +335,8 @@ export function InspectionChecklistForm({
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Complete every checklist item, then submit. Managers are notified
-              when anything needs attention.
+              Complete the questions, then submit. Managers are notified when
+              anything needs attention.
             </p>
           )}
         </CardContent>

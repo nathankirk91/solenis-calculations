@@ -33,6 +33,14 @@ enum InspectionRunStatus {
   @@map("inspection_run_status")
 }
 
+enum InspectionQuestionType {
+  YES_NO
+  TEXT
+  RADIO
+
+  @@map("inspection_question_type")
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -103,18 +111,41 @@ model CalculationRun {
 }
 
 model Inspection {
-  id          String   @id
-  slug        String   @unique
-  title       String
-  description String
-  category    String   @default("general")
-  href        String
-  isAvailable Boolean  @default(true) @map("is_available")
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  runs        InspectionRun[]
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  description    String   @default("")
+  category       String   @default("general")
+  href           String
+  equipmentLabel String?  @map("equipment_label")
+  isAvailable    Boolean  @default(true) @map("is_available")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  runs           InspectionRun[]
+  questions      InspectionQuestion[]
 
   @@map("inspections")
+}
+
+model InspectionQuestion {
+  id              String                  @id @default(cuid())
+  inspectionId    String                  @map("inspection_id")
+  inspection      Inspection              @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  label           String
+  helpText        String?                 @map("help_text")
+  sectionTitle    String?                 @map("section_title")
+  type            InspectionQuestionType
+  options         Json?
+  attentionValues Json?                   @map("attention_values")
+  required        Boolean                 @default(true)
+  isActive        Boolean                 @default(true) @map("is_active")
+  sortOrder       Int                     @default(0) @map("sort_order")
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([inspectionId, isActive, sortOrder])
+  @@map("inspection_questions")
 }
 
 model InspectionRun {

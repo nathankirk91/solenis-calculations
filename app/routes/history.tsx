@@ -269,25 +269,24 @@ export default function HistoryPage({ loaderData }: Route.ComponentProps) {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <dl className="grid gap-3 sm:grid-cols-3">
+                      <dl className="grid gap-3 sm:grid-cols-2">
                         <Stat
-                          label="OK"
-                          value={String(run.summary.okCount)}
+                          label="Answered"
+                          value={String(run.summary.answeredCount)}
                         />
                         <Stat
                           label="Needs attention"
                           value={String(run.summary.attentionCount)}
                           emphasize={run.summary.attentionCount > 0}
                         />
-                        <Stat
-                          label="N/A"
-                          value={String(run.summary.naCount)}
-                        />
                       </dl>
                       {run.summary.attentionItems.length > 0 ? (
                         <ul className="mt-4 grid gap-1 text-sm text-amber-900">
                           {run.summary.attentionItems.map((item) => (
-                            <li key={item.itemId}>• {item.label}</li>
+                            <li key={item.itemId}>
+                              • {item.label}
+                              {item.answer ? ` (${item.answer})` : null}
+                            </li>
                           ))}
                         </ul>
                       ) : null}

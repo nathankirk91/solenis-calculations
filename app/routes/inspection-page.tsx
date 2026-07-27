@@ -8,30 +8,23 @@ import { Badge } from "~/components/ui/badge";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
 import { handleInspectionSubmit } from "~/lib/inspection-action.server";
-import { getInspectionById } from "~/lib/inspections";
+import { getInspectionDefinition } from "~/lib/inspections.server";
 import { listActiveOperators } from "~/lib/operators.server";
 import { canReviewRuns } from "~/lib/roles";
 
-export function meta({ params }: Route.MetaArgs) {
-  const definition = getInspectionById(params.inspectionId);
+export function meta({}: Route.MetaArgs) {
   return [
-    {
-      title: definition
-        ? `${definition.title} | Springvale Solenis`
-        : "Inspection | Springvale Solenis",
-    },
+    { title: "Inspection | Springvale Solenis" },
     {
       name: "description",
-      content:
-        definition?.description ??
-        "Plant inspection checklist for Solenis Springvale.",
+      content: "Plant inspection checklist for Solenis Springvale.",
     },
   ];
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const definition = getInspectionById(params.inspectionId);
-  if (!definition) {
+  const definition = await getInspectionDefinition(params.inspectionId);
+  if (!definition || !definition.isAvailable) {
     throw new Response("Inspection not found", { status: 404 });
   }
 
@@ -45,8 +38,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const definition = getInspectionById(params.inspectionId);
-  if (!definition) {
+  const definition = await getInspectionDefinition(params.inspectionId);
+  if (!definition || !definition.isAvailable) {
     throw new Response("Inspection not found", { status: 404 });
   }
 

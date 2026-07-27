@@ -88,6 +88,9 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
         ]
       : []),
     ...(showOperators ? [{ to: "/operators", label: "Operators" }] : []),
+    ...(showOperators
+      ? [{ to: "/inspections/manage", label: "Inspections" }]
+      : []),
     ...(showManagers ? [{ to: "/managers", label: "Managers" }] : []),
     ...(showApprovals ? [{ to: "/settings", label: "Settings" }] : []),
   ];

@@ -131,13 +131,30 @@ Weights shown for charged/extra/target DETA and Adipic are whole kilograms.
 
 ## Inspections
 
-The home page lists inspections alongside calculators. Each checklist records OK / Needs attention / N/A per item. Runs with any “Needs attention” items notify managers via push (when configured).
+The home page lists inspections alongside calculators. Managers (and admin) can create inspections and questions from **Inspections** in the nav.
+
+Question types:
+
+| Type | Operator input | Needs-attention |
+|---|---|---|
+| Yes / No | Yes or No | Usually **No** (configurable) |
+| Text box | Free text | Not auto-flagged |
+| Radio | Custom options | Manager picks which options flag attention |
+
+Default seeded inspections:
 
 | Inspection | Route |
 |---|---|
 | Forklift — Daily Check | `/inspections/forklift-daily-check` |
 | Daily Start-up | `/inspections/daily-startup` |
 | Daily Shut-down | `/inspections/daily-shutdown` |
+
+Management:
+
+| Page | Route |
+|---|---|
+| Create / list inspections | `/inspections/manage` |
+| Edit questions | `/inspections/manage/:id` |
 
 ## Scripts
 

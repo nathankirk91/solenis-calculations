@@ -2,42 +2,81 @@ import assert from "node:assert/strict";
 
 const {
   FORKLIFT_DAILY_CHECK,
-  summarizeInspectionResponses,
+  buildAnswersFromResponses,
+  summarizeInspectionAnswers,
 } = await import("./inspections.ts");
 
 function allOkResponses() {
-  /** @type {Record<string, "ok" | "attention" | "na">} */
+  /** @type {Record<string, string>} */
   const responses = {};
-  for (const section of FORKLIFT_DAILY_CHECK.sections) {
-    for (const item of section.items) {
-      responses[item.id] = "ok";
-    }
+  for (const question of FORKLIFT_DAILY_CHECK.questions) {
+    responses[question.id] = "OK";
   }
   return responses;
 }
 
 {
-  const summary = summarizeInspectionResponses(
+  const answers = buildAnswersFromResponses(
     FORKLIFT_DAILY_CHECK,
     allOkResponses(),
   );
+  const summary = summarizeInspectionAnswers(answers);
   assert.equal(summary.status, "PASSED");
   assert.equal(summary.attentionCount, 0);
-  assert.equal(summary.okCount, 10);
+  assert.equal(summary.answeredCount, 10);
   assert.equal(summary.attentionItems.length, 0);
 }
 
 {
   const responses = allOkResponses();
-  responses.brakes = "attention";
-  responses["horn-lights"] = "na";
+  responses["forklift-daily-check__brakes"] = "Needs attention";
+  responses["forklift-daily-check__horn-lights"] = "N/A";
 
-  const summary = summarizeInspectionResponses(FORKLIFT_DAILY_CHECK, responses);
+  const answers = buildAnswersFromResponses(FORKLIFT_DAILY_CHECK, responses);
+  const summary = summarizeInspectionAnswers(answers);
   assert.equal(summary.status, "NEEDS_ATTENTION");
   assert.equal(summary.attentionCount, 1);
-  assert.equal(summary.naCount, 1);
-  assert.equal(summary.okCount, 8);
-  assert.equal(summary.attentionItems[0]?.itemId, "brakes");
+  assert.equal(summary.answeredCount, 10);
+  assert.equal(
+    summary.attentionItems[0]?.itemId,
+    "forklift-daily-check__brakes",
+  );
+}
+
+{
+  const yesNoDefinition = {
+    ...FORKLIFT_DAILY_CHECK,
+    questions: [
+      {
+        id: "q1",
+        label: "Walkways clear?",
+        type: "YES_NO",
+        options: ["Yes", "No"],
+        attentionValues: ["No"],
+        required: true,
+        sortOrder: 1,
+      },
+      {
+        id: "q2",
+        label: "Notes",
+        type: "TEXT",
+        options: [],
+        attentionValues: [],
+        required: false,
+        sortOrder: 2,
+      },
+    ],
+  };
+
+  const answers = buildAnswersFromResponses(yesNoDefinition, {
+    q1: "No",
+    q2: "Spill near bay 2",
+  });
+  const summary = summarizeInspectionAnswers(answers);
+  assert.equal(summary.status, "NEEDS_ATTENTION");
+  assert.equal(summary.attentionCount, 1);
+  assert.equal(answers[1]?.flagged, false);
+  assert.equal(answers[1]?.answer, "Spill near bay 2");
 }
 
 console.log("inspections tests passed");
