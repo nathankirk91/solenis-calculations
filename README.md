@@ -1,6 +1,6 @@
 # Solenis Calculations
 
-Plant calculation tools for Solenis production processes.
+Plant calculation and inspection tools for Solenis production processes.
 
 ## Stack
 
@@ -56,7 +56,7 @@ Roles:
 
 | Role | Purpose |
 |---|---|
-| `OPERATOR` | Shared plant-floor login; submits calculations |
+| `OPERATOR` | Shared plant-floor login; submits calculations and inspections |
 | `MANAGER` | Personal email login; approves/rejects; manages operator names |
 | `ADMIN` | One admin account; same review and operator management as manager |
 
@@ -129,6 +129,16 @@ extra DETA (kg)  = target DETA − DETA already charged
 
 Weights shown for charged/extra/target DETA and Adipic are whole kilograms.
 
+## Inspections
+
+The home page lists inspections alongside calculators. Each checklist records OK / Needs attention / N/A per item. Runs with any “Needs attention” items notify managers via push (when configured).
+
+| Inspection | Route |
+|---|---|
+| Forklift — Daily Check | `/inspections/forklift-daily-check` |
+| Daily Start-up | `/inspections/daily-startup` |
+| Daily Shut-down | `/inspections/daily-shutdown` |
+
 ## Scripts
 
 - `npm run dev` — local development (React Router + Vite)
@@ -137,5 +147,5 @@ Weights shown for charged/extra/target DETA and Adipic are whole kilograms.
 - `npm run typecheck` — typegen + TypeScript
 - `npm run db:migrate` — create/apply migrations in development
 - `npm run db:deploy` — apply migrations in CI/production
-- `npm run db:seed` — seed calculation catalog
+- `npm run db:seed` — seed calculation and inspection catalogs
 - `npm run db:studio` — open Prisma Studio

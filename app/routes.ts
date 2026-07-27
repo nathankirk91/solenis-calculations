@@ -19,4 +19,6 @@ export default [
     "calculations/polymer-an04-adipic-deta",
     "routes/polymer-an04-adipic-deta.tsx",
   ),
+  route("inspections/submissions/:runId", "routes/inspection-submission.tsx"),
+  route("inspections/:inspectionId", "routes/inspection-page.tsx"),
 ] satisfies RouteConfig;

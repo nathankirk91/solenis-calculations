@@ -56,7 +56,7 @@ export default function Polymer973AdipicDetaPage({
               to="/"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              ← All calculators
+              ← Home
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">

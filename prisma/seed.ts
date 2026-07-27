@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../generated/prisma/client";
+import { INSPECTION_DEFINITIONS } from "../app/lib/inspections";
 import { POLYMER_ADIPIC_DETA_PRODUCTS } from "../app/lib/polymer-adipic-deta";
 
 const connectionString = process.env.DATABASE_URL;
@@ -71,6 +72,30 @@ async function main() {
     });
   }
 
+  for (const inspection of INSPECTION_DEFINITIONS) {
+    await prisma.inspection.upsert({
+      where: { id: inspection.id },
+      update: {
+        title: inspection.title,
+        description: inspection.description,
+        category: inspection.category,
+        href: inspection.href,
+        isAvailable: true,
+        sortOrder: inspection.sortOrder,
+      },
+      create: {
+        id: inspection.id,
+        slug: inspection.slug,
+        title: inspection.title,
+        description: inspection.description,
+        category: inspection.category,
+        href: inspection.href,
+        isAvailable: true,
+        sortOrder: inspection.sortOrder,
+      },
+    });
+  }
+
   const adminEmail = (
     process.env.SEED_ADMIN_EMAIL ??
     process.env.SEED_USER_EMAIL ??
@@ -135,6 +160,7 @@ async function main() {
   }
 
   console.log(`Seeded ${POLYMER_ADIPIC_DETA_PRODUCTS.length} calculations`);
+  console.log(`Seeded ${INSPECTION_DEFINITIONS.length} inspections`);
   console.log(`Seeded ${DEFAULT_OPERATORS.length} operators`);
 }
 

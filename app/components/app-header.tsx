@@ -76,7 +76,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
   }, [open]);
 
   const navItems: NavItem[] = [
-    { to: "/", label: "All calculators" },
+    { to: "/", label: "Home" },
     ...(user ? [{ to: "/history", label: "History" }] : []),
     ...(showApprovals
       ? [
