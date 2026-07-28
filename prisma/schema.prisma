@@ -37,6 +37,8 @@ enum InspectionQuestionType {
   YES_NO
   TEXT
   RADIO
+  NUMBER
+  DATE
 
   @@map("inspection_question_type")
 }

@@ -1,4 +1,10 @@
-export const INSPECTION_QUESTION_TYPES = ["YES_NO", "TEXT", "RADIO"] as const;
+export const INSPECTION_QUESTION_TYPES = [
+  "YES_NO",
+  "TEXT",
+  "RADIO",
+  "NUMBER",
+  "DATE",
+] as const;
 
 export type InspectionQuestionType = (typeof INSPECTION_QUESTION_TYPES)[number];
 
@@ -176,6 +182,48 @@ function textQuestion(
   };
 }
 
+function numberQuestion(
+  inspectionId: string,
+  id: string,
+  label: string,
+  sectionTitle: string,
+  sortOrder: number,
+  opts?: { required?: boolean; helpText?: string },
+): InspectionQuestionDef {
+  return {
+    id: `${inspectionId}__${id}`,
+    label,
+    sectionTitle,
+    type: "NUMBER",
+    options: [],
+    attentionValues: [],
+    required: opts?.required ?? true,
+    sortOrder,
+    helpText: opts?.helpText,
+  };
+}
+
+function dateQuestion(
+  inspectionId: string,
+  id: string,
+  label: string,
+  sectionTitle: string,
+  sortOrder: number,
+  opts?: { required?: boolean; helpText?: string },
+): InspectionQuestionDef {
+  return {
+    id: `${inspectionId}__${id}`,
+    label,
+    sectionTitle,
+    type: "DATE",
+    options: [],
+    attentionValues: [],
+    required: opts?.required ?? true,
+    sortOrder,
+    helpText: opts?.helpText,
+  };
+}
+
 /** ADAPT-A-LIFT unit numbers on Form 78 (6 forklifts, checked each shift). */
 export const FORKLIFT_UNITS = [
   {
@@ -228,7 +276,7 @@ export const FORKLIFT_DAILY_CHECK: InspectionDefinition = {
       ["Day", "Afternoon"],
       1,
     ),
-    textQuestion(
+    numberQuestion(
       "forklift-daily-check",
       "hour-meter",
       "Hour meter reading",
@@ -236,7 +284,7 @@ export const FORKLIFT_DAILY_CHECK: InspectionDefinition = {
       2,
       { helpText: "Reading from the hour meter before start." },
     ),
-    textQuestion(
+    dateQuestion(
       "forklift-daily-check",
       "service-date",
       "Service date",
@@ -679,7 +727,7 @@ export function questionOptionsForType(
   if (type === "YES_NO") {
     return [...YES_NO_OPTIONS];
   }
-  if (type === "TEXT") {
+  if (type === "TEXT" || type === "NUMBER" || type === "DATE") {
     return [];
   }
   return options.map((option) => option.trim()).filter(Boolean);
@@ -698,6 +746,21 @@ export function defaultAttentionValues(
     );
   }
   return [];
+}
+
+export function questionTypeLabel(type: InspectionQuestionType): string {
+  switch (type) {
+    case "YES_NO":
+      return "Yes / No";
+    case "TEXT":
+      return "Text";
+    case "RADIO":
+      return "Radio";
+    case "NUMBER":
+      return "Number";
+    case "DATE":
+      return "Date";
+  }
 }
 
 export function isAnswerFlagged(
