@@ -19,8 +19,10 @@ import { requireOperatorManager } from "~/lib/auth.server";
 import {
   createManagedInspection,
   listManagedInspections,
+  seedDefaultInspections,
   setInspectionAvailability,
 } from "~/lib/inspections.server";
+import { applyPendingMigrations } from "~/lib/migrate.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -34,11 +36,33 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireOperatorManager(request);
-  const [inspections, pendingCount] = await Promise.all([
-    listManagedInspections(),
-    countPendingRuns(),
-  ]);
-  return { user, inspections, pendingCount };
+
+  let migrateNote: string | null = null;
+  let inspections = await listManagedInspections();
+
+  // First visit after deploy: create missing inspection tables + seed defaults.
+  if (inspections.length === 0) {
+    try {
+      const results = await applyPendingMigrations();
+      const applied = results.filter((row) => row.status === "applied");
+      const failed = results.find((row) => row.status === "failed");
+      if (failed) {
+        migrateNote = `Migration ${failed.name} failed: ${failed.detail ?? "unknown error"}`;
+      } else if (applied.length > 0) {
+        const seeded = await seedDefaultInspections();
+        migrateNote = `Applied ${applied.length} migration(s) and seeded ${seeded} inspections.`;
+        inspections = await listManagedInspections();
+      }
+    } catch (error) {
+      migrateNote =
+        error instanceof Error
+          ? error.message
+          : "Could not apply inspection migrations.";
+    }
+  }
+
+  const pendingCount = await countPendingRuns();
+  return { user, inspections, pendingCount, migrateNote };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -88,7 +112,7 @@ export default function InspectionsManagePage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { user, inspections, pendingCount } = loaderData;
+  const { user, inspections, pendingCount, migrateNote } = loaderData;
 
   return (
     <div className="app-shell">
@@ -111,6 +135,11 @@ export default function InspectionsManagePage({
             Create checklists and add questions (yes/no, text, or radio
             options). Operators see available inspections on the home page.
           </p>
+          {migrateNote ? (
+            <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
+              {migrateNote}
+            </p>
+          ) : null}
           {actionData && "error" in actionData && actionData.error ? (
             <p className="mt-3 text-sm text-destructive">{actionData.error}</p>
           ) : null}
