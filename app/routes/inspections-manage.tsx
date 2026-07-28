@@ -22,7 +22,7 @@ import {
   seedDefaultInspections,
   setInspectionAvailability,
 } from "~/lib/inspections.server";
-import { applyPendingMigrations } from "~/lib/migrate.server";
+import { ensureInspectionSchema } from "~/lib/migrate.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -40,30 +40,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   let migrateNote: string | null = null;
   let inspections = await listManagedInspections();
 
-  // First visit after deploy: create missing tables, then always seed defaults
-  // when the manage list is empty (not only when a migration was newly applied).
+  // First visit after deploy: create missing tables, then seed defaults.
   if (inspections.length === 0) {
     try {
-      const results = await applyPendingMigrations();
-      const applied = results.filter((row) => row.status === "applied");
-      const failed = results.find((row) => row.status === "failed");
-      if (failed) {
-        migrateNote = `Migration ${failed.name} failed: ${failed.detail ?? "unknown error"}`;
-      } else {
-        const seeded = await seedDefaultInspections();
-        const parts: string[] = [];
-        if (applied.length > 0) {
-          parts.push(`Applied ${applied.length} migration(s)`);
-        }
-        parts.push(`loaded ${seeded} default inspections`);
-        migrateNote = `${parts.join(" and ")}.`;
-        inspections = await listManagedInspections();
-      }
+      await ensureInspectionSchema();
+      const seeded = await seedDefaultInspections();
+      migrateNote = `Loaded ${seeded} default inspections.`;
+      inspections = await listManagedInspections();
     } catch (error) {
       migrateNote =
         error instanceof Error
           ? error.message
-          : "Could not apply inspection migrations.";
+          : "Could not create inspection tables.";
     }
   }
 
@@ -78,7 +66,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     if (intent === "seed-defaults") {
-      await applyPendingMigrations();
+      await ensureInspectionSchema();
       const seeded = await seedDefaultInspections();
       return { ok: true as const, seeded };
     }
