@@ -18,6 +18,7 @@ import {
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireAdmin } from "~/lib/auth.server";
 import { getPrisma } from "~/lib/db.server";
+import { seedDefaultInspections } from "~/lib/inspections.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -133,13 +134,17 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request, "/admin/db-migrate");
   const formData = await request.formData();
-  if (String(formData.get("intent") ?? "") !== "migrate") {
-    return data({ error: "Unknown action." }, { status: 400 });
-  }
+  const intent = String(formData.get("intent") ?? "");
 
   try {
-    const results = await applyPendingMigrations();
-    return { ok: true as const, results };
+    if (intent === "migrate") {
+      const results = await applyPendingMigrations();
+      return { ok: true as const, results };
+    }
+    if (intent === "seed") {
+      const seeded = await seedDefaultInspections();
+      return { ok: true as const, seeded };
+    }
   } catch (error) {
     return data(
       {
@@ -149,6 +154,8 @@ export async function action({ request }: Route.ActionArgs) {
       { status: 500 },
     );
   }
+
+  return data({ error: "Unknown action." }, { status: 400 });
 }
 
 export default function AdminDbMigratePage({
@@ -186,7 +193,8 @@ export default function AdminDbMigratePage({
             <CardTitle>Pending migrations</CardTitle>
             <CardDescription>
               Safe to run more than once — already-applied migrations are
-              skipped.
+              skipped. After migrations succeed, seed the default forklift and
+              daily checklists.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -209,10 +217,23 @@ export default function AdminDbMigratePage({
                 ))}
               </ul>
             ) : null}
-            <Form method="post">
-              <input type="hidden" name="intent" value="migrate" />
-              <Button type="submit">Apply pending migrations</Button>
-            </Form>
+            {actionData && "seeded" in actionData && actionData.seeded != null ? (
+              <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                Seeded {actionData.seeded} default inspections with questions.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-3">
+              <Form method="post">
+                <input type="hidden" name="intent" value="migrate" />
+                <Button type="submit">Apply pending migrations</Button>
+              </Form>
+              <Form method="post">
+                <input type="hidden" name="intent" value="seed" />
+                <Button type="submit" variant="outline">
+                  Seed default inspections
+                </Button>
+              </Form>
+            </div>
           </CardContent>
         </Card>
       </main>

@@ -270,6 +270,75 @@ async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
   }
 }
 
+/** Upsert built-in forklift / start-up / shut-down definitions after migrations. */
+export async function seedDefaultInspections(): Promise<number> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  for (const inspection of INSPECTION_DEFINITIONS) {
+    await prisma.inspection.upsert({
+      where: { id: inspection.id },
+      update: {
+        title: inspection.title,
+        description: inspection.description,
+        category: inspection.category,
+        href: inspection.href,
+        equipmentLabel: inspection.equipmentLabel ?? null,
+        isAvailable: true,
+        sortOrder: inspection.sortOrder,
+      },
+      create: {
+        id: inspection.id,
+        slug: inspection.slug,
+        title: inspection.title,
+        description: inspection.description,
+        category: inspection.category,
+        href: inspection.href,
+        equipmentLabel: inspection.equipmentLabel ?? null,
+        isAvailable: true,
+        sortOrder: inspection.sortOrder,
+      },
+    });
+
+    for (const question of inspection.questions) {
+      await prisma.inspectionQuestion.upsert({
+        where: { id: question.id },
+        update: {
+          inspectionId: inspection.id,
+          label: question.label,
+          helpText: question.helpText ?? null,
+          sectionTitle: question.sectionTitle ?? null,
+          type: question.type,
+          options:
+            question.type === "RADIO" ? question.options : Prisma.DbNull,
+          attentionValues: question.attentionValues,
+          required: question.required,
+          isActive: true,
+          sortOrder: question.sortOrder,
+        },
+        create: {
+          id: question.id,
+          inspectionId: inspection.id,
+          label: question.label,
+          helpText: question.helpText ?? null,
+          sectionTitle: question.sectionTitle ?? null,
+          type: question.type,
+          options:
+            question.type === "RADIO" ? question.options : Prisma.DbNull,
+          attentionValues: question.attentionValues,
+          required: question.required,
+          isActive: true,
+          sortOrder: question.sortOrder,
+        },
+      });
+    }
+  }
+
+  return INSPECTION_DEFINITIONS.length;
+}
+
 export async function createManagedInspection(args: {
   title: string;
   description?: string;
