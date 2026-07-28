@@ -53,6 +53,7 @@ model User {
   submittedRuns           CalculationRun[]  @relation("SubmittedBy")
   reviewedRuns            CalculationRun[]  @relation("ReviewedBy")
   submittedInspectionRuns InspectionRun[]   @relation("InspectionSubmittedBy")
+  inspectionVersions      InspectionVersion[] @relation("InspectionVersionChangedBy")
   pushSubscriptions       PushSubscription[]
 
   @@map("users")
@@ -120,12 +121,30 @@ model Inspection {
   equipmentLabel String?  @map("equipment_label")
   isAvailable    Boolean  @default(true) @map("is_available")
   sortOrder      Int      @default(0) @map("sort_order")
+  version        Int      @default(1)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   runs           InspectionRun[]
   questions      InspectionQuestion[]
+  versions       InspectionVersion[]
 
   @@map("inspections")
+}
+
+model InspectionVersion {
+  id            String     @id @default(cuid())
+  inspectionId  String     @map("inspection_id")
+  inspection    Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  version       Int
+  changeComment String     @map("change_comment")
+  changedById   String?    @map("changed_by_id")
+  changedBy     User?      @relation("InspectionVersionChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  snapshot      Json
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([inspectionId, version])
+  @@index([inspectionId, createdAt(sort: Desc)])
+  @@map("inspection_versions")
 }
 
 model InspectionQuestion {
@@ -149,19 +168,20 @@ model InspectionQuestion {
 }
 
 model InspectionRun {
-  id            String               @id @default(cuid())
-  inspectionId  String               @map("inspection_id")
-  inspection    Inspection           @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  operatorId    String?              @map("operator_id")
-  operator      Operator?            @relation(fields: [operatorId], references: [id], onDelete: SetNull)
-  submittedById String?              @map("submitted_by_id")
-  submittedBy   User?                @relation("InspectionSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
-  status        InspectionRunStatus
-  equipmentRef  String?              @map("equipment_ref")
-  responses     Json
-  summary       Json
-  notes         String?
-  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                 String               @id @default(cuid())
+  inspectionId       String               @map("inspection_id")
+  inspection         Inspection           @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  operatorId         String?              @map("operator_id")
+  operator           Operator?            @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  submittedById      String?              @map("submitted_by_id")
+  submittedBy        User?                @relation("InspectionSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  status             InspectionRunStatus
+  equipmentRef       String?              @map("equipment_ref")
+  inspectionVersion  Int?                 @map("inspection_version")
+  responses          Json
+  summary            Json
+  notes              String?
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([inspectionId])
   @@index([status, createdAt(sort: Desc)])

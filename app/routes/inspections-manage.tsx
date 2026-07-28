@@ -38,6 +38,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireOperatorManager(request);
 
   let migrateNote: string | null = null;
+  try {
+    await ensureInspectionSchema();
+  } catch {
+    // Schema ensure is best-effort; list/seed errors surface below.
+  }
+
   let inspections = await listManagedInspections();
 
   // First visit after deploy: create missing tables, then seed defaults.
@@ -244,6 +250,7 @@ export default function InspectionsManagePage({
                             {inspection.title}
                           </p>
                           <Badge variant="secondary">{inspection.category}</Badge>
+                          <Badge variant="outline">v{inspection.version}</Badge>
                           {!inspection.isAvailable ? (
                             <Badge variant="outline">Hidden</Badge>
                           ) : null}

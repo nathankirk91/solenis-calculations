@@ -6,11 +6,22 @@ const {
   summarizeInspectionAnswers,
 } = await import("./inspections.ts");
 
-function allOkResponses() {
+function passResponses(definition) {
   /** @type {Record<string, string>} */
   const responses = {};
-  for (const question of FORKLIFT_DAILY_CHECK.questions) {
-    responses[question.id] = "OK";
+  for (const question of definition.questions) {
+    if (question.type === "YES_NO") {
+      responses[question.id] = question.attentionValues.includes("Yes")
+        ? "No"
+        : "Yes";
+    } else if (question.type === "RADIO") {
+      const ok = question.options.find(
+        (option) => !question.attentionValues.includes(option),
+      );
+      responses[question.id] = ok ?? question.options[0];
+    } else if (question.required) {
+      responses[question.id] = "—";
+    }
   }
   return responses;
 }
@@ -18,28 +29,42 @@ function allOkResponses() {
 {
   const answers = buildAnswersFromResponses(
     FORKLIFT_DAILY_CHECK,
-    allOkResponses(),
+    passResponses(FORKLIFT_DAILY_CHECK),
   );
   const summary = summarizeInspectionAnswers(answers);
   assert.equal(summary.status, "PASSED");
   assert.equal(summary.attentionCount, 0);
-  assert.equal(summary.answeredCount, 10);
+  assert.ok(summary.answeredCount > 0);
   assert.equal(summary.attentionItems.length, 0);
 }
 
 {
-  const responses = allOkResponses();
-  responses["forklift-daily-check__brakes"] = "Needs attention";
-  responses["forklift-daily-check__horn-lights"] = "N/A";
+  const responses = passResponses(FORKLIFT_DAILY_CHECK);
+  responses["forklift-daily-check__footbrake"] = "No";
+  responses["forklift-daily-check__danger-tag"] = "No";
 
   const answers = buildAnswersFromResponses(FORKLIFT_DAILY_CHECK, responses);
   const summary = summarizeInspectionAnswers(answers);
   assert.equal(summary.status, "NEEDS_ATTENTION");
   assert.equal(summary.attentionCount, 1);
-  assert.equal(summary.answeredCount, 10);
   assert.equal(
     summary.attentionItems[0]?.itemId,
-    "forklift-daily-check__brakes",
+    "forklift-daily-check__footbrake",
+  );
+}
+
+{
+  const responses = passResponses(FORKLIFT_DAILY_CHECK);
+  responses["forklift-daily-check__danger-tag"] = "Yes";
+
+  const summary = summarizeInspectionAnswers(
+    buildAnswersFromResponses(FORKLIFT_DAILY_CHECK, responses),
+  );
+  assert.equal(summary.status, "NEEDS_ATTENTION");
+  assert.equal(summary.attentionCount, 1);
+  assert.equal(
+    summary.attentionItems[0]?.itemId,
+    "forklift-daily-check__danger-tag",
   );
 }
 

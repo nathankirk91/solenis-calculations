@@ -113,17 +113,41 @@ export function InspectionChecklistForm({
                 <Label htmlFor={fields.equipmentRef.id}>
                   {definition.equipmentLabel}
                 </Label>
-                <Input
-                  {...getInputProps(fields.equipmentRef, { type: "text" })}
-                  key={fields.equipmentRef.key}
-                  placeholder="e.g. FL-01"
-                  autoComplete="off"
-                />
+                {definition.equipmentChoices?.length ? (
+                  <select
+                    {...getSelectProps(fields.equipmentRef)}
+                    key={fields.equipmentRef.key}
+                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+                    required
+                  >
+                    <option value="">Select unit…</option>
+                    {definition.equipmentChoices.map((choice) => (
+                      <option key={choice.value} value={choice.value}>
+                        {choice.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    {...getInputProps(fields.equipmentRef, { type: "text" })}
+                    key={fields.equipmentRef.key}
+                    placeholder="e.g. FL-01"
+                    autoComplete="off"
+                  />
+                )}
                 {fields.equipmentRef.errors ? (
                   <p className="text-sm text-destructive">
                     {fields.equipmentRef.errors.join(" ")}
                   </p>
                 ) : null}
+              </section>
+            ) : null}
+
+            {definition.instructionNotes ? (
+              <section
+                className="rounded-lg border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+              >
+                {definition.instructionNotes}
               </section>
             ) : null}
 

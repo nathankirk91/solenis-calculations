@@ -67,7 +67,18 @@ export function createInspectionSchema(definition: InspectionDefinition) {
       responses: z.object(responseShape),
     })
     .superRefine((value, ctx) => {
-      if (definition.equipmentLabel && !value.equipmentRef) {
+      if (definition.equipmentChoices?.length) {
+        const allowed = new Set(
+          definition.equipmentChoices.map((choice) => choice.value),
+        );
+        if (!value.equipmentRef || !allowed.has(value.equipmentRef)) {
+          ctx.addIssue({
+            code: "custom",
+            message: `Select ${definition.equipmentLabel ?? "a unit"}.`,
+            path: ["equipmentRef"],
+          });
+        }
+      } else if (definition.equipmentLabel && !value.equipmentRef) {
         ctx.addIssue({
           code: "custom",
           message: `${definition.equipmentLabel} is required.`,

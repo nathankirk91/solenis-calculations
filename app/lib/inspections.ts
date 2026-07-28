@@ -26,6 +26,10 @@ export type InspectionDefinition = {
   href: string;
   sortOrder: number;
   equipmentLabel?: string | null;
+  /** When set, operators pick a unit from this list instead of free text. */
+  equipmentChoices?: Array<{ value: string; label: string }>;
+  /** Extra guidance shown above the checklist (e.g. Form 78 instructions). */
+  instructionNotes?: string | null;
   isAvailable: boolean;
   questions: InspectionQuestionDef[];
 };
@@ -100,82 +104,394 @@ function statusQuestion(
   };
 }
 
+function yesNoQuestion(
+  inspectionId: string,
+  id: string,
+  label: string,
+  sectionTitle: string,
+  sortOrder: number,
+  opts?: {
+    required?: boolean;
+    helpText?: string;
+    attentionValues?: string[];
+  },
+): InspectionQuestionDef {
+  return {
+    id: `${inspectionId}__${id}`,
+    label,
+    sectionTitle,
+    type: "YES_NO",
+    options: [...YES_NO_OPTIONS],
+    attentionValues: opts?.attentionValues ?? [...DEFAULT_YES_NO_ATTENTION],
+    required: opts?.required ?? true,
+    sortOrder,
+    helpText: opts?.helpText,
+  };
+}
+
+function radioQuestion(
+  inspectionId: string,
+  id: string,
+  label: string,
+  sectionTitle: string,
+  options: string[],
+  sortOrder: number,
+  opts?: {
+    required?: boolean;
+    helpText?: string;
+    attentionValues?: string[];
+  },
+): InspectionQuestionDef {
+  return {
+    id: `${inspectionId}__${id}`,
+    label,
+    sectionTitle,
+    type: "RADIO",
+    options,
+    attentionValues: opts?.attentionValues ?? [],
+    required: opts?.required ?? true,
+    sortOrder,
+    helpText: opts?.helpText,
+  };
+}
+
+function textQuestion(
+  inspectionId: string,
+  id: string,
+  label: string,
+  sectionTitle: string,
+  sortOrder: number,
+  opts?: { required?: boolean; helpText?: string },
+): InspectionQuestionDef {
+  return {
+    id: `${inspectionId}__${id}`,
+    label,
+    sectionTitle,
+    type: "TEXT",
+    options: [],
+    attentionValues: [],
+    required: opts?.required ?? true,
+    sortOrder,
+    helpText: opts?.helpText,
+  };
+}
+
+/** ADAPT-A-LIFT unit numbers on Form 78 (6 forklifts, checked each shift). */
+export const FORKLIFT_UNITS = [
+  {
+    value: "H20287",
+    label: "H20287 — Low Mast (NZ, Non-Zoned)",
+  },
+  {
+    value: "H57168",
+    label: "H57168 — Low Mast (NZ, Non-Zoned)",
+  },
+  {
+    value: "H57171",
+    label: "H57171 — Rosin / Grab (Non-Zoned)",
+  },
+  {
+    value: "H57170",
+    label: "H57170 — High Mast (NZ, Non-Zoned)",
+  },
+  {
+    value: "H15660",
+    label: "H15660 — High Mast (Z, Zoned)",
+  },
+  {
+    value: "H15659",
+    label: "H15659 — Low Mast (Z, Zoned)",
+  },
+] as const;
+
 export const FORKLIFT_DAILY_CHECK: InspectionDefinition = {
   id: "forklift-daily-check",
   slug: "forklift-daily-check",
-  title: "Forklift — Daily Check",
+  title: "Forklift — Daily Safety Check (Form 78)",
   shortName: "Forklift check",
   description:
-    "Pre-use forklift safety check before operating. Mark each item OK, Needs attention, or N/A.",
+    "Start-of-shift forklift safety check for each unit before use. Complete one form per forklift at the beginning of each shift (day and afternoon), Monday–Friday. Checks must be done outside restricted areas (DG warehouse), in a clear area away from people and other vehicles.",
   category: "Equipment",
   href: "/inspections/forklift-daily-check",
   sortOrder: 1,
-  equipmentLabel: "Forklift / unit ID",
+  equipmentLabel: "Unit No.",
+  equipmentChoices: [...FORKLIFT_UNITS],
+  instructionNotes:
+    "First operator of each shift must complete this check. All items must be Yes (or repaired before use). If faults are found or service is overdue, call ADAPT-A-LIFT on (03) 9547 8000 — report the unit number (e.g. H57168) and schedule service. Note defects in comments for the next shift and management.",
   isAvailable: true,
   questions: [
-    statusQuestion("forklift-daily-check", "tyres", "Tyres / wheels — condition, pressure, debris", "Pre-start visual", 1),
-    statusQuestion(
+    radioQuestion(
       "forklift-daily-check",
-      "forks-mast",
-      "Forks, mast, chains, and carriage — no damage or slack",
-      "Pre-start visual",
+      "shift",
+      "Shift",
+      "Shift details",
+      ["Day", "Afternoon"],
+      1,
+    ),
+    textQuestion(
+      "forklift-daily-check",
+      "hour-meter",
+      "Hour meter reading",
+      "Shift details",
       2,
+      { helpText: "Reading from the hour meter before start." },
     ),
-    statusQuestion(
+    textQuestion(
       "forklift-daily-check",
-      "hydraulics",
-      "Hydraulics — no leaks under mast or cylinders",
-      "Pre-start visual",
+      "service-date",
+      "Service date",
+      "Before start",
       3,
+      { helpText: "Date from the service sticker (as on Form 78)." },
     ),
-    statusQuestion(
+    yesNoQuestion(
       "forklift-daily-check",
-      "body-damage",
-      "Body / overhead guard — no new damage",
-      "Pre-start visual",
+      "fuel-level",
+      "Fuel level",
+      "Before start",
       4,
     ),
-    statusQuestion(
+    yesNoQuestion(
       "forklift-daily-check",
-      "capacity-plate",
-      "Load capacity plate readable and fitted",
-      "Pre-start visual",
+      "engine-oil",
+      "Engine oil level",
+      "Before start",
       5,
+      {
+        required: false,
+        helpText: "Skip if not applicable to this unit (shaded on paper form).",
+      },
     ),
-    statusQuestion(
+    yesNoQuestion(
       "forklift-daily-check",
-      "horn-lights",
-      "Horn, lights, and reverse beeper working",
-      "Controls & safety devices",
+      "brake-fluid",
+      "Brake fluid level",
+      "Before start",
       6,
     ),
-    statusQuestion(
+    yesNoQuestion(
       "forklift-daily-check",
-      "seat-belt",
-      "Seat belt / operator restraint functional",
-      "Controls & safety devices",
+      "wheel-nuts",
+      "Wheel nuts / clamps",
+      "Before start",
       7,
     ),
-    statusQuestion(
+    yesNoQuestion(
       "forklift-daily-check",
-      "brakes",
-      "Service and parking brakes effective",
-      "Controls & safety devices",
+      "tyres",
+      "Tyre condition",
+      "Before start",
       8,
     ),
-    statusQuestion(
+    yesNoQuestion(
       "forklift-daily-check",
-      "steering",
-      "Steering smooth with no excessive play",
-      "Controls & safety devices",
+      "canopy-masts",
+      "No cracks — canopy stays / masts",
+      "Before start",
       9,
     ),
-    statusQuestion(
+    yesNoQuestion(
       "forklift-daily-check",
-      "fluids-fuel",
-      "Fluids / battery / fuel or LPG adequate",
-      "Controls & safety devices",
+      "lifting-capacity",
+      "Lifting capacity",
+      "Before start",
       10,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "seat-belt",
+      "Seat belt",
+      "Before start",
+      11,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "physical-damage",
+      "No physical damage",
+      "Before start",
+      12,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "hydraulic-oil",
+      "Hydraulic oil",
+      "Before start",
+      13,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "scrubber-drained",
+      "Scrubber drained",
+      "Weekly (1st day shift of week)",
+      14,
+      {
+        required: false,
+        helpText: "Once per week on the first day shift only.",
+      },
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "scrubber-washed",
+      "Scrubber washed as per Chess",
+      "Weekly (1st day shift of week)",
+      15,
+      {
+        required: false,
+        helpText: "Once per week on the first day shift only.",
+      },
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "flameproofers",
+      "Flameproofers mtce instruction",
+      "Weekly (1st day shift of week)",
+      16,
+      {
+        required: false,
+        helpText: "Zoned units only; once per week on first day shift.",
+      },
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "anode",
+      "Anode condition",
+      "Weekly (1st day shift of week)",
+      17,
+      {
+        required: false,
+        helpText: "Once per week on the first day shift only.",
+      },
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "air-receiver",
+      "Air receiver drained of water",
+      "Weekly (1st day shift of week)",
+      18,
+      {
+        required: false,
+        helpText: "Once per week on the first day shift only.",
+      },
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "windscreen",
+      "Windscreen clean",
+      "Before start",
+      19,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "canopy-cover",
+      "Canopy cover clean",
+      "Before start",
+      20,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "fire-extinguisher",
+      "Fire extinguisher (date within 6 months)",
+      "Before start",
+      21,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "wipers",
+      "Wiper blades and windscreen water tank",
+      "Before start",
+      22,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "danger-tag",
+      "Forklift tagged out (DANGER TAG)",
+      "Tagged out",
+      23,
+      {
+        attentionValues: ["Yes"],
+        helpText: "Select Yes only if the unit is tagged out and must not be used.",
+      },
+    ),
+    textQuestion(
+      "forklift-daily-check",
+      "reported-to",
+      "Reported immediately to",
+      "Tagged out",
+      24,
+      {
+        required: false,
+        helpText: "If tagged out or a fault was reported.",
+      },
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "footbrake",
+      "Footbrake operation",
+      "After start",
+      25,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "handbrake",
+      "Handbrake operation",
+      "After start",
+      26,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "steering",
+      "Steering operation",
+      "After start",
+      27,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "hoist-tilt",
+      "Hoist / tilt operation",
+      "After start",
+      28,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "rotary-sideshift",
+      "Rotary / sideshift operation",
+      "After start",
+      29,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "horn-alarm",
+      "Horn / reverse alarm",
+      "After start",
+      30,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "gauges",
+      "Gauges & instruments",
+      "After start",
+      31,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "fluid-leaks",
+      "No fluid leaks",
+      "After start",
+      32,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "lights-front",
+      "Lights — front",
+      "After start",
+      33,
+    ),
+    yesNoQuestion(
+      "forklift-daily-check",
+      "coolant",
+      "Engine coolant / water level ok",
+      "After start",
+      34,
     ),
   ],
 };
