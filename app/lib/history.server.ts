@@ -38,7 +38,14 @@ export async function listCalculationHistory(
   const rows = await prisma.calculationRun.findMany({
     orderBy: { createdAt: "desc" },
     take: limit,
-    include: {
+    select: {
+      id: true,
+      status: true,
+      createdAt: true,
+      reviewedAt: true,
+      reviewNote: true,
+      outputs: true,
+      inputs: true,
       calculation: { select: { title: true, href: true } },
       operator: { select: { name: true } },
       reviewedBy: { select: { name: true, email: true } },
