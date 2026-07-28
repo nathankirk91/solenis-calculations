@@ -1134,14 +1134,20 @@ export async function listInspectionHistory(
   const rows = await prisma.inspectionRun.findMany({
     orderBy: { createdAt: "desc" },
     take: limit,
-    include: {
+    select: {
+      id: true,
+      status: true,
+      createdAt: true,
+      equipmentRef: true,
+      notes: true,
+      summary: true,
       inspection: { select: { id: true, title: true, href: true } },
       operator: { select: { name: true } },
     },
   });
 
   return rows.map((row) => {
-    const answers = parseAnswers(row.responses);
+    const summary = parseSummary(row.summary);
     return {
       id: row.id,
       status: row.status,
@@ -1152,9 +1158,10 @@ export async function listInspectionHistory(
       operatorName: row.operator?.name ?? null,
       equipmentRef: row.equipmentRef,
       notes: row.notes,
-      summary: parseSummary(row.summary),
-      answers,
-      responseRows: answers,
+      summary,
+      // Full answers are loaded on the submission detail page only.
+      answers: [],
+      responseRows: [],
     };
   });
 }

@@ -7,7 +7,7 @@ Plant calculation and inspection tools for Solenis production processes.
 - **React Router 8** (framework mode + Vite SSR)
 - **Prisma 7** ORM against **Supabase Postgres**
 - **remix-auth** + **FormStrategy** (email/password)
-- **Vercel** (`@vercel/react-router` preset)
+- **Vercel** (`@vercel/react-router` preset) — functions run in **Sydney (`syd1`)** close to the plant
 - **Tailwind CSS 4** + **shadcn/ui**
 - **Conform** + **Zod** for forms
 
