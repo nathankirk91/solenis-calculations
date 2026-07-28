@@ -145,7 +145,7 @@ Default seeded inspections:
 
 | Inspection | Route |
 |---|---|
-| Forklift — Daily Check | `/inspections/forklift-daily-check` |
+| Forklift — Daily Safety Check (Form 78) | `/inspections/forklift-daily-check` |
 | Daily Start-up | `/inspections/daily-startup` |
 | Daily Shut-down | `/inspections/daily-shutdown` |
 
