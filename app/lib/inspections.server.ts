@@ -214,10 +214,27 @@ export async function getInspectionDefinition(
       return getFallbackInspectionByIdOrSlug(idOrSlug) ?? null;
     }
 
-    return mapDefinition(row);
+    return mergeStaticDefinitionMeta(mapDefinition(row));
   } catch {
     return getFallbackInspectionByIdOrSlug(idOrSlug) ?? null;
   }
+}
+
+/** Static checklist metadata (unit list, Form 78 notes) lives in code, not the DB. */
+function mergeStaticDefinitionMeta(
+  definition: InspectionDefinition,
+): InspectionDefinition {
+  const fallback = getFallbackInspectionByIdOrSlug(definition.id);
+  if (!fallback) {
+    return definition;
+  }
+
+  return {
+    ...definition,
+    equipmentLabel: definition.equipmentLabel ?? fallback.equipmentLabel,
+    equipmentChoices: fallback.equipmentChoices ?? definition.equipmentChoices,
+    instructionNotes: fallback.instructionNotes ?? definition.instructionNotes,
+  };
 }
 
 export async function listManagedInspections(): Promise<ManagedInspection[]> {
@@ -626,6 +643,16 @@ export async function seedDefaultInspections(): Promise<number> {
         },
       });
     }
+
+    const questionIds = inspection.questions.map((question) => question.id);
+    await prisma.inspectionQuestion.updateMany({
+      where: {
+        inspectionId: inspection.id,
+        isActive: true,
+        id: { notIn: questionIds },
+      },
+      data: { isActive: false },
+    });
 
     await ensureBaselineInspectionVersion(
       inspection.id,
