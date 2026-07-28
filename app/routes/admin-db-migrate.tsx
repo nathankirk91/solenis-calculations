@@ -15,7 +15,7 @@ import {
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireAdmin } from "~/lib/auth.server";
 import { seedDefaultInspections } from "~/lib/inspections.server";
-import { applyPendingMigrations } from "~/lib/migrate.server";
+import { applyPendingMigrations, ensureInspectionSchema } from "~/lib/migrate.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -44,6 +44,7 @@ export async function action({ request }: Route.ActionArgs) {
       return { ok: true as const, results };
     }
     if (intent === "seed") {
+      await ensureInspectionSchema();
       const seeded = await seedDefaultInspections();
       return { ok: true as const, seeded };
     }
