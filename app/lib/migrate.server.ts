@@ -23,8 +23,23 @@ async function listMigrationDirs(): Promise<string[]> {
  * Ensure inspection tables/enums exist without reading prisma/migrations from disk.
  * Vercel serverless builds do not ship the migrations folder, so runtime
  * `readdir(prisma/migrations)` fails — this is the production-safe path.
+ *
+ * Memoized per warm function instance so navigations do not re-run ~24 DDL
+ * statements against Supabase on every manage page load.
  */
+let inspectionSchemaReady: Promise<void> | null = null;
+
 export async function ensureInspectionSchema(): Promise<void> {
+  if (!inspectionSchemaReady) {
+    inspectionSchemaReady = ensureInspectionSchemaOnce().catch((error) => {
+      inspectionSchemaReady = null;
+      throw error;
+    });
+  }
+  await inspectionSchemaReady;
+}
+
+async function ensureInspectionSchemaOnce(): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("DATABASE_URL is not configured.");

@@ -308,39 +308,42 @@ export async function getManagedInspection(
     return null;
   }
 
-  await ensureBaselineInspectionVersion(row.id);
-
-  const refreshed =
-    row.versions.length > 0
-      ? row
-      : await prisma.inspection.findUnique({
-          where: { id },
+  // Only backfill version 1 when this inspection has no history yet.
+  if (row.versions.length === 0) {
+    await ensureBaselineInspectionVersion(row.id);
+    const refreshed = await prisma.inspection.findUnique({
+      where: { id },
+      include: {
+        questions: {
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+        },
+        versions: {
+          orderBy: { version: "desc" },
           include: {
-            questions: {
-              where: { isActive: true },
-              orderBy: { sortOrder: "asc" },
-            },
-            versions: {
-              orderBy: { version: "desc" },
-              include: {
-                changedBy: {
-                  select: { name: true, email: true },
-                },
-              },
+            changedBy: {
+              select: { name: true, email: true },
             },
           },
-        });
-
-  if (!refreshed) {
-    return null;
+        },
+      },
+    });
+    if (!refreshed) {
+      return null;
+    }
+    return {
+      ...mapDefinition(refreshed),
+      version: refreshed.version ?? 1,
+      versions: refreshed.versions.map((version) =>
+        mapVersionHistoryItem(version),
+      ),
+    };
   }
 
   return {
-    ...mapDefinition(refreshed),
-    version: refreshed.version ?? 1,
-    versions: refreshed.versions.map((version) =>
-      mapVersionHistoryItem(version),
-    ),
+    ...mapDefinition(row),
+    version: row.version ?? 1,
+    versions: row.versions.map((version) => mapVersionHistoryItem(version)),
   };
 }
 

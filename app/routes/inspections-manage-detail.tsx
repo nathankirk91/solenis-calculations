@@ -32,7 +32,6 @@ import {
   updateManagedInspection,
   type InspectionVersionHistoryItem,
 } from "~/lib/inspections.server";
-import { ensureInspectionSchema } from "~/lib/migrate.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -46,11 +45,6 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireOperatorManager(request);
-  try {
-    await ensureInspectionSchema();
-  } catch {
-    // Best-effort schema ensure for version history columns.
-  }
   const inspection = await getManagedInspection(params.inspectionId);
   if (!inspection) {
     throw new Response("Inspection not found", { status: 404 });

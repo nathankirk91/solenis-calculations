@@ -14,7 +14,6 @@ import {
   type UserRole,
 } from "~/lib/roles";
 import {
-  findAuthUserById,
   verifyLogin,
   type AuthUser,
 } from "~/lib/user.server";
@@ -44,9 +43,9 @@ export async function getUser(request: Request): Promise<AuthUser | null> {
     return null;
   }
 
-  // Refresh from DB so role changes apply without forcing a re-login.
-  const fresh = await findAuthUserById(sessionUser.id);
-  return fresh ?? sessionUser;
+  // Trust the session on each navigation. A DB round-trip here made every
+  // in-app click wait on Supabase; role changes take effect on next login.
+  return sessionUser;
 }
 
 export async function requireUser(
