@@ -95,6 +95,16 @@ export default function ManagersPage({
             Create manager accounts that can review approvals and manage
             operators.
           </p>
+          <p className="mt-2 text-sm">
+            <Link
+              to="/admin/db-migrate"
+              className="text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Apply database migrations
+            </Link>
+            {" "}
+            if inspection tables are missing after a deploy.
+          </p>
           {actionData && "error" in actionData && actionData.error ? (
             <p className="mt-3 text-sm text-destructive">{actionData.error}</p>
           ) : null}

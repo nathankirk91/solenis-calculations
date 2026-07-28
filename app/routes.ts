@@ -7,6 +7,7 @@ export default [
   route("approvals", "routes/approvals.tsx"),
   route("operators", "routes/operators.tsx"),
   route("managers", "routes/managers.tsx"),
+  route("admin/db-migrate", "routes/admin-db-migrate.tsx"),
   route("history", "routes/history.tsx"),
   route("settings", "routes/settings.tsx"),
   route("push/subscribe", "routes/push-subscribe.tsx"),
