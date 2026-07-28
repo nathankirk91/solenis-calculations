@@ -50,8 +50,10 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
       CREATE TYPE "inspection_run_status" AS ENUM ('PASSED', 'NEEDS_ATTENTION');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `DO $$ BEGIN
-      CREATE TYPE "inspection_question_type" AS ENUM ('YES_NO', 'TEXT', 'RADIO');
+      CREATE TYPE "inspection_question_type" AS ENUM ('YES_NO', 'TEXT', 'RADIO', 'NUMBER', 'DATE');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `ALTER TYPE "inspection_question_type" ADD VALUE IF NOT EXISTS 'NUMBER'`,
+    `ALTER TYPE "inspection_question_type" ADD VALUE IF NOT EXISTS 'DATE'`,
     `CREATE TABLE IF NOT EXISTS "inspections" (
       "id" TEXT NOT NULL,
       "slug" TEXT NOT NULL,

@@ -19,6 +19,10 @@ function passResponses(definition) {
         (option) => !question.attentionValues.includes(option),
       );
       responses[question.id] = ok ?? question.options[0];
+    } else if (question.type === "NUMBER") {
+      responses[question.id] = "100";
+    } else if (question.type === "DATE") {
+      responses[question.id] = "2026-07-28";
     } else if (question.required) {
       responses[question.id] = "—";
     }

@@ -18,7 +18,7 @@ export function createInspectionSchema(definition: InspectionDefinition) {
 
   for (const question of definition.questions) {
     if (question.type === "TEXT") {
-      let field = z.preprocess(
+      responseShape[question.id] = z.preprocess(
         emptyToUndefined,
         z
           .string()
@@ -26,7 +26,24 @@ export function createInspectionSchema(definition: InspectionDefinition) {
           .max(2000, "Keep the answer under 2000 characters.")
           .optional(),
       );
-      responseShape[question.id] = field;
+    } else if (question.type === "NUMBER") {
+      responseShape[question.id] = z.preprocess(
+        emptyToUndefined,
+        z
+          .string()
+          .trim()
+          .regex(/^-?\d+(\.\d+)?$/, "Enter a valid number.")
+          .optional(),
+      );
+    } else if (question.type === "DATE") {
+      responseShape[question.id] = z.preprocess(
+        emptyToUndefined,
+        z
+          .string()
+          .trim()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date.")
+          .optional(),
+      );
     } else if (question.type === "YES_NO") {
       responseShape[question.id] = z.enum(["Yes", "No"], {
         error: "Select Yes or No.",
@@ -92,7 +109,9 @@ export function createInspectionSchema(definition: InspectionDefinition) {
           ctx.addIssue({
             code: "custom",
             message:
-              question.type === "TEXT"
+              question.type === "TEXT" ||
+              question.type === "NUMBER" ||
+              question.type === "DATE"
                 ? "Enter an answer."
                 : "Select an answer.",
             path: ["responses", question.id],

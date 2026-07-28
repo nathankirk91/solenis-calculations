@@ -217,6 +217,25 @@ export function InspectionChecklistForm({
                               aria-invalid={Boolean(field.errors)}
                             />
                           </div>
+                        ) : question.type === "NUMBER" ? (
+                          <div className="mt-3">
+                            <Input
+                              {...getInputProps(field, { type: "number" })}
+                              key={field.key}
+                              inputMode="decimal"
+                              step="any"
+                              placeholder="e.g. 4025.3"
+                              className="max-w-xs"
+                            />
+                          </div>
+                        ) : question.type === "DATE" ? (
+                          <div className="mt-3">
+                            <Input
+                              {...getInputProps(field, { type: "date" })}
+                              key={field.key}
+                              className="max-w-xs"
+                            />
+                          </div>
                         ) : (
                           <fieldset className="mt-3">
                             <legend className="sr-only">{question.label}</legend>

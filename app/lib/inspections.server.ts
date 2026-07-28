@@ -353,7 +353,11 @@ function parseVersionSnapshot(value: unknown): InspectionVersionSnapshot {
     ? snapshot.questions.map((question) => {
         const row = question as Partial<InspectionQuestionDef>;
         const type: InspectionQuestionType =
-          row.type === "YES_NO" || row.type === "TEXT" || row.type === "RADIO"
+          row.type === "YES_NO" ||
+          row.type === "TEXT" ||
+          row.type === "RADIO" ||
+          row.type === "NUMBER" ||
+          row.type === "DATE"
             ? row.type
             : "TEXT";
         const options = Array.isArray(row.options)
@@ -808,7 +812,7 @@ export async function addInspectionQuestion(args: {
     defaultAttentionValues(args.type, options);
 
   const normalizedAttention =
-    args.type === "TEXT"
+    args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
       ? []
       : attentionValues.filter((value) =>
           args.type === "YES_NO"
@@ -830,7 +834,7 @@ export async function addInspectionQuestion(args: {
       type: args.type,
       options: args.type === "RADIO" ? options : Prisma.DbNull,
       attentionValues:
-        args.type === "TEXT"
+        args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
           ? Prisma.DbNull
           : normalizedAttention.length
             ? normalizedAttention
@@ -930,7 +934,7 @@ export async function updateInspectionQuestion(args: {
     defaultAttentionValues(args.type, options);
 
   const normalizedAttention =
-    args.type === "TEXT"
+    args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
       ? []
       : attentionValues.filter((value) =>
           args.type === "YES_NO"
@@ -947,7 +951,7 @@ export async function updateInspectionQuestion(args: {
       type: args.type,
       options: args.type === "RADIO" ? options : Prisma.DbNull,
       attentionValues:
-        args.type === "TEXT"
+        args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
           ? Prisma.DbNull
           : normalizedAttention.length
             ? normalizedAttention
@@ -1089,7 +1093,11 @@ function parseAnswers(value: unknown): InspectionAnswerRecord[] {
         label: String(row.label ?? ""),
         sectionTitle: row.sectionTitle ? String(row.sectionTitle) : null,
         type:
-          row.type === "YES_NO" || row.type === "TEXT" || row.type === "RADIO"
+          row.type === "YES_NO" ||
+          row.type === "TEXT" ||
+          row.type === "RADIO" ||
+          row.type === "NUMBER" ||
+          row.type === "DATE"
             ? row.type
             : "TEXT",
         answer: String(row.answer ?? ""),

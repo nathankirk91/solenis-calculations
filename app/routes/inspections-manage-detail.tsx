@@ -20,6 +20,7 @@ import { requireOperatorManager } from "~/lib/auth.server";
 import {
   INSPECTION_QUESTION_TYPES,
   YES_NO_OPTIONS,
+  questionTypeLabel,
   type InspectionQuestionDef,
   type InspectionQuestionType,
 } from "~/lib/inspections";
@@ -247,6 +248,8 @@ function QuestionFields({
         >
           <option value="YES_NO">Yes / No</option>
           <option value="TEXT">Text box</option>
+          <option value="NUMBER">Number</option>
+          <option value="DATE">Date</option>
           <option value="RADIO">Radio options</option>
         </select>
       </div>
@@ -413,11 +416,7 @@ function QuestionEditor({
             <span className="text-xs text-muted-foreground">#{index + 1}</span>
             <p className="font-medium text-brand-navy">{question.label}</p>
             <Badge variant="secondary">
-              {question.type === "YES_NO"
-                ? "Yes / No"
-                : question.type === "TEXT"
-                  ? "Text"
-                  : "Radio"}
+              {questionTypeLabel(question.type)}
             </Badge>
             {!question.required ? (
               <Badge variant="outline">Optional</Badge>
@@ -573,13 +572,7 @@ function VersionHistory({
                     {question.label}
                     <span className="text-muted-foreground">
                       {" "}
-                      (
-                      {question.type === "YES_NO"
-                        ? "Yes / No"
-                        : question.type === "TEXT"
-                          ? "Text"
-                          : "Radio"}
-                      )
+                      ({questionTypeLabel(question.type)})
                     </span>
                   </li>
                 ))}
@@ -712,8 +705,9 @@ export default function InspectionsManageDetailPage({
             <CardHeader>
               <CardTitle>Add question</CardTitle>
               <CardDescription>
-                Choose yes/no, a text box, or radio options. Mark which answers
-                should flag “needs attention”. Saving creates a new version.
+                Choose yes/no, number, date, a text box, or radio options. Mark
+                which answers should flag “needs attention”. Saving creates a
+                new version.
               </CardDescription>
             </CardHeader>
             <CardContent>
