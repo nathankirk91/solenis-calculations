@@ -40,7 +40,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   let migrateNote: string | null = null;
   let inspections = await listManagedInspections();
 
-  // First visit after deploy: create missing inspection tables + seed defaults.
+  // First visit after deploy: create missing tables, then always seed defaults
+  // when the manage list is empty (not only when a migration was newly applied).
   if (inspections.length === 0) {
     try {
       const results = await applyPendingMigrations();
@@ -48,9 +49,14 @@ export async function loader({ request }: Route.LoaderArgs) {
       const failed = results.find((row) => row.status === "failed");
       if (failed) {
         migrateNote = `Migration ${failed.name} failed: ${failed.detail ?? "unknown error"}`;
-      } else if (applied.length > 0) {
+      } else {
         const seeded = await seedDefaultInspections();
-        migrateNote = `Applied ${applied.length} migration(s) and seeded ${seeded} inspections.`;
+        const parts: string[] = [];
+        if (applied.length > 0) {
+          parts.push(`Applied ${applied.length} migration(s)`);
+        }
+        parts.push(`loaded ${seeded} default inspections`);
+        migrateNote = `${parts.join(" and ")}.`;
         inspections = await listManagedInspections();
       }
     } catch (error) {
@@ -71,6 +77,12 @@ export async function action({ request }: Route.ActionArgs) {
   const intent = String(formData.get("intent") ?? "");
 
   try {
+    if (intent === "seed-defaults") {
+      await applyPendingMigrations();
+      const seeded = await seedDefaultInspections();
+      return { ok: true as const, seeded };
+    }
+
     if (intent === "create") {
       const created = await createManagedInspection({
         title: String(formData.get("title") ?? ""),
@@ -138,6 +150,12 @@ export default function InspectionsManagePage({
           {migrateNote ? (
             <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
               {migrateNote}
+            </p>
+          ) : null}
+          {actionData && "seeded" in actionData && actionData.seeded != null ? (
+            <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
+              Loaded {actionData.seeded} default inspections (forklift, start-up,
+              shut-down). You can edit their questions below.
             </p>
           ) : null}
           {actionData && "error" in actionData && actionData.error ? (
@@ -214,11 +232,17 @@ export default function InspectionsManagePage({
             </CardHeader>
             <CardContent>
               {inspections.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No inspections yet. Create one above, or run{" "}
-                  <code className="text-xs">npm run db:seed</code> for the
-                  defaults.
-                </p>
+                <div className="grid gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    No inspections in the database yet. Load the built-in
+                    forklift, daily start-up, and daily shut-down checklists to
+                    edit them.
+                  </p>
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="seed-defaults" />
+                    <Button type="submit">Load default inspections</Button>
+                  </Form>
+                </div>
               ) : (
                 <ul className="grid gap-3">
                   {inspections.map((inspection) => (
@@ -259,7 +283,7 @@ export default function InspectionsManagePage({
                             name="isAvailable"
                             value={String(inspection.isAvailable)}
                           />
-                          <Button type="submit" variant="outline" size="sm">
+                          <Button type="submit" variant="ghost" size="sm">
                             {inspection.isAvailable ? "Hide" : "Show"}
                           </Button>
                         </Form>
@@ -268,6 +292,14 @@ export default function InspectionsManagePage({
                   ))}
                 </ul>
               )}
+              {inspections.length > 0 ? (
+                <Form method="post" className="mt-4">
+                  <input type="hidden" name="intent" value="seed-defaults" />
+                  <Button type="submit" variant="outline" size="sm">
+                    Re-sync built-in defaults
+                  </Button>
+                </Form>
+              ) : null}
             </CardContent>
           </Card>
         </div>
