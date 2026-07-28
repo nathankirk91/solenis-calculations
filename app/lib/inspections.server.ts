@@ -201,27 +201,38 @@ export async function listManagedInspections(): Promise<ManagedInspection[]> {
     return [];
   }
 
-  const rows = await prisma.inspection.findMany({
-    orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-    include: {
-      _count: {
-        select: { questions: { where: { isActive: true } } },
+  try {
+    const rows = await prisma.inspection.findMany({
+      orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+      include: {
+        _count: {
+          select: { questions: { where: { isActive: true } } },
+        },
       },
-    },
-  });
+    });
 
-  return rows.map((row) => ({
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    description: row.description,
-    category: row.category,
-    href: row.href,
-    equipmentLabel: row.equipmentLabel,
-    isAvailable: row.isAvailable,
-    sortOrder: row.sortOrder,
-    questionCount: row._count.questions,
-  }));
+    return rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      href: row.href,
+      equipmentLabel: row.equipmentLabel,
+      isAvailable: row.isAvailable,
+      sortOrder: row.sortOrder,
+      questionCount: row._count.questions,
+    }));
+  } catch (error) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : "";
+    if (code === "P2021") {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function getManagedInspection(
