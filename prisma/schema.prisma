@@ -183,6 +183,7 @@ model InspectionRun {
   responses          Json
   summary            Json
   notes              String?
+  signature          String?
   createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([inspectionId])

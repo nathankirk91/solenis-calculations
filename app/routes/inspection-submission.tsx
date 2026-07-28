@@ -176,6 +176,19 @@ export default function InspectionSubmissionPage({
               </div>
             ) : null}
 
+            {run.signature ? (
+              <div className="rounded-lg border border-border/70 bg-background/50 p-4">
+                <p className="text-sm font-medium">Operator signature</p>
+                <div className="mt-2">
+                  <img
+                    src={run.signature}
+                    alt="Operator signature"
+                    className="h-24 w-auto rounded border border-border/50 bg-white object-contain sm:h-32"
+                  />
+                </div>
+              </div>
+            ) : null}
+
             <p className="text-sm text-muted-foreground">
               <Link
                 to={run.inspectionHref}

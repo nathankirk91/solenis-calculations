@@ -70,6 +70,7 @@ export type InspectionHistoryItem = {
   operatorName: string | null;
   equipmentRef: string | null;
   notes: string | null;
+  signature: string | null;
   summary: InspectionSummary;
   answers: InspectionAnswerRecord[];
   responseRows: InspectionResponseRow[];
@@ -1033,6 +1034,7 @@ export async function createInspectionRun(args: {
   submittedById: string;
   equipmentRef: string | null;
   notes: string | null;
+  signature?: string | null;
   answers: InspectionAnswerRecord[];
   summary: InspectionSummary;
 }): Promise<{ id: string } | null> {
@@ -1054,6 +1056,7 @@ export async function createInspectionRun(args: {
       status: args.summary.status,
       equipmentRef: args.equipmentRef,
       notes: args.notes,
+      signature: args.signature ?? null,
       responses: args.answers,
       summary: args.summary,
       inspectionVersion: inspection?.version ?? null,
@@ -1166,6 +1169,7 @@ export async function listInspectionHistory(
       operatorName: row.operator?.name ?? null,
       equipmentRef: row.equipmentRef,
       notes: row.notes,
+      signature: null,
       summary,
       // Full answers are loaded on the submission detail page only.
       answers: [],
@@ -1205,6 +1209,7 @@ export async function getInspectionRunById(
     operatorName: row.operator?.name ?? null,
     equipmentRef: row.equipmentRef,
     notes: row.notes,
+    signature: row.signature ?? null,
     summary: parseSummary(row.summary),
     answers,
     responseRows: answers,

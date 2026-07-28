@@ -57,7 +57,7 @@ export async function handleInspectionSubmit(args: {
     );
   }
 
-  const { answers, summary, equipmentRef, notes } = submission.value;
+  const { answers, summary, equipmentRef, notes, signature } = submission.value;
 
   let runId: string | null = null;
   try {
@@ -67,6 +67,7 @@ export async function handleInspectionSubmit(args: {
       submittedById: user.id,
       equipmentRef,
       notes,
+      signature,
       answers,
       summary,
     });
