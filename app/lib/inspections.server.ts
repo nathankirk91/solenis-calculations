@@ -33,6 +33,31 @@ export type ManagedInspection = {
   isAvailable: boolean;
   sortOrder: number;
   questionCount: number;
+  version: number;
+};
+
+export type InspectionVersionSnapshot = {
+  title: string;
+  description: string;
+  category: string;
+  equipmentLabel: string | null;
+  questions: InspectionQuestionDef[];
+};
+
+export type InspectionVersionHistoryItem = {
+  id: string;
+  version: number;
+  changeComment: string;
+  createdAt: Date;
+  changedByName: string | null;
+  changedByEmail: string | null;
+  questionCount: number;
+  snapshot: InspectionVersionSnapshot;
+};
+
+export type ManagedInspectionDetail = InspectionDefinition & {
+  version: number;
+  versions: InspectionVersionHistoryItem[];
 };
 
 export type InspectionHistoryItem = {
@@ -222,6 +247,7 @@ export async function listManagedInspections(): Promise<ManagedInspection[]> {
       isAvailable: row.isAvailable,
       sortOrder: row.sortOrder,
       questionCount: row._count.questions,
+      version: row.version ?? 1,
     }));
   } catch (error) {
     const code =
@@ -237,7 +263,7 @@ export async function listManagedInspections(): Promise<ManagedInspection[]> {
 
 export async function getManagedInspection(
   id: string,
-): Promise<(InspectionDefinition & { questions: InspectionQuestionDef[] }) | null> {
+): Promise<ManagedInspectionDetail | null> {
   const prisma = getPrisma();
   if (!prisma) {
     return null;
@@ -250,6 +276,14 @@ export async function getManagedInspection(
         where: { isActive: true },
         orderBy: { sortOrder: "asc" },
       },
+      versions: {
+        orderBy: { version: "desc" },
+        include: {
+          changedBy: {
+            select: { name: true, email: true },
+          },
+        },
+      },
     },
   });
 
@@ -257,7 +291,253 @@ export async function getManagedInspection(
     return null;
   }
 
-  return mapDefinition(row);
+  await ensureBaselineInspectionVersion(row.id);
+
+  const refreshed =
+    row.versions.length > 0
+      ? row
+      : await prisma.inspection.findUnique({
+          where: { id },
+          include: {
+            questions: {
+              where: { isActive: true },
+              orderBy: { sortOrder: "asc" },
+            },
+            versions: {
+              orderBy: { version: "desc" },
+              include: {
+                changedBy: {
+                  select: { name: true, email: true },
+                },
+              },
+            },
+          },
+        });
+
+  if (!refreshed) {
+    return null;
+  }
+
+  return {
+    ...mapDefinition(refreshed),
+    version: refreshed.version ?? 1,
+    versions: refreshed.versions.map((version) =>
+      mapVersionHistoryItem(version),
+    ),
+  };
+}
+
+function parseVersionSnapshot(value: unknown): InspectionVersionSnapshot {
+  const snapshot = (value ?? {}) as Partial<InspectionVersionSnapshot>;
+  const questions = Array.isArray(snapshot.questions)
+    ? snapshot.questions.map((question) => {
+        const row = question as Partial<InspectionQuestionDef>;
+        const type: InspectionQuestionType =
+          row.type === "YES_NO" || row.type === "TEXT" || row.type === "RADIO"
+            ? row.type
+            : "TEXT";
+        const options = Array.isArray(row.options)
+          ? row.options.map(String)
+          : [];
+        return {
+          id: String(row.id ?? ""),
+          label: String(row.label ?? ""),
+          helpText: row.helpText ? String(row.helpText) : null,
+          sectionTitle: row.sectionTitle ? String(row.sectionTitle) : null,
+          type,
+          options,
+          attentionValues: Array.isArray(row.attentionValues)
+            ? row.attentionValues.map(String)
+            : [],
+          required: Boolean(row.required ?? true),
+          sortOrder: Number(row.sortOrder ?? 0),
+        } satisfies InspectionQuestionDef;
+      })
+    : [];
+
+  return {
+    title: String(snapshot.title ?? ""),
+    description: String(snapshot.description ?? ""),
+    category: String(snapshot.category ?? ""),
+    equipmentLabel: snapshot.equipmentLabel
+      ? String(snapshot.equipmentLabel)
+      : null,
+    questions,
+  };
+}
+
+function mapVersionHistoryItem(row: {
+  id: string;
+  version: number;
+  changeComment: string;
+  createdAt: Date;
+  snapshot: unknown;
+  changedBy: { name: string | null; email: string } | null;
+}): InspectionVersionHistoryItem {
+  const snapshot = parseVersionSnapshot(row.snapshot);
+  return {
+    id: row.id,
+    version: row.version,
+    changeComment: row.changeComment,
+    createdAt: row.createdAt,
+    changedByName: row.changedBy?.name ?? null,
+    changedByEmail: row.changedBy?.email ?? null,
+    questionCount: snapshot.questions.length,
+    snapshot,
+  };
+}
+
+async function buildInspectionSnapshot(
+  inspectionId: string,
+): Promise<InspectionVersionSnapshot> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  const row = await prisma.inspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      questions: {
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+  if (!row) {
+    throw new Error("Inspection not found.");
+  }
+
+  return {
+    title: row.title,
+    description: row.description,
+    category: row.category,
+    equipmentLabel: row.equipmentLabel,
+    questions: row.questions.map(mapQuestion),
+  };
+}
+
+/** Create version 1 history when an inspection has none yet. */
+export async function ensureBaselineInspectionVersion(
+  inspectionId: string,
+  changeComment = "Initial version",
+): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return;
+  }
+
+  const existing = await prisma.inspectionVersion.count({
+    where: { inspectionId },
+  });
+  if (existing > 0) {
+    return;
+  }
+
+  const inspection = await prisma.inspection.findUnique({
+    where: { id: inspectionId },
+    select: { version: true },
+  });
+  if (!inspection) {
+    return;
+  }
+
+  const snapshot = await buildInspectionSnapshot(inspectionId);
+  const version = inspection.version > 0 ? inspection.version : 1;
+
+  await prisma.$transaction([
+    prisma.inspection.update({
+      where: { id: inspectionId },
+      data: { version },
+    }),
+    prisma.inspectionVersion.create({
+      data: {
+        inspectionId,
+        version,
+        changeComment,
+        changedById: null,
+        snapshot,
+      },
+    }),
+  ]);
+}
+
+async function bumpInspectionVersion(args: {
+  inspectionId: string;
+  changeComment: string;
+  changedById: string;
+}): Promise<number> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  const changeComment = args.changeComment.trim();
+  if (!changeComment) {
+    throw new Error(
+      "A change comment is required when questions are added, edited, removed, or reordered.",
+    );
+  }
+
+  await ensureBaselineInspectionVersion(args.inspectionId);
+
+  return prisma.$transaction(async (tx) => {
+    const inspection = await tx.inspection.findUnique({
+      where: { id: args.inspectionId },
+      select: {
+        id: true,
+        version: true,
+        title: true,
+        description: true,
+        category: true,
+        equipmentLabel: true,
+      },
+    });
+    if (!inspection) {
+      throw new Error("Inspection not found.");
+    }
+
+    const questions = await tx.inspectionQuestion.findMany({
+      where: { inspectionId: args.inspectionId, isActive: true },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    const nextVersion = (inspection.version ?? 1) + 1;
+    const snapshot: InspectionVersionSnapshot = {
+      title: inspection.title,
+      description: inspection.description,
+      category: inspection.category,
+      equipmentLabel: inspection.equipmentLabel,
+      questions: questions.map(mapQuestion),
+    };
+
+    await tx.inspection.update({
+      where: { id: args.inspectionId },
+      data: { version: nextVersion },
+    });
+
+    await tx.inspectionVersion.create({
+      data: {
+        inspectionId: args.inspectionId,
+        version: nextVersion,
+        changeComment,
+        changedById: args.changedById,
+        snapshot,
+      },
+    });
+
+    return nextVersion;
+  });
+}
+
+function requireChangeComment(changeComment: string | undefined): string {
+  const comment = changeComment?.trim() ?? "";
+  if (!comment) {
+    throw new Error(
+      "A change comment is required when questions are added, edited, removed, or reordered.",
+    );
+  }
+  return comment;
 }
 
 async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
@@ -310,6 +590,7 @@ export async function seedDefaultInspections(): Promise<number> {
         equipmentLabel: inspection.equipmentLabel ?? null,
         isAvailable: true,
         sortOrder: inspection.sortOrder,
+        version: 1,
       },
     });
 
@@ -345,6 +626,11 @@ export async function seedDefaultInspections(): Promise<number> {
         },
       });
     }
+
+    await ensureBaselineInspectionVersion(
+      inspection.id,
+      "Loaded default inspection",
+    );
   }
 
   return INSPECTION_DEFINITIONS.length;
@@ -382,8 +668,11 @@ export async function createManagedInspection(args: {
       equipmentLabel: args.equipmentLabel?.trim() || null,
       isAvailable: true,
       sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
+      version: 1,
     },
   });
+
+  await ensureBaselineInspectionVersion(row.id, "Created inspection");
 
   return {
     id: row.id,
@@ -396,6 +685,7 @@ export async function createManagedInspection(args: {
     isAvailable: row.isAvailable,
     sortOrder: row.sortOrder,
     questionCount: 0,
+    version: row.version ?? 1,
   };
 }
 
@@ -464,12 +754,15 @@ export async function addInspectionQuestion(args: {
   options?: string[];
   attentionValues?: string[];
   required?: boolean;
+  changeComment: string;
+  changedById: string;
 }): Promise<InspectionQuestionDef> {
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
   }
 
+  const changeComment = requireChangeComment(args.changeComment);
   const label = args.label.trim();
   if (!label) {
     throw new Error("Question label is required.");
@@ -518,6 +811,12 @@ export async function addInspectionQuestion(args: {
     },
   });
 
+  await bumpInspectionVersion({
+    inspectionId: args.inspectionId,
+    changeComment,
+    changedById: args.changedById,
+  });
+
   return mapQuestion(row);
 }
 
@@ -525,19 +824,39 @@ function YES_NO_INCLUDES(value: string) {
   return value === "Yes" || value === "No";
 }
 
-export async function removeInspectionQuestion(questionId: string): Promise<void> {
+export async function removeInspectionQuestion(args: {
+  questionId: string;
+  changeComment: string;
+  changedById: string;
+}): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
   }
 
+  const changeComment = requireChangeComment(args.changeComment);
+
+  const existing = await prisma.inspectionQuestion.findFirst({
+    where: { id: args.questionId, isActive: true },
+    select: { inspectionId: true },
+  });
+  if (!existing) {
+    throw new Error("Question not found.");
+  }
+
   const updated = await prisma.inspectionQuestion.updateMany({
-    where: { id: questionId, isActive: true },
+    where: { id: args.questionId, isActive: true },
     data: { isActive: false },
   });
   if (updated.count === 0) {
     throw new Error("Question not found.");
   }
+
+  await bumpInspectionVersion({
+    inspectionId: existing.inspectionId,
+    changeComment,
+    changedById: args.changedById,
+  });
 }
 
 export async function updateInspectionQuestion(args: {
@@ -549,12 +868,15 @@ export async function updateInspectionQuestion(args: {
   options?: string[];
   attentionValues?: string[];
   required?: boolean;
+  changeComment: string;
+  changedById: string;
 }): Promise<InspectionQuestionDef> {
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
   }
 
+  const changeComment = requireChangeComment(args.changeComment);
   const label = args.label.trim();
   if (!label) {
     throw new Error("Question label is required.");
@@ -562,7 +884,7 @@ export async function updateInspectionQuestion(args: {
 
   const existing = await prisma.inspectionQuestion.findFirst({
     where: { id: args.questionId, isActive: true },
-    select: { id: true },
+    select: { id: true, inspectionId: true },
   });
   if (!existing) {
     throw new Error("Question not found.");
@@ -604,17 +926,27 @@ export async function updateInspectionQuestion(args: {
     },
   });
 
+  await bumpInspectionVersion({
+    inspectionId: existing.inspectionId,
+    changeComment,
+    changedById: args.changedById,
+  });
+
   return mapQuestion(row);
 }
 
 export async function moveInspectionQuestion(args: {
   questionId: string;
   direction: "up" | "down";
+  changeComment: string;
+  changedById: string;
 }): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
   }
+
+  const changeComment = requireChangeComment(args.changeComment);
 
   const current = await prisma.inspectionQuestion.findFirst({
     where: { id: args.questionId, isActive: true },
@@ -653,6 +985,12 @@ export async function moveInspectionQuestion(args: {
       data: { sortOrder: current.sortOrder },
     }),
   ]);
+
+  await bumpInspectionVersion({
+    inspectionId: current.inspectionId,
+    changeComment,
+    changedById: args.changedById,
+  });
 }
 
 export async function createInspectionRun(args: {
@@ -669,6 +1007,11 @@ export async function createInspectionRun(args: {
     return null;
   }
 
+  const inspection = await prisma.inspection.findUnique({
+    where: { id: args.inspectionId },
+    select: { version: true },
+  });
+
   return prisma.inspectionRun.create({
     data: {
       inspectionId: args.inspectionId,
@@ -679,6 +1022,7 @@ export async function createInspectionRun(args: {
       notes: args.notes,
       responses: args.answers,
       summary: args.summary,
+      inspectionVersion: inspection?.version ?? null,
     },
     select: { id: true },
   });

@@ -30,7 +30,9 @@ import {
   removeInspectionQuestion,
   updateInspectionQuestion,
   updateManagedInspection,
+  type InspectionVersionHistoryItem,
 } from "~/lib/inspections.server";
+import { ensureInspectionSchema } from "~/lib/migrate.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -44,6 +46,11 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireOperatorManager(request);
+  try {
+    await ensureInspectionSchema();
+  } catch {
+    // Best-effort schema ensure for version history columns.
+  }
   const inspection = await getManagedInspection(params.inspectionId);
   if (!inspection) {
     throw new Response("Inspection not found", { status: 404 });
@@ -53,10 +60,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  await requireOperatorManager(request);
+  const user = await requireOperatorManager(request);
   const inspectionId = params.inspectionId;
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
+  const changeComment = String(formData.get("changeComment") ?? "");
 
   try {
     if (intent === "update") {
@@ -94,6 +102,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         options,
         attentionValues: attentionRaw,
         required: String(formData.get("required") ?? "") === "on",
+        changeComment,
+        changedById: user.id,
       };
 
       if (intent === "add-question") {
@@ -101,7 +111,10 @@ export async function action({ request, params }: Route.ActionArgs) {
           inspectionId,
           ...payload,
         });
-        return { ok: true as const, message: "Question added." };
+        return {
+          ok: true as const,
+          message: "Question added. Version updated.",
+        };
       }
 
       const questionId = String(formData.get("questionId") ?? "");
@@ -112,7 +125,10 @@ export async function action({ request, params }: Route.ActionArgs) {
         questionId,
         ...payload,
       });
-      return { ok: true as const, message: "Question updated." };
+      return {
+        ok: true as const,
+        message: "Question updated. Version updated.",
+      };
     }
 
     if (intent === "remove-question") {
@@ -120,8 +136,15 @@ export async function action({ request, params }: Route.ActionArgs) {
       if (!questionId) {
         return data({ error: "Missing question." }, { status: 400 });
       }
-      await removeInspectionQuestion(questionId);
-      return { ok: true as const, message: "Question removed." };
+      await removeInspectionQuestion({
+        questionId,
+        changeComment,
+        changedById: user.id,
+      });
+      return {
+        ok: true as const,
+        message: "Question removed. Version updated.",
+      };
     }
 
     if (intent === "move-question") {
@@ -133,8 +156,13 @@ export async function action({ request, params }: Route.ActionArgs) {
       await moveInspectionQuestion({
         questionId,
         direction,
+        changeComment,
+        changedById: user.id,
       });
-      return { ok: true as const, message: "Question order updated." };
+      return {
+        ok: true as const,
+        message: "Question order updated. Version updated.",
+      };
     }
   } catch (error) {
     return data(
@@ -289,6 +317,36 @@ function QuestionFields({
   );
 }
 
+function ChangeCommentField({
+  value,
+  onChange,
+  id = "changeComment",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  id?: string;
+}) {
+  return (
+    <div className="grid gap-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-3">
+      <Label htmlFor={id}>Change comment (required)</Label>
+      <textarea
+        id={id}
+        name="changeComment"
+        rows={2}
+        required
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Explain what changed and why (required for version history)"
+        className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+      />
+      <p className="text-xs text-muted-foreground">
+        Adding, editing, removing, or reordering questions creates a new
+        version and stores this comment.
+      </p>
+    </div>
+  );
+}
+
 function QuestionEditor({
   question,
   index,
@@ -296,6 +354,8 @@ function QuestionEditor({
   isEditing,
   onEdit,
   onCancel,
+  changeComment,
+  setChangeComment,
 }: {
   question: InspectionQuestionDef;
   index: number;
@@ -303,6 +363,8 @@ function QuestionEditor({
   isEditing: boolean;
   onEdit: () => void;
   onCancel: () => void;
+  changeComment: string;
+  setChangeComment: (value: string) => void;
 }) {
   const [questionType, setQuestionType] = useState<InspectionQuestionType>(
     question.type,
@@ -332,6 +394,11 @@ function QuestionEditor({
               required: question.required,
               attentionValues: question.attentionValues,
             }}
+          />
+          <ChangeCommentField
+            id={`changeComment-edit-${question.id}`}
+            value={changeComment}
+            onChange={setChangeComment}
           />
           <div className="flex flex-wrap gap-2">
             <Button type="submit">Save question</Button>
@@ -383,11 +450,17 @@ function QuestionEditor({
             <input type="hidden" name="intent" value="move-question" />
             <input type="hidden" name="questionId" value={question.id} />
             <input type="hidden" name="direction" value="up" />
+            <input type="hidden" name="changeComment" value={changeComment} />
             <Button
               type="submit"
               variant="outline"
               size="sm"
-              disabled={index === 0}
+              disabled={index === 0 || !changeComment.trim()}
+              title={
+                changeComment.trim()
+                  ? undefined
+                  : "Enter a change comment above first"
+              }
             >
               Move up
             </Button>
@@ -396,11 +469,17 @@ function QuestionEditor({
             <input type="hidden" name="intent" value="move-question" />
             <input type="hidden" name="questionId" value={question.id} />
             <input type="hidden" name="direction" value="down" />
+            <input type="hidden" name="changeComment" value={changeComment} />
             <Button
               type="submit"
               variant="outline"
               size="sm"
-              disabled={index >= total - 1}
+              disabled={index >= total - 1 || !changeComment.trim()}
+              title={
+                changeComment.trim()
+                  ? undefined
+                  : "Enter a change comment above first"
+              }
             >
               Move down
             </Button>
@@ -411,13 +490,111 @@ function QuestionEditor({
           <Form method="post">
             <input type="hidden" name="intent" value="remove-question" />
             <input type="hidden" name="questionId" value={question.id} />
-            <Button type="submit" variant="outline" size="sm">
+            <input type="hidden" name="changeComment" value={changeComment} />
+            <Button
+              type="submit"
+              variant="outline"
+              size="sm"
+              disabled={!changeComment.trim()}
+              title={
+                changeComment.trim()
+                  ? undefined
+                  : "Enter a change comment above first"
+              }
+            >
               Remove
             </Button>
           </Form>
         </div>
       </div>
     </li>
+  );
+}
+
+function formatVersionDate(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function VersionHistory({
+  versions,
+}: {
+  versions: InspectionVersionHistoryItem[];
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (versions.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">No version history yet.</p>
+    );
+  }
+
+  return (
+    <ul className="grid gap-3">
+      {versions.map((version) => {
+        const expanded = expandedId === version.id;
+        const author =
+          version.changedByName || version.changedByEmail || "System";
+        return (
+          <li
+            key={version.id}
+            className="rounded-lg border border-border/70 bg-background/50 px-3 py-3"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">v{version.version}</Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {formatVersionDate(version.createdAt)}
+                  </span>
+                  <span className="text-sm text-muted-foreground">· {author}</span>
+                </div>
+                <p className="mt-2 text-sm text-brand-navy">
+                  {version.changeComment}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {version.questionCount} question
+                  {version.questionCount === 1 ? "" : "s"} in this snapshot
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setExpandedId(expanded ? null : version.id)
+                }
+              >
+                {expanded ? "Hide questions" : "Show questions"}
+              </Button>
+            </div>
+            {expanded ? (
+              <ol className="mt-3 grid gap-2 border-t border-border/60 pt-3">
+                {version.snapshot.questions.map((question, index) => (
+                  <li key={`${version.id}-${question.id || index}`} className="text-sm">
+                    <span className="text-muted-foreground">#{index + 1}</span>{" "}
+                    {question.label}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      (
+                      {question.type === "YES_NO"
+                        ? "Yes / No"
+                        : question.type === "TEXT"
+                          ? "Text"
+                          : "Radio"}
+                      )
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -432,6 +609,7 @@ export default function InspectionsManageDetailPage({
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
     null,
   );
+  const [changeComment, setChangeComment] = useState("");
 
   return (
     <div className="app-shell">
@@ -440,6 +618,7 @@ export default function InspectionsManageDetailPage({
         <div className="mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Management</Badge>
+            <Badge variant="outline">Version {inspection.version}</Badge>
             <Link
               to="/inspections/manage"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
@@ -451,8 +630,9 @@ export default function InspectionsManageDetailPage({
             {inspection.title}
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Update details, edit questions, and change their order. Operators
-            fill these out on{" "}
+            Update details, edit questions, and change their order. Question
+            changes bump the checklist version and require a manager comment.
+            Operators fill these out on{" "}
             <Link
               to={inspection.href}
               className="underline-offset-4 hover:underline"
@@ -473,6 +653,9 @@ export default function InspectionsManageDetailPage({
           <Card>
             <CardHeader>
               <CardTitle>Details</CardTitle>
+              <CardDescription>
+                Title and availability changes do not create a new version.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Form method="post" className="grid gap-4">
@@ -536,7 +719,7 @@ export default function InspectionsManageDetailPage({
               <CardTitle>Add question</CardTitle>
               <CardDescription>
                 Choose yes/no, a text box, or radio options. Mark which answers
-                should flag “needs attention”.
+                should flag “needs attention”. Saving creates a new version.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -547,6 +730,11 @@ export default function InspectionsManageDetailPage({
                   setQuestionType={setQuestionType}
                   radioOptions={radioOptions}
                   setRadioOptions={setRadioOptions}
+                />
+                <ChangeCommentField
+                  id="changeComment-add"
+                  value={changeComment}
+                  onChange={setChangeComment}
                 />
                 <div>
                   <Button type="submit">Add question</Button>
@@ -559,12 +747,18 @@ export default function InspectionsManageDetailPage({
             <CardHeader>
               <CardTitle>Questions ({inspection.questions.length})</CardTitle>
               <CardDescription>
-                Edit wording and options, or move questions up and down. Removing
-                a question hides it from new submissions; past runs keep their
-                answers.
+                Edit wording and options, or move questions up and down.
+                Removing a question hides it from new submissions; past runs
+                keep their answers. Enter a change comment before moving or
+                removing.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="grid gap-4">
+              <ChangeCommentField
+                id="changeComment-list"
+                value={changeComment}
+                onChange={setChangeComment}
+              />
               {inspection.questions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No questions yet. Add one above.
@@ -580,10 +774,25 @@ export default function InspectionsManageDetailPage({
                       isEditing={editingQuestionId === question.id}
                       onEdit={() => setEditingQuestionId(question.id)}
                       onCancel={() => setEditingQuestionId(null)}
+                      changeComment={changeComment}
+                      setChangeComment={setChangeComment}
                     />
                   ))}
                 </ul>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Version history</CardTitle>
+              <CardDescription>
+                Each question change creates a revision with the manager’s
+                comment and a snapshot of the checklist at that time.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VersionHistory versions={inspection.versions} />
             </CardContent>
           </Card>
         </div>

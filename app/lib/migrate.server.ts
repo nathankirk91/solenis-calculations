@@ -47,12 +47,14 @@ export async function ensureInspectionSchema(): Promise<void> {
       "equipment_label" TEXT,
       "is_available" BOOLEAN NOT NULL DEFAULT true,
       "sort_order" INTEGER NOT NULL DEFAULT 0,
+      "version" INTEGER NOT NULL DEFAULT 1,
       "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "inspections_pkey" PRIMARY KEY ("id")
     )`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "equipment_label" TEXT`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+    `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE "inspections" ALTER COLUMN "description" SET DEFAULT ''`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "inspections_slug_key" ON "inspections"("slug")`,
     `CREATE TABLE IF NOT EXISTS "inspection_questions" (
@@ -86,12 +88,14 @@ export async function ensureInspectionSchema(): Promise<void> {
       "submitted_by_id" TEXT,
       "status" "inspection_run_status" NOT NULL,
       "equipment_ref" TEXT,
+      "inspection_version" INTEGER,
       "responses" JSONB NOT NULL,
       "summary" JSONB NOT NULL,
       "notes" TEXT,
       "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "inspection_runs_pkey" PRIMARY KEY ("id")
     )`,
+    `ALTER TABLE "inspection_runs" ADD COLUMN IF NOT EXISTS "inspection_version" INTEGER`,
     `CREATE INDEX IF NOT EXISTS "inspection_runs_inspection_id_idx" ON "inspection_runs"("inspection_id")`,
     `CREATE INDEX IF NOT EXISTS "inspection_runs_status_created_at_idx" ON "inspection_runs"("status", "created_at" DESC)`,
     `CREATE INDEX IF NOT EXISTS "inspection_runs_created_at_idx" ON "inspection_runs"("created_at" DESC)`,
@@ -111,6 +115,32 @@ export async function ensureInspectionSchema(): Promise<void> {
       ALTER TABLE "inspection_runs"
         ADD CONSTRAINT "inspection_runs_submitted_by_id_fkey"
         FOREIGN KEY ("submitted_by_id") REFERENCES "users"("id")
+        ON DELETE SET NULL ON UPDATE CASCADE;
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `CREATE TABLE IF NOT EXISTS "inspection_versions" (
+      "id" TEXT NOT NULL,
+      "inspection_id" TEXT NOT NULL,
+      "version" INTEGER NOT NULL,
+      "change_comment" TEXT NOT NULL,
+      "changed_by_id" TEXT,
+      "snapshot" JSONB NOT NULL,
+      "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "inspection_versions_pkey" PRIMARY KEY ("id")
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "inspection_versions_inspection_id_version_key"
+      ON "inspection_versions"("inspection_id", "version")`,
+    `CREATE INDEX IF NOT EXISTS "inspection_versions_inspection_id_created_at_idx"
+      ON "inspection_versions"("inspection_id", "created_at" DESC)`,
+    `DO $$ BEGIN
+      ALTER TABLE "inspection_versions"
+        ADD CONSTRAINT "inspection_versions_inspection_id_fkey"
+        FOREIGN KEY ("inspection_id") REFERENCES "inspections"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `DO $$ BEGIN
+      ALTER TABLE "inspection_versions"
+        ADD CONSTRAINT "inspection_versions_changed_by_id_fkey"
+        FOREIGN KEY ("changed_by_id") REFERENCES "users"("id")
         ON DELETE SET NULL ON UPDATE CASCADE;
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
   ];
@@ -182,7 +212,8 @@ export async function applyPendingMigrations(): Promise<AppliedMigration[]> {
     // record them so Prisma history stays consistent when files are present.
     if (
       name.includes("_inspections") ||
-      name.includes("_inspection_questions")
+      name.includes("_inspection_questions") ||
+      name.includes("_inspection_versions")
     ) {
       const sqlPath = path.join(
         process.cwd(),
