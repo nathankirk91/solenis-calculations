@@ -540,6 +540,121 @@ export async function removeInspectionQuestion(questionId: string): Promise<void
   }
 }
 
+export async function updateInspectionQuestion(args: {
+  questionId: string;
+  label: string;
+  helpText?: string;
+  sectionTitle?: string;
+  type: InspectionQuestionType;
+  options?: string[];
+  attentionValues?: string[];
+  required?: boolean;
+}): Promise<InspectionQuestionDef> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  const label = args.label.trim();
+  if (!label) {
+    throw new Error("Question label is required.");
+  }
+
+  const existing = await prisma.inspectionQuestion.findFirst({
+    where: { id: args.questionId, isActive: true },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new Error("Question not found.");
+  }
+
+  const options = questionOptionsForType(args.type, args.options ?? []);
+  if (args.type === "RADIO" && options.length < 2) {
+    throw new Error("Radio questions need at least two options.");
+  }
+
+  const attentionValues =
+    args.attentionValues?.filter(Boolean) ??
+    defaultAttentionValues(args.type, options);
+
+  const normalizedAttention =
+    args.type === "TEXT"
+      ? []
+      : attentionValues.filter((value) =>
+          args.type === "YES_NO"
+            ? YES_NO_INCLUDES(value)
+            : options.includes(value),
+        );
+
+  const row = await prisma.inspectionQuestion.update({
+    where: { id: args.questionId },
+    data: {
+      label,
+      helpText: args.helpText?.trim() || null,
+      sectionTitle: args.sectionTitle?.trim() || null,
+      type: args.type,
+      options: args.type === "RADIO" ? options : Prisma.DbNull,
+      attentionValues:
+        args.type === "TEXT"
+          ? Prisma.DbNull
+          : normalizedAttention.length
+            ? normalizedAttention
+            : defaultAttentionValues(args.type, options),
+      required: args.required ?? true,
+    },
+  });
+
+  return mapQuestion(row);
+}
+
+export async function moveInspectionQuestion(args: {
+  questionId: string;
+  direction: "up" | "down";
+}): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  const current = await prisma.inspectionQuestion.findFirst({
+    where: { id: args.questionId, isActive: true },
+    select: { id: true, inspectionId: true, sortOrder: true },
+  });
+  if (!current) {
+    throw new Error("Question not found.");
+  }
+
+  const neighbor = await prisma.inspectionQuestion.findFirst({
+    where: {
+      inspectionId: current.inspectionId,
+      isActive: true,
+      sortOrder:
+        args.direction === "up"
+          ? { lt: current.sortOrder }
+          : { gt: current.sortOrder },
+    },
+    orderBy: {
+      sortOrder: args.direction === "up" ? "desc" : "asc",
+    },
+    select: { id: true, sortOrder: true },
+  });
+
+  if (!neighbor) {
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.inspectionQuestion.update({
+      where: { id: current.id },
+      data: { sortOrder: neighbor.sortOrder },
+    }),
+    prisma.inspectionQuestion.update({
+      where: { id: neighbor.id },
+      data: { sortOrder: current.sortOrder },
+    }),
+  ]);
+}
+
 export async function createInspectionRun(args: {
   inspectionId: string;
   operatorId: string;
