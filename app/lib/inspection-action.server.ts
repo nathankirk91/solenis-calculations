@@ -6,6 +6,7 @@ import { getAppBaseUrl } from "~/lib/app-url.server";
 import { createInspectionSchema } from "~/lib/inspection.schema";
 import type { InspectionDefinition, InspectionSummary } from "~/lib/inspections";
 import { createInspectionRun } from "~/lib/inspections.server";
+import { ensureInspectionSchema } from "~/lib/migrate.server";
 import { getActiveOperatorById } from "~/lib/operators.server";
 import { notifyManagersPush } from "~/lib/push.server";
 import type { AuthUser } from "~/lib/user.server";
@@ -61,6 +62,7 @@ export async function handleInspectionSubmit(args: {
 
   let runId: string | null = null;
   try {
+    await ensureInspectionSchema();
     const run = await createInspectionRun({
       inspectionId: definition.id,
       operatorId: operator.id,
