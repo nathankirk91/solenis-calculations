@@ -38,15 +38,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireOperatorManager(request);
 
   let migrateNote: string | null = null;
-  try {
-    await ensureInspectionSchema();
-  } catch {
-    // Schema ensure is best-effort; list/seed errors surface below.
-  }
-
   let inspections = await listManagedInspections();
 
   // First visit after deploy: create missing tables, then seed defaults.
+  // Do not run schema ensure on every navigation — that is ~24 DDL round-trips.
   if (inspections.length === 0) {
     try {
       await ensureInspectionSchema();
