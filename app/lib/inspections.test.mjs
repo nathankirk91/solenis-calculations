@@ -223,4 +223,67 @@ function passResponses(definition) {
   );
 }
 
+{
+  const {
+    FORKLIFT_UNIT_FORMS,
+    DAILY_STARTUP,
+    DAILY_SHUTDOWN,
+    FORKLIFT_DAILY_CHECK_TEMPLATE,
+    FORKLIFT_INSPECTIONS_HREF,
+    buildHomeInspectionCatalog,
+    isForkliftUnitInspection,
+  } = await import("./inspections.ts");
+
+  assert.equal(isForkliftUnitInspection(FORKLIFT_UNIT_FORMS[0]), true);
+  assert.equal(isForkliftUnitInspection(FORKLIFT_DAILY_CHECK_TEMPLATE), false);
+  assert.equal(isForkliftUnitInspection(DAILY_STARTUP), false);
+
+  const catalog = buildHomeInspectionCatalog([
+    ...FORKLIFT_UNIT_FORMS.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      href: row.href,
+      isAvailable: row.isAvailable,
+    })),
+    {
+      id: DAILY_STARTUP.id,
+      slug: DAILY_STARTUP.slug,
+      title: DAILY_STARTUP.title,
+      description: DAILY_STARTUP.description,
+      category: DAILY_STARTUP.category,
+      href: DAILY_STARTUP.href,
+      isAvailable: true,
+    },
+    {
+      id: DAILY_SHUTDOWN.id,
+      slug: DAILY_SHUTDOWN.slug,
+      title: DAILY_SHUTDOWN.title,
+      description: DAILY_SHUTDOWN.description,
+      category: DAILY_SHUTDOWN.category,
+      href: DAILY_SHUTDOWN.href,
+      isAvailable: true,
+    },
+    {
+      id: FORKLIFT_DAILY_CHECK_TEMPLATE.id,
+      slug: FORKLIFT_DAILY_CHECK_TEMPLATE.slug,
+      title: FORKLIFT_DAILY_CHECK_TEMPLATE.title,
+      description: FORKLIFT_DAILY_CHECK_TEMPLATE.description,
+      category: FORKLIFT_DAILY_CHECK_TEMPLATE.category,
+      href: FORKLIFT_DAILY_CHECK_TEMPLATE.href,
+      isAvailable: false,
+    },
+  ]);
+
+  assert.equal(catalog.length, 3);
+  assert.equal(catalog[0]?.href, FORKLIFT_INSPECTIONS_HREF);
+  assert.equal(catalog[0]?.title, "Forklift inspections");
+  assert.deepEqual(
+    catalog.slice(1).map((row) => row.id),
+    [DAILY_STARTUP.id, DAILY_SHUTDOWN.id],
+  );
+}
+
 console.log("inspections tests passed");

@@ -73,7 +73,11 @@ export default function HistoryPage({ loaderData }: Route.ComponentProps) {
           </p>
         </div>
 
-        <section className="mb-14" aria-labelledby="calc-history-heading">
+        <section
+          id="calculations"
+          className="mb-14 scroll-mt-24"
+          aria-labelledby="calc-history-heading"
+        >
           <h2
             id="calc-history-heading"
             className="mb-4 font-heading text-2xl font-semibold tracking-tight text-brand-navy"
@@ -218,7 +222,11 @@ export default function HistoryPage({ loaderData }: Route.ComponentProps) {
           )}
         </section>
 
-        <section aria-labelledby="inspection-history-heading">
+        <section
+          id="inspections"
+          className="scroll-mt-24"
+          aria-labelledby="inspection-history-heading"
+        >
           <h2
             id="inspection-history-heading"
             className="mb-4 font-heading text-2xl font-semibold tracking-tight text-brand-navy"

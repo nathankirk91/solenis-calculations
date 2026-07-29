@@ -8,6 +8,10 @@ import { Badge } from "~/components/ui/badge";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
 import { handleInspectionSubmit } from "~/lib/inspection-action.server";
+import {
+  FORKLIFT_INSPECTIONS_HREF,
+  isForkliftUnitInspection,
+} from "~/lib/inspections";
 import { getInspectionDefinition } from "~/lib/inspections.server";
 import { listActiveOperators } from "~/lib/operators.server";
 import { canReviewRuns } from "~/lib/roles";
@@ -52,6 +56,7 @@ export default function InspectionPage({
   actionData,
 }: Route.ComponentProps) {
   const { definition, user, operators, pendingCount } = loaderData;
+  const backToForklifts = isForkliftUnitInspection(definition);
 
   return (
     <div className="app-shell">
@@ -61,10 +66,10 @@ export default function InspectionPage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{definition.category}</Badge>
             <Link
-              to="/#inspections"
+              to={backToForklifts ? FORKLIFT_INSPECTIONS_HREF : "/#inspections"}
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              ← All tools
+              {backToForklifts ? "← Forklift inspections" : "← All tools"}
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
