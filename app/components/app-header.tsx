@@ -1,6 +1,6 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Form, Link, useLocation } from "react-router";
-import { MenuIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -17,11 +17,25 @@ type Props = {
   pendingCount?: number;
 };
 
-type NavItem = {
+type NavLinkItem = {
+  type: "link";
   to: string;
   label: string;
   badge?: number;
 };
+
+type NavGroupItem = {
+  type: "group";
+  id: string;
+  label: string;
+  children: Array<{
+    to: string;
+    label: string;
+    description?: string;
+  }>;
+};
+
+type NavItem = NavLinkItem | NavGroupItem;
 
 function SolenisMark({ className }: { className?: string }) {
   return (
@@ -44,6 +58,205 @@ function SolenisMark({ className }: { className?: string }) {
   );
 }
 
+function pathOnly(to: string) {
+  return to.split("#")[0] || "/";
+}
+
+function pathMatches(
+  location: { pathname: string; hash: string },
+  to: string,
+) {
+  const [targetPath = "/", targetHash = ""] = to.split("#");
+  const hash = targetHash ? `#${targetHash}` : "";
+  const pathOk =
+    targetPath === "/"
+      ? location.pathname === "/"
+      : location.pathname === targetPath ||
+        location.pathname.startsWith(`${targetPath}/`);
+
+  if (!pathOk) {
+    return false;
+  }
+
+  if (!hash) {
+    return true;
+  }
+
+  return location.hash === hash;
+}
+
+function groupIsActive(
+  location: { pathname: string; hash: string },
+  group: NavGroupItem,
+) {
+  return group.children.some((child) => {
+    const [targetPath = "/", targetHash = ""] = child.to.split("#");
+    const hash = targetHash ? `#${targetHash}` : "";
+
+    if (targetPath === "/") {
+      return location.pathname === "/" && (!hash || location.hash === hash);
+    }
+
+    const pathOk =
+      location.pathname === targetPath ||
+      location.pathname.startsWith(`${targetPath}/`);
+    if (!pathOk) {
+      return false;
+    }
+
+    if (hash && location.hash) {
+      return location.hash === hash;
+    }
+
+    return true;
+  });
+}
+
+function DesktopNavGroup({
+  group,
+  location,
+}: {
+  group: NavGroupItem;
+  location: { pathname: string; hash: string };
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const active = groupIsActive(location, group);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={cn(
+          "gap-1 text-brand-navy hover:bg-muted hover:text-brand-navy",
+          (open || active) && "bg-muted",
+        )}
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {group.label}
+        <ChevronDownIcon
+          className={cn(
+            "size-3.5 opacity-70 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </Button>
+      {open ? (
+        <div
+          id={menuId}
+          role="menu"
+          className="absolute top-full left-0 z-50 mt-1 min-w-56 rounded-lg border border-border/80 bg-white p-1 shadow-md"
+        >
+          {group.children.map((child) => (
+            <Link
+              key={child.to}
+              to={child.to}
+              role="menuitem"
+              className={cn(
+                "block rounded-md px-3 py-2 text-sm text-brand-navy transition-colors hover:bg-muted",
+                pathMatches(location, child.to) && "bg-muted font-medium",
+              )}
+              onClick={() => setOpen(false)}
+            >
+              <span className="block">{child.label}</span>
+              {child.description ? (
+                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                  {child.description}
+                </span>
+              ) : null}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MobileNavGroup({
+  group,
+  location,
+  defaultOpen,
+}: {
+  group: NavGroupItem;
+  location: { pathname: string; hash: string };
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const panelId = useId();
+
+  return (
+    <div className="rounded-lg">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-brand-navy hover:bg-muted"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span>{group.label}</span>
+        <ChevronDownIcon
+          className={cn(
+            "size-4 opacity-70 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open ? (
+        <div id={panelId} className="mb-1 ml-2 grid gap-0.5 border-l border-border/70 pl-2">
+          {group.children.map((child) => (
+            <Link
+              key={child.to}
+              to={child.to}
+              className={cn(
+                "rounded-lg px-3 py-2 text-sm text-brand-navy hover:bg-muted",
+                pathMatches(location, child.to) && "bg-muted font-medium",
+              )}
+            >
+              <span className="block">{child.label}</span>
+              {child.description ? (
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {child.description}
+                </span>
+              ) : null}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function AppHeader({ user, pendingCount = 0 }: Props) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -54,7 +267,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
 
   useEffect(() => {
     setOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     if (!open) {
@@ -76,23 +289,98 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
   }, [open]);
 
   const navItems: NavItem[] = [
-    { to: "/", label: "Home" },
-    ...(user ? [{ to: "/history", label: "History" }] : []),
-    ...(showApprovals
-      ? [
+    { type: "link", to: "/", label: "Home" },
+    ...(user
+      ? ([
           {
+            type: "group",
+            id: "calculations",
+            label: "Calculations",
+            children: [
+              {
+                to: "/#calculations",
+                label: "Calculators",
+                description: "Batch make-up calculators",
+              },
+              {
+                to: "/history#calculations",
+                label: "History",
+                description: "Past submissions and approvals",
+              },
+            ],
+          },
+          {
+            type: "group",
+            id: "inspections",
+            label: "Inspections",
+            children: [
+              {
+                to: "/#inspections",
+                label: "Checklists",
+                description: "Run equipment and shift checks",
+              },
+              {
+                to: "/history#inspections",
+                label: "Records",
+                description: "Completed inspection history",
+              },
+              ...(showOperators
+                ? [
+                    {
+                      to: "/inspections/manage",
+                      label: "Manage",
+                      description: "Edit inspection templates",
+                    },
+                  ]
+                : []),
+            ],
+          },
+        ] satisfies NavItem[])
+      : []),
+    ...(showApprovals
+      ? ([
+          {
+            type: "link",
             to: "/approvals",
             label: "Approvals",
             badge: pendingCount > 0 ? pendingCount : undefined,
           },
-        ]
+        ] satisfies NavItem[])
       : []),
-    ...(showOperators ? [{ to: "/operators", label: "Operators" }] : []),
-    ...(showOperators
-      ? [{ to: "/inspections/manage", label: "Inspections" }]
+    ...(showApprovals
+      ? ([
+          {
+            type: "group",
+            id: "settings",
+            label: "Settings",
+            children: [
+              {
+                to: "/settings",
+                label: "Notifications",
+                description: "Push alerts for this device",
+              },
+              ...(showOperators
+                ? [
+                    {
+                      to: "/operators",
+                      label: "Operators",
+                      description: "Names shown on forms",
+                    },
+                  ]
+                : []),
+              ...(showManagers
+                ? [
+                    {
+                      to: "/managers",
+                      label: "Managers",
+                      description: "Accounts and access",
+                    },
+                  ]
+                : []),
+            ],
+          },
+        ] satisfies NavItem[])
       : []),
-    ...(showManagers ? [{ to: "/managers", label: "Managers" }] : []),
-    ...(showApprovals ? [{ to: "/settings", label: "Settings" }] : []),
   ];
 
   return (
@@ -113,27 +401,38 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">
-          {navItems.map((item) => (
-            <Button
-              key={item.to}
-              asChild
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-brand-navy hover:bg-muted hover:text-brand-navy"
-            >
-              <Link to={item.to}>
-                {item.label}
-                {item.badge != null ? (
-                  <Badge
-                    variant="secondary"
-                    className="bg-brand/15 text-brand-navy tabular-nums"
-                  >
-                    {item.badge}
-                  </Badge>
-                ) : null}
-              </Link>
-            </Button>
-          ))}
+          {navItems.map((item) =>
+            item.type === "link" ? (
+              <Button
+                key={item.to}
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "gap-2 text-brand-navy hover:bg-muted hover:text-brand-navy",
+                  pathMatches(location, item.to) && "bg-muted",
+                )}
+              >
+                <Link to={item.to}>
+                  {item.label}
+                  {item.badge != null ? (
+                    <Badge
+                      variant="secondary"
+                      className="bg-brand/15 text-brand-navy tabular-nums"
+                    >
+                      {item.badge}
+                    </Badge>
+                  ) : null}
+                </Link>
+              </Button>
+            ) : (
+              <DesktopNavGroup
+                key={item.id}
+                group={item}
+                location={location}
+              />
+            ),
+          )}
 
           {user ? (
             <>
@@ -189,23 +488,35 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
         )}
       >
         <nav className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-3 sm:px-6">
-          {navItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-brand-navy hover:bg-muted"
-            >
-              <span>{item.label}</span>
-              {item.badge != null ? (
-                <Badge
-                  variant="secondary"
-                  className="bg-brand/15 text-brand-navy tabular-nums"
-                >
-                  {item.badge}
-                </Badge>
-              ) : null}
-            </Link>
-          ))}
+          {navItems.map((item) =>
+            item.type === "link" ? (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-brand-navy hover:bg-muted",
+                  pathMatches(location, item.to) && "bg-muted",
+                )}
+              >
+                <span>{item.label}</span>
+                {item.badge != null ? (
+                  <Badge
+                    variant="secondary"
+                    className="bg-brand/15 text-brand-navy tabular-nums"
+                  >
+                    {item.badge}
+                  </Badge>
+                ) : null}
+              </Link>
+            ) : (
+              <MobileNavGroup
+                key={item.id}
+                group={item}
+                location={location}
+                defaultOpen={groupIsActive(location, item)}
+              />
+            ),
+          )}
 
           {user ? (
             <>
