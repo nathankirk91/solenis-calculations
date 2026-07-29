@@ -108,4 +108,30 @@ function passResponses(definition) {
   assert.equal(answers[1]?.answer, "Spill near bay 2");
 }
 
+{
+  const { buildLastAnswerMap, formatLastAnswerDisplay } = await import(
+    "./inspections.ts"
+  );
+
+  const map = buildLastAnswerMap([
+    {
+      questionId: "forklift-daily-check__service-date",
+      answer: "2026-07-15",
+    },
+    { questionId: "forklift-daily-check__hour-meter", answer: "4025.3" },
+    { questionId: "empty", answer: "   " },
+    { questionId: "", answer: "ignored" },
+  ]);
+
+  assert.deepEqual(map, {
+    "forklift-daily-check__service-date": "2026-07-15",
+    "forklift-daily-check__hour-meter": "4025.3",
+  });
+  assert.equal(
+    formatLastAnswerDisplay("2026-07-15", "DATE"),
+    "15 July 2026",
+  );
+  assert.equal(formatLastAnswerDisplay("4025.3", "NUMBER"), "4025.3");
+}
+
 console.log("inspections tests passed");

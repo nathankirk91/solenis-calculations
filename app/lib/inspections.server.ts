@@ -4,6 +4,7 @@ import {
   FALLBACK_INSPECTIONS,
   INSPECTION_DEFINITIONS,
   buildAnswersFromResponses,
+  buildLastAnswerMap,
   defaultAttentionValues,
   getFallbackInspectionByIdOrSlug,
   groupQuestionsBySection,
@@ -18,6 +19,7 @@ import {
   type InspectionQuestionType,
   type InspectionResponseRow,
   type InspectionSummary,
+  type LastInspectionAnswers,
 } from "~/lib/inspections";
 
 export type InspectionRunStatus = "PASSED" | "NEEDS_ATTENTION";
@@ -1176,6 +1178,45 @@ export async function listInspectionHistory(
       responseRows: [],
     };
   });
+}
+
+/**
+ * Latest submitted answers for an inspection, optionally scoped to a unit.
+ * Used so operators can view/adopt values like service date from the prior report.
+ */
+export async function getLastAnswersForInspection(args: {
+  inspectionId: string;
+  equipmentRef?: string | null;
+}): Promise<LastInspectionAnswers> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return { answers: {}, runId: null, createdAt: null };
+  }
+
+  const equipmentRef = args.equipmentRef?.trim() || null;
+
+  const row = await prisma.inspectionRun.findFirst({
+    where: {
+      inspectionId: args.inspectionId,
+      ...(equipmentRef ? { equipmentRef } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      createdAt: true,
+      responses: true,
+    },
+  });
+
+  if (!row) {
+    return { answers: {}, runId: null, createdAt: null };
+  }
+
+  return {
+    answers: buildLastAnswerMap(parseAnswers(row.responses)),
+    runId: row.id,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
 export async function getInspectionRunById(

@@ -26,5 +26,9 @@ export default [
     "routes/inspections-manage-detail.tsx",
   ),
   route("inspections/submissions/:runId", "routes/inspection-submission.tsx"),
+  route(
+    "inspections/:inspectionId/last-answers",
+    "routes/inspection-last-answers.tsx",
+  ),
   route("inspections/:inspectionId", "routes/inspection-page.tsx"),
 ] satisfies RouteConfig;

@@ -807,6 +807,56 @@ export function buildAnswersFromResponses(
   });
 }
 
+/** Map questionId → non-empty answer from a prior inspection run. */
+export function buildLastAnswerMap(
+  answers: Array<Pick<InspectionAnswerRecord, "questionId" | "answer">>,
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const item of answers) {
+    const questionId = String(item.questionId ?? "").trim();
+    const answer = String(item.answer ?? "").trim();
+    if (questionId && answer) {
+      map[questionId] = answer;
+    }
+  }
+  return map;
+}
+
+export type LastInspectionAnswers = {
+  answers: Record<string, string>;
+  runId: string | null;
+  createdAt: string | null;
+};
+
+/** Human-readable last value for checklist display (esp. DATE). */
+export function formatLastAnswerDisplay(
+  value: string,
+  type: InspectionQuestionType,
+): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (type === "DATE") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (match) {
+      const date = new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+      );
+      if (!Number.isNaN(date.getTime())) {
+        return date.toLocaleDateString("en-AU", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+      }
+    }
+  }
+  return trimmed;
+}
+
 export function groupQuestionsBySection(
   questions: InspectionQuestionDef[],
 ): Array<{ title: string | null; questions: InspectionQuestionDef[] }> {
