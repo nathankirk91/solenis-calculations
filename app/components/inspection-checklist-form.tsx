@@ -7,6 +7,7 @@ import {
 } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import { Form, useNavigation } from "react-router";
+import { useState } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -20,6 +21,7 @@ import {
 } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { SignaturePad } from "~/components/signature-pad";
 import { createInspectionSchema } from "~/lib/inspection.schema";
 import {
   YES_NO_OPTIONS,
@@ -51,6 +53,7 @@ export function InspectionChecklistForm({
   const isSubmitting = navigation.state !== "idle";
   const schema = createInspectionSchema(definition);
   const sections = groupQuestionsBySection(definition.questions);
+  const [signature, setSignature] = useState("");
 
   const defaultResponses = Object.fromEntries(
     definition.questions.map((question) => [question.id, ""]),
@@ -67,6 +70,7 @@ export function InspectionChecklistForm({
       operatorId: "",
       equipmentRef: "",
       notes: "",
+      signature: "",
       responses: defaultResponses,
     },
   });
@@ -79,35 +83,12 @@ export function InspectionChecklistForm({
         <CardHeader>
           <CardTitle>Checklist</CardTitle>
           <CardDescription>
-            Answer each question, then submit to record this inspection.
+            Answer each question, then sign and submit to record this
+            inspection.
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
           <CardContent className="grid gap-8 pb-6">
-            <section className="grid gap-2">
-              <Label htmlFor={fields.operatorId.id}>
-                Operator / who is doing this inspection
-              </Label>
-              <select
-                {...getSelectProps(fields.operatorId)}
-                key={fields.operatorId.key}
-                className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
-                required
-              >
-                <option value="">Select operator…</option>
-                {operators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>
-                    {operator.name}
-                  </option>
-                ))}
-              </select>
-              {fields.operatorId.errors ? (
-                <p className="text-sm text-destructive">
-                  {fields.operatorId.errors.join(" ")}
-                </p>
-              ) : null}
-            </section>
-
             {definition.equipmentLabel ? (
               <section className="grid gap-2">
                 <Label htmlFor={fields.equipmentRef.id}>
@@ -144,9 +125,7 @@ export function InspectionChecklistForm({
             ) : null}
 
             {definition.instructionNotes ? (
-              <section
-                className="rounded-lg border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
-              >
+              <section className="rounded-lg border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
                 {definition.instructionNotes}
               </section>
             ) : null}
@@ -304,6 +283,44 @@ export function InspectionChecklistForm({
                   {fields.notes.errors.join(" ")}
                 </p>
               ) : null}
+            </section>
+
+            <hr className="border-border/60" />
+
+            <section className="grid gap-2">
+              <Label htmlFor={fields.operatorId.id}>
+                Operator / who filled out this form
+              </Label>
+              <select
+                {...getSelectProps(fields.operatorId)}
+                key={fields.operatorId.key}
+                className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+                required
+              >
+                <option value="">Select operator…</option>
+                {operators.map((operator) => (
+                  <option key={operator.id} value={operator.id}>
+                    {operator.name}
+                  </option>
+                ))}
+              </select>
+              {fields.operatorId.errors ? (
+                <p className="text-sm text-destructive">
+                  {fields.operatorId.errors.join(" ")}
+                </p>
+              ) : null}
+            </section>
+
+            <section className="grid gap-2">
+              <Label>Signature / initials</Label>
+              <SignaturePad
+                name={fields.signature.name}
+                id={fields.signature.id}
+                required
+                value={signature}
+                onChange={setSignature}
+                error={fields.signature.errors?.join(" ")}
+              />
             </section>
 
             {formError ? (

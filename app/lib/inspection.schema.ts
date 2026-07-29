@@ -81,6 +81,9 @@ export function createInspectionSchema(definition: InspectionDefinition) {
           .max(2000, "Notes must be under 2000 characters.")
           .optional(),
       ),
+      signature: z
+        .string({ error: "Signature is required." })
+        .min(1, "Please sign or initial the form."),
       responses: z.object(responseShape),
     })
     .superRefine((value, ctx) => {
@@ -131,6 +134,7 @@ export function createInspectionSchema(definition: InspectionDefinition) {
         operatorId: value.operatorId,
         equipmentRef: value.equipmentRef ?? null,
         notes: value.notes ?? null,
+        signature: value.signature,
         responses,
         answers,
         summary,
