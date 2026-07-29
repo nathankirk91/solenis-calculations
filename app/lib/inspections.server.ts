@@ -96,6 +96,7 @@ function mapQuestion(row: {
   options: unknown;
   attentionValues: unknown;
   required: boolean;
+  showLastValue?: boolean | null;
   sortOrder: number;
 }): InspectionQuestionDef {
   const options = questionOptionsForType(
@@ -116,6 +117,7 @@ function mapQuestion(row: {
         ? attentionValues
         : defaultAttentionValues(row.type, options),
     required: row.required,
+    showLastValue: Boolean(row.showLastValue),
     sortOrder: row.sortOrder,
   };
 }
@@ -141,6 +143,7 @@ function mapDefinition(row: {
     options: unknown;
     attentionValues: unknown;
     required: boolean;
+    showLastValue?: boolean | null;
     sortOrder: number;
   }>;
 }): InspectionDefinition {
@@ -500,6 +503,7 @@ function parseVersionSnapshot(value: unknown): InspectionVersionSnapshot {
             ? row.attentionValues.map(String)
             : [],
           required: Boolean(row.required ?? true),
+          showLastValue: Boolean(row.showLastValue),
           sortOrder: Number(row.sortOrder ?? 0),
         } satisfies InspectionQuestionDef;
       })
@@ -776,6 +780,7 @@ export async function seedDefaultInspections(): Promise<number> {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -790,6 +795,7 @@ export async function seedDefaultInspections(): Promise<number> {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -959,6 +965,7 @@ export async function addInspectionQuestion(args: {
   options?: string[];
   attentionValues?: string[];
   required?: boolean;
+  showLastValue?: boolean;
   changeComment: string;
   changedById: string;
 }): Promise<InspectionQuestionDef> {
@@ -1012,6 +1019,7 @@ export async function addInspectionQuestion(args: {
             ? normalizedAttention
             : defaultAttentionValues(args.type, options),
       required: args.required ?? true,
+      showLastValue: args.showLastValue ?? false,
       isActive: true,
       sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
     },
@@ -1075,6 +1083,7 @@ export async function updateInspectionQuestion(args: {
   options?: string[];
   attentionValues?: string[];
   required?: boolean;
+  showLastValue?: boolean;
   changeComment: string;
   changedById: string;
 }): Promise<InspectionQuestionDef> {
@@ -1131,6 +1140,7 @@ export async function updateInspectionQuestion(args: {
             ? normalizedAttention
             : defaultAttentionValues(args.type, options),
       required: args.required ?? true,
+      showLastValue: args.showLastValue ?? false,
     },
   });
 
@@ -1530,6 +1540,7 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
           isActive: true,
           sortOrder: question.sortOrder,
           inspectionId: definition.id,
@@ -1545,6 +1556,7 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
           isActive: true,
           sortOrder: question.sortOrder,
         },

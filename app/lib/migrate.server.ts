@@ -93,12 +93,15 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
       "options" JSONB,
       "attention_values" JSONB,
       "required" BOOLEAN NOT NULL DEFAULT true,
+      "show_last_value" BOOLEAN NOT NULL DEFAULT false,
       "is_active" BOOLEAN NOT NULL DEFAULT true,
       "sort_order" INTEGER NOT NULL DEFAULT 0,
       "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "inspection_questions_pkey" PRIMARY KEY ("id")
     )`,
+    `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "show_last_value" BOOLEAN NOT NULL DEFAULT false`,
+    `UPDATE "inspection_questions" SET "show_last_value" = true WHERE "id" = 'forklift-daily-check__service-date'`,
     `CREATE INDEX IF NOT EXISTS "inspection_questions_inspection_id_is_active_sort_order_idx"
       ON "inspection_questions"("inspection_id", "is_active", "sort_order")`,
     `DO $$ BEGIN
@@ -242,6 +245,7 @@ export async function applyPendingMigrations(): Promise<AppliedMigration[]> {
       name.includes("_inspection_questions") ||
       name.includes("_inspection_versions") ||
       name.includes("_inspection_templates") ||
+      name.includes("_inspection_question_show_last_value") ||
       name.includes("_inspection_run_signature")
     ) {
       const sqlPath = path.join(

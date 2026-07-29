@@ -97,6 +97,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         options,
         attentionValues: attentionRaw,
         required: String(formData.get("required") ?? "") === "on",
+        showLastValue: String(formData.get("showLastValue") ?? "") === "on",
         changeComment,
         changedById: user.id,
       };
@@ -190,6 +191,7 @@ function QuestionFields({
     helpText?: string | null;
     sectionTitle?: string | null;
     required?: boolean;
+    showLastValue?: boolean;
     attentionValues?: string[];
   };
 }) {
@@ -310,6 +312,21 @@ function QuestionFields({
         />
         Required
       </label>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="showLastValue"
+          defaultChecked={defaults?.showLastValue ?? false}
+          className="mt-0.5 size-4 accent-[var(--brand-navy)]"
+        />
+        <span>
+          Show last value
+          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+            Operators see the prior report’s answer when one exists (useful for
+            service date).
+          </span>
+        </span>
+      </label>
     </>
   );
 }
@@ -389,6 +406,7 @@ function QuestionEditor({
               helpText: question.helpText,
               sectionTitle: question.sectionTitle,
               required: question.required,
+              showLastValue: question.showLastValue,
               attentionValues: question.attentionValues,
             }}
           />
@@ -420,6 +438,9 @@ function QuestionEditor({
             </Badge>
             {!question.required ? (
               <Badge variant="outline">Optional</Badge>
+            ) : null}
+            {question.showLastValue ? (
+              <Badge variant="outline">Shows last value</Badge>
             ) : null}
           </div>
           {question.sectionTitle ? (
@@ -838,6 +859,7 @@ export default function InspectionsManageDetailPage({
                           ? ` · ${question.sectionTitle}`
                           : ""}
                         {question.required ? "" : " · Optional"}
+                        {question.showLastValue ? " · Shows last value" : ""}
                       </p>
                     </li>
                   ))}

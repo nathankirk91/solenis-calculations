@@ -83,6 +83,7 @@ function passResponses(definition) {
         options: ["Yes", "No"],
         attentionValues: ["No"],
         required: true,
+        showLastValue: false,
         sortOrder: 1,
       },
       {
@@ -92,6 +93,7 @@ function passResponses(definition) {
         options: [],
         attentionValues: [],
         required: false,
+        showLastValue: false,
         sortOrder: 2,
       },
     ],
@@ -155,6 +157,10 @@ function passResponses(definition) {
   const unit = getFallbackInspectionByIdOrSlug("forklift-daily-check-h57168");
   assert.equal(unit?.fixedEquipmentRef, "H57168");
   assert.equal(unit?.templateInspectionId, "forklift-daily-check");
+  const serviceDate = FORKLIFT_DAILY_CHECK_TEMPLATE.questions.find((question) =>
+    question.id.endsWith("__service-date"),
+  );
+  assert.equal(serviceDate?.showLastValue, true);
 }
 
 console.log("inspections tests passed");

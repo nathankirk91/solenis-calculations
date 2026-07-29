@@ -19,6 +19,11 @@ export type InspectionQuestionDef = {
   /** Answer values that mark the inspection as needing attention. */
   attentionValues: string[];
   required: boolean;
+  /**
+   * When true, operators see the prior report's answer for this question
+   * (configured by managers; not a per-submission toggle).
+   */
+  showLastValue: boolean;
   sortOrder: number;
 };
 
@@ -113,6 +118,7 @@ function statusQuestion(
     options: [...STATUS_CHECK_OPTIONS],
     attentionValues: [...DEFAULT_STATUS_ATTENTION],
     required: true,
+    showLastValue: false,
     sortOrder,
   };
 }
@@ -127,6 +133,7 @@ function yesNoQuestion(
     required?: boolean;
     helpText?: string;
     attentionValues?: string[];
+    showLastValue?: boolean;
   },
 ): InspectionQuestionDef {
   return {
@@ -137,6 +144,7 @@ function yesNoQuestion(
     options: [...YES_NO_OPTIONS],
     attentionValues: opts?.attentionValues ?? [...DEFAULT_YES_NO_ATTENTION],
     required: opts?.required ?? true,
+    showLastValue: opts?.showLastValue ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -153,6 +161,7 @@ function radioQuestion(
     required?: boolean;
     helpText?: string;
     attentionValues?: string[];
+    showLastValue?: boolean;
   },
 ): InspectionQuestionDef {
   return {
@@ -163,6 +172,7 @@ function radioQuestion(
     options,
     attentionValues: opts?.attentionValues ?? [],
     required: opts?.required ?? true,
+    showLastValue: opts?.showLastValue ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -174,7 +184,7 @@ function textQuestion(
   label: string,
   sectionTitle: string,
   sortOrder: number,
-  opts?: { required?: boolean; helpText?: string },
+  opts?: { required?: boolean; helpText?: string; showLastValue?: boolean },
 ): InspectionQuestionDef {
   return {
     id: `${inspectionId}__${id}`,
@@ -184,6 +194,7 @@ function textQuestion(
     options: [],
     attentionValues: [],
     required: opts?.required ?? true,
+    showLastValue: opts?.showLastValue ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -195,7 +206,7 @@ function numberQuestion(
   label: string,
   sectionTitle: string,
   sortOrder: number,
-  opts?: { required?: boolean; helpText?: string },
+  opts?: { required?: boolean; helpText?: string; showLastValue?: boolean },
 ): InspectionQuestionDef {
   return {
     id: `${inspectionId}__${id}`,
@@ -205,6 +216,7 @@ function numberQuestion(
     options: [],
     attentionValues: [],
     required: opts?.required ?? true,
+    showLastValue: opts?.showLastValue ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -216,7 +228,7 @@ function dateQuestion(
   label: string,
   sectionTitle: string,
   sortOrder: number,
-  opts?: { required?: boolean; helpText?: string },
+  opts?: { required?: boolean; helpText?: string; showLastValue?: boolean },
 ): InspectionQuestionDef {
   return {
     id: `${inspectionId}__${id}`,
@@ -226,6 +238,7 @@ function dateQuestion(
     options: [],
     attentionValues: [],
     required: opts?.required ?? true,
+    showLastValue: opts?.showLastValue ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -297,7 +310,10 @@ export const FORKLIFT_DAILY_CHECK_TEMPLATE: InspectionDefinition = {
       "Service date",
       "Before start",
       3,
-      { helpText: "Date from the service sticker (as on Form 78)." },
+      {
+        helpText: "Date from the service sticker (as on Form 78).",
+        showLastValue: true,
+      },
     ),
     yesNoQuestion(
       "forklift-daily-check",
