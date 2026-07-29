@@ -1008,3 +1008,53 @@ export const FALLBACK_INSPECTIONS: InspectionCard[] =
     href: inspection.href,
     isAvailable: inspection.isAvailable,
   }));
+
+/** Operator hub that lists every forklift unit form. */
+export const FORKLIFT_INSPECTIONS_HREF = "/inspections/forklifts";
+
+export const FORKLIFT_INSPECTIONS_CARD: InspectionCard = {
+  id: "forklift-inspections",
+  slug: "forklifts",
+  title: "Forklift inspections",
+  description:
+    "Daily safety checks for each forklift unit (Form 78). Choose a unit to begin.",
+  category: "Equipment",
+  href: FORKLIFT_INSPECTIONS_HREF,
+  isAvailable: true,
+};
+
+/** Per-unit forklift forms (not the shared master template). */
+export function isForkliftUnitInspection(item: {
+  id: string;
+  slug?: string;
+  fixedEquipmentRef?: string | null;
+  templateInspectionId?: string | null;
+}): boolean {
+  if (item.templateInspectionId === FORKLIFT_DAILY_CHECK_TEMPLATE.id) {
+    return true;
+  }
+  const key = `${item.id} ${item.slug ?? ""}`.toLowerCase();
+  return /forklift-daily-check-[a-z0-9]/.test(key);
+}
+
+/**
+ * Home / checklist catalog: collapse individual forklift units into one
+ * "Forklift inspections" entry that opens the unit picker.
+ */
+export function buildHomeInspectionCatalog(
+  inspections: InspectionCard[],
+): InspectionCard[] {
+  const available = inspections.filter((inspection) => inspection.isAvailable);
+  const forkliftUnits = available.filter((inspection) =>
+    isForkliftUnitInspection(inspection),
+  );
+  const others = available.filter(
+    (inspection) => !isForkliftUnitInspection(inspection),
+  );
+
+  if (forkliftUnits.length === 0) {
+    return others;
+  }
+
+  return [FORKLIFT_INSPECTIONS_CARD, ...others];
+}

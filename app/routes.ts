@@ -25,6 +25,7 @@ export default [
     "inspections/manage/:inspectionId",
     "routes/inspections-manage-detail.tsx",
   ),
+  route("inspections/forklifts", "routes/inspections-forklifts.tsx"),
   route("inspections/submissions/:runId", "routes/inspection-submission.tsx"),
   route(
     "inspections/:inspectionId/last-answers",

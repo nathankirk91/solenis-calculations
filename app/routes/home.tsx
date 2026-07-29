@@ -11,6 +11,7 @@ import {
 import { getPrisma } from "~/lib/db.server";
 import {
   FALLBACK_INSPECTIONS,
+  buildHomeInspectionCatalog,
   type InspectionCard,
 } from "~/lib/inspections";
 import { canReviewRuns } from "~/lib/roles";
@@ -37,7 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     return {
       user,
       calculations: FALLBACK_CALCULATIONS,
-      inspections: FALLBACK_INSPECTIONS,
+      inspections: buildHomeInspectionCatalog(FALLBACK_INSPECTIONS),
       pendingCount,
       source: "fallback" as const,
     };
@@ -83,7 +84,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         }))
       : FALLBACK_CALCULATIONS;
 
-    const inspections: InspectionCard[] = (
+    const inspections: InspectionCard[] = buildHomeInspectionCatalog(
       inspectionRows.length
         ? inspectionRows.map((row) => ({
             id: row.id,
@@ -94,8 +95,8 @@ export async function loader({ request }: Route.LoaderArgs) {
             href: row.href,
             isAvailable: row.isAvailable,
           }))
-        : FALLBACK_INSPECTIONS
-    ).filter((row) => row.isAvailable);
+        : FALLBACK_INSPECTIONS,
+    );
 
     return {
       user,
@@ -108,7 +109,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     return {
       user,
       calculations: FALLBACK_CALCULATIONS,
-      inspections: FALLBACK_INSPECTIONS,
+      inspections: buildHomeInspectionCatalog(FALLBACK_INSPECTIONS),
       pendingCount,
       source: "fallback" as const,
     };
@@ -178,8 +179,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               Inspections
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Complete forklift and daily start-up / shut-down checklists.
-              Anything marked for attention notifies managers.
+              Open forklift checks by unit, or complete daily start-up /
+              shut-down checklists. Anything marked for attention notifies
+              managers.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
