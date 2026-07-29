@@ -54,6 +54,20 @@ export async function loader({ request }: Route.LoaderArgs) {
           ? error.message
           : "Could not create inspection tables.";
     }
+  } else if (
+    !inspections.some((inspection) => inspection.fixedEquipmentRef)
+  ) {
+    // Upgrade path: split the combined forklift form into per-unit forms.
+    try {
+      const seeded = await seedDefaultInspections();
+      migrateNote = `Updated default inspections (${seeded}), including per-unit forklift forms.`;
+      inspections = await listManagedInspections();
+    } catch (error) {
+      migrateNote =
+        error instanceof Error
+          ? error.message
+          : "Could not update forklift unit forms.";
+    }
   }
 
   const pendingCount = await countPendingRuns();
