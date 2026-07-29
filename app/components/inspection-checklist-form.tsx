@@ -58,8 +58,10 @@ export function InspectionChecklistForm({
   const schema = createInspectionSchema(definition);
   const sections = groupQuestionsBySection(definition.questions);
   const [signature, setSignature] = useState("");
-  const [equipmentRef, setEquipmentRef] = useState("");
-  const [equipmentRefForFetch, setEquipmentRefForFetch] = useState("");
+  const fixedEquipmentRef = definition.fixedEquipmentRef?.trim() || "";
+  const [equipmentRef, setEquipmentRef] = useState(fixedEquipmentRef);
+  const [equipmentRefForFetch, setEquipmentRefForFetch] =
+    useState(fixedEquipmentRef);
   const [showLastByQuestion, setShowLastByQuestion] = useState<
     Record<string, boolean>
   >({});
@@ -73,9 +75,9 @@ export function InspectionChecklistForm({
   const lastAnswersFetcher = useFetcher<LastInspectionAnswers>();
   const lastAnswers = lastAnswersFetcher.data?.answers ?? {};
   const lastRunAt = lastAnswersFetcher.data?.createdAt ?? null;
-  const needsEquipment = Boolean(definition.equipmentLabel);
-  const canLoadLastAnswers =
-    !needsEquipment || Boolean(equipmentRefForFetch.trim());
+  const needsEquipmentPick =
+    Boolean(definition.equipmentLabel) && !fixedEquipmentRef;
+  const canLoadLastAnswers = !needsEquipmentPick || Boolean(equipmentRefForFetch.trim());
   const isLoadingLastAnswers =
     lastAnswersFetcher.state === "loading" ||
     lastAnswersFetcher.state === "submitting";
@@ -93,7 +95,7 @@ export function InspectionChecklistForm({
     shouldRevalidate: "onInput",
     defaultValue: {
       operatorId: "",
-      equipmentRef: "",
+      equipmentRef: fixedEquipmentRef,
       notes: "",
       signature: "",
       responses: defaultResponses,
@@ -103,6 +105,11 @@ export function InspectionChecklistForm({
   const responseFields = fields.responses.getFieldset();
 
   useEffect(() => {
+    if (fixedEquipmentRef) {
+      setEquipmentRef(fixedEquipmentRef);
+      setEquipmentRefForFetch(fixedEquipmentRef);
+      return;
+    }
     if (definition.equipmentChoices?.length) {
       setEquipmentRefForFetch(equipmentRef);
       return;
@@ -111,7 +118,11 @@ export function InspectionChecklistForm({
       setEquipmentRefForFetch(equipmentRef.trim());
     }, 400);
     return () => window.clearTimeout(timeoutId);
-  }, [equipmentRef, definition.equipmentChoices?.length]);
+  }, [
+    equipmentRef,
+    definition.equipmentChoices?.length,
+    fixedEquipmentRef,
+  ]);
 
   useEffect(() => {
     setUseLastByQuestion({});
@@ -199,7 +210,29 @@ export function InspectionChecklistForm({
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
           <CardContent className="grid gap-8 pb-6">
-            {definition.equipmentLabel ? (
+            {fixedEquipmentRef ? (
+              <section className="grid gap-2">
+                <input
+                  type="hidden"
+                  name={fields.equipmentRef.name}
+                  value={fixedEquipmentRef}
+                  readOnly
+                />
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-brand-navy">
+                    {definition.equipmentLabel ?? "Unit"}:
+                  </span>{" "}
+                  {fixedEquipmentRef}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isLoadingLastAnswers
+                    ? "Loading previous answers…"
+                    : lastRunAt
+                      ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
+                      : "No previous report for this unit yet."}
+                </p>
+              </section>
+            ) : definition.equipmentLabel ? (
               <section className="grid gap-2">
                 <Label htmlFor={fields.equipmentRef.id}>
                   {definition.equipmentLabel}
@@ -248,7 +281,7 @@ export function InspectionChecklistForm({
               </section>
             ) : null}
 
-            {!needsEquipment && lastRunAt ? (
+            {!needsEquipmentPick && !fixedEquipmentRef && lastRunAt ? (
               <p className="text-xs text-muted-foreground">
                 Previous report: {formatMelbourneDateTime(lastRunAt)}
               </p>

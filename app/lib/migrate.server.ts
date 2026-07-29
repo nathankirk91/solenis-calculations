@@ -70,10 +70,19 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
       CONSTRAINT "inspections_pkey" PRIMARY KEY ("id")
     )`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "equipment_label" TEXT`,
+    `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "template_inspection_id" TEXT`,
+    `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "fixed_equipment_ref" TEXT`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE "inspections" ALTER COLUMN "description" SET DEFAULT ''`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "inspections_slug_key" ON "inspections"("slug")`,
+    `CREATE INDEX IF NOT EXISTS "inspections_template_inspection_id_idx" ON "inspections"("template_inspection_id")`,
+    `DO $$ BEGIN
+      ALTER TABLE "inspections"
+        ADD CONSTRAINT "inspections_template_inspection_id_fkey"
+        FOREIGN KEY ("template_inspection_id") REFERENCES "inspections"("id")
+        ON DELETE RESTRICT ON UPDATE CASCADE;
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `CREATE TABLE IF NOT EXISTS "inspection_questions" (
       "id" TEXT NOT NULL,
       "inspection_id" TEXT NOT NULL,
@@ -231,7 +240,9 @@ export async function applyPendingMigrations(): Promise<AppliedMigration[]> {
     if (
       name.includes("_inspections") ||
       name.includes("_inspection_questions") ||
-      name.includes("_inspection_versions")
+      name.includes("_inspection_versions") ||
+      name.includes("_inspection_templates") ||
+      name.includes("_inspection_run_signature")
     ) {
       const sqlPath = path.join(
         process.cwd(),

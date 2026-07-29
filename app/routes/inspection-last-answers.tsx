@@ -17,9 +17,15 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   await requireUser(request, definition.href);
 
   const url = new URL(request.url);
-  const equipmentRef = url.searchParams.get("equipmentRef");
+  const equipmentRef =
+    url.searchParams.get("equipmentRef") ||
+    definition.fixedEquipmentRef ||
+    null;
 
-  if (definition.equipmentLabel && !equipmentRef?.trim()) {
+  const needsEquipmentPick =
+    Boolean(definition.equipmentLabel) && !definition.fixedEquipmentRef;
+
+  if (needsEquipmentPick && !equipmentRef?.trim()) {
     return data({
       answers: {} as Record<string, string>,
       runId: null as string | null,

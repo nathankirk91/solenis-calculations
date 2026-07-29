@@ -32,10 +32,14 @@ export type ManagedInspection = {
   category: string;
   href: string;
   equipmentLabel: string | null;
+  templateInspectionId: string | null;
+  fixedEquipmentRef: string | null;
   isAvailable: boolean;
   sortOrder: number;
   questionCount: number;
   version: number;
+  /** True when this inspection owns the shared question list for unit forms. */
+  isQuestionSource: boolean;
 };
 
 export type InspectionVersionSnapshot = {
@@ -60,6 +64,11 @@ export type InspectionVersionHistoryItem = {
 export type ManagedInspectionDetail = InspectionDefinition & {
   version: number;
   versions: InspectionVersionHistoryItem[];
+  /** When inheriting, the template that owns editable questions. */
+  questionSourceId: string | null;
+  questionSourceTitle: string | null;
+  inheritsQuestions: boolean;
+  unitFormCount: number;
 };
 
 export type InspectionHistoryItem = {
@@ -119,6 +128,8 @@ function mapDefinition(row: {
   category: string;
   href: string;
   equipmentLabel: string | null;
+  templateInspectionId?: string | null;
+  fixedEquipmentRef?: string | null;
   isAvailable: boolean;
   sortOrder: number;
   questions: Array<{
@@ -142,6 +153,8 @@ function mapDefinition(row: {
     category: row.category,
     href: row.href,
     equipmentLabel: row.equipmentLabel,
+    templateInspectionId: row.templateInspectionId ?? null,
+    fixedEquipmentRef: row.fixedEquipmentRef ?? null,
     isAvailable: row.isAvailable,
     sortOrder: row.sortOrder,
     questions: row.questions.map(mapQuestion),
@@ -197,7 +210,7 @@ export async function getInspectionDefinition(
 ): Promise<InspectionDefinition | null> {
   const prisma = getPrisma();
   if (!prisma) {
-    return getFallbackInspectionByIdOrSlug(idOrSlug) ?? null;
+    return resolveFallbackDefinition(idOrSlug);
   }
 
   try {
@@ -214,13 +227,58 @@ export async function getInspectionDefinition(
     });
 
     if (!row) {
-      return getFallbackInspectionByIdOrSlug(idOrSlug) ?? null;
+      return resolveFallbackDefinition(idOrSlug);
     }
 
-    return mergeStaticDefinitionMeta(mapDefinition(row));
+    let questions = row.questions;
+    let shortNameFallback: string | undefined;
+
+    if (row.templateInspectionId) {
+      const template = await prisma.inspection.findUnique({
+        where: { id: row.templateInspectionId },
+        include: {
+          questions: {
+            where: { isActive: true },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+      });
+      if (template) {
+        questions = template.questions;
+      }
+      shortNameFallback = getFallbackInspectionByIdOrSlug(row.id)?.shortName;
+    }
+
+    const definition = mapDefinition({ ...row, questions });
+    if (shortNameFallback) {
+      definition.shortName = shortNameFallback;
+    }
+
+    return mergeStaticDefinitionMeta(definition);
   } catch {
-    return getFallbackInspectionByIdOrSlug(idOrSlug) ?? null;
+    return resolveFallbackDefinition(idOrSlug);
   }
+}
+
+function resolveFallbackDefinition(
+  idOrSlug: string,
+): InspectionDefinition | null {
+  const fallback = getFallbackInspectionByIdOrSlug(idOrSlug);
+  if (!fallback) {
+    return null;
+  }
+  if (fallback.templateInspectionId) {
+    const template = getFallbackInspectionByIdOrSlug(
+      fallback.templateInspectionId,
+    );
+    return {
+      ...fallback,
+      questions: template?.questions ?? [],
+      instructionNotes:
+        fallback.instructionNotes ?? template?.instructionNotes,
+    };
+  }
+  return fallback;
 }
 
 /** Static checklist metadata (unit list, Form 78 notes) lives in code, not the DB. */
@@ -228,15 +286,29 @@ function mergeStaticDefinitionMeta(
   definition: InspectionDefinition,
 ): InspectionDefinition {
   const fallback = getFallbackInspectionByIdOrSlug(definition.id);
-  if (!fallback) {
-    return definition;
-  }
+  const templateFallback = definition.templateInspectionId
+    ? getFallbackInspectionByIdOrSlug(definition.templateInspectionId)
+    : null;
 
   return {
     ...definition,
-    equipmentLabel: definition.equipmentLabel ?? fallback.equipmentLabel,
-    equipmentChoices: fallback.equipmentChoices ?? definition.equipmentChoices,
-    instructionNotes: fallback.instructionNotes ?? definition.instructionNotes,
+    shortName: fallback?.shortName ?? definition.shortName,
+    equipmentLabel:
+      definition.equipmentLabel ??
+      fallback?.equipmentLabel ??
+      templateFallback?.equipmentLabel,
+    equipmentChoices:
+      fallback?.equipmentChoices ?? definition.equipmentChoices,
+    fixedEquipmentRef:
+      definition.fixedEquipmentRef ?? fallback?.fixedEquipmentRef ?? null,
+    templateInspectionId:
+      definition.templateInspectionId ??
+      fallback?.templateInspectionId ??
+      null,
+    instructionNotes:
+      definition.instructionNotes ??
+      fallback?.instructionNotes ??
+      templateFallback?.instructionNotes,
   };
 }
 
@@ -247,28 +319,7 @@ export async function listManagedInspections(): Promise<ManagedInspection[]> {
   }
 
   try {
-    const rows = await prisma.inspection.findMany({
-      orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-      include: {
-        _count: {
-          select: { questions: { where: { isActive: true } } },
-        },
-      },
-    });
-
-    return rows.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      title: row.title,
-      description: row.description,
-      category: row.category,
-      href: row.href,
-      equipmentLabel: row.equipmentLabel,
-      isAvailable: row.isAvailable,
-      sortOrder: row.sortOrder,
-      questionCount: row._count.questions,
-      version: row.version ?? 1,
-    }));
+    return await listManagedInspectionsOnce();
   } catch (error) {
     const code =
       error && typeof error === "object" && "code" in error
@@ -277,8 +328,65 @@ export async function listManagedInspections(): Promise<ManagedInspection[]> {
     if (code === "P2021") {
       return [];
     }
+    // New template columns may be missing until embedded schema ensure runs.
+    const message = error instanceof Error ? error.message : String(error);
+    if (/template_inspection_id|fixed_equipment_ref|does not exist/i.test(message)) {
+      const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+      await ensureInspectionSchema();
+      return listManagedInspectionsOnce();
+    }
     throw error;
   }
+}
+
+async function listManagedInspectionsOnce(): Promise<ManagedInspection[]> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return [];
+  }
+
+  const rows = await prisma.inspection.findMany({
+    orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+    include: {
+      _count: {
+        select: {
+          questions: { where: { isActive: true } },
+          unitForms: true,
+        },
+      },
+      template: {
+        include: {
+          _count: {
+            select: { questions: { where: { isActive: true } } },
+          },
+        },
+      },
+    },
+  });
+
+  return rows.map((row) => {
+    const inheritsQuestions = Boolean(row.templateInspectionId);
+    const questionCount = inheritsQuestions
+      ? (row.template?._count.questions ?? 0)
+      : row._count.questions;
+
+    return {
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      href: row.href,
+      equipmentLabel: row.equipmentLabel,
+      templateInspectionId: row.templateInspectionId,
+      fixedEquipmentRef: row.fixedEquipmentRef,
+      isAvailable: row.isAvailable,
+      sortOrder: row.sortOrder,
+      questionCount,
+      version: row.version ?? 1,
+      isQuestionSource: !inheritsQuestions && row._count.unitForms > 0,
+    };
+  });
 }
 
 export async function getManagedInspection(
@@ -296,6 +404,22 @@ export async function getManagedInspection(
         where: { isActive: true },
         orderBy: { sortOrder: "asc" },
       },
+      template: {
+        include: {
+          questions: {
+            where: { isActive: true },
+            orderBy: { sortOrder: "asc" },
+          },
+          versions: {
+            orderBy: { version: "desc" },
+            include: {
+              changedBy: {
+                select: { name: true, email: true },
+              },
+            },
+          },
+        },
+      },
       versions: {
         orderBy: { version: "desc" },
         include: {
@@ -304,6 +428,9 @@ export async function getManagedInspection(
           },
         },
       },
+      _count: {
+        select: { unitForms: true },
+      },
     },
   });
 
@@ -311,42 +438,38 @@ export async function getManagedInspection(
     return null;
   }
 
-  // Only backfill version 1 when this inspection has no history yet.
-  if (row.versions.length === 0) {
+  const inheritsQuestions = Boolean(row.templateInspectionId && row.template);
+  const questionRows = inheritsQuestions
+    ? row.template!.questions
+    : row.questions;
+  const versionRows = inheritsQuestions ? row.template!.versions : row.versions;
+  const versionNumber = inheritsQuestions
+    ? (row.template!.version ?? 1)
+    : (row.version ?? 1);
+
+  // Only backfill version 1 when this question-source inspection has no history yet.
+  if (!inheritsQuestions && versionRows.length === 0) {
     await ensureBaselineInspectionVersion(row.id);
-    const refreshed = await prisma.inspection.findUnique({
-      where: { id },
-      include: {
-        questions: {
-          where: { isActive: true },
-          orderBy: { sortOrder: "asc" },
-        },
-        versions: {
-          orderBy: { version: "desc" },
-          include: {
-            changedBy: {
-              select: { name: true, email: true },
-            },
-          },
-        },
-      },
-    });
-    if (!refreshed) {
-      return null;
-    }
-    return {
-      ...mapDefinition(refreshed),
-      version: refreshed.version ?? 1,
-      versions: refreshed.versions.map((version) =>
-        mapVersionHistoryItem(version),
-      ),
-    };
+    return getManagedInspection(id);
   }
 
+  const definition = mergeStaticDefinitionMeta(
+    mapDefinition({
+      ...row,
+      questions: questionRows,
+    }),
+  );
+
   return {
-    ...mapDefinition(row),
-    version: row.version ?? 1,
-    versions: row.versions.map((version) => mapVersionHistoryItem(version)),
+    ...definition,
+    version: versionNumber,
+    versions: versionRows.map((version) => mapVersionHistoryItem(version)),
+    questionSourceId: inheritsQuestions ? row.templateInspectionId : row.id,
+    questionSourceTitle: inheritsQuestions
+      ? (row.template?.title ?? null)
+      : row.title,
+    inheritsQuestions,
+    unitFormCount: row._count.unitForms,
   };
 }
 
@@ -590,12 +713,22 @@ async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
 
 /** Upsert built-in forklift / start-up / shut-down definitions after migrations. */
 export async function seedDefaultInspections(): Promise<number> {
+  const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+  await ensureInspectionSchema();
+
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
   }
 
-  for (const inspection of INSPECTION_DEFINITIONS) {
+  // Seed templates before unit forms that reference them.
+  const ordered = [...INSPECTION_DEFINITIONS].sort((a, b) => {
+    const aChild = a.templateInspectionId ? 1 : 0;
+    const bChild = b.templateInspectionId ? 1 : 0;
+    return aChild - bChild || a.sortOrder - b.sortOrder;
+  });
+
+  for (const inspection of ordered) {
     await prisma.inspection.upsert({
       where: { id: inspection.id },
       update: {
@@ -604,7 +737,9 @@ export async function seedDefaultInspections(): Promise<number> {
         category: inspection.category,
         href: inspection.href,
         equipmentLabel: inspection.equipmentLabel ?? null,
-        isAvailable: true,
+        templateInspectionId: inspection.templateInspectionId ?? null,
+        fixedEquipmentRef: inspection.fixedEquipmentRef ?? null,
+        isAvailable: inspection.isAvailable,
         sortOrder: inspection.sortOrder,
       },
       create: {
@@ -615,11 +750,18 @@ export async function seedDefaultInspections(): Promise<number> {
         category: inspection.category,
         href: inspection.href,
         equipmentLabel: inspection.equipmentLabel ?? null,
-        isAvailable: true,
+        templateInspectionId: inspection.templateInspectionId ?? null,
+        fixedEquipmentRef: inspection.fixedEquipmentRef ?? null,
+        isAvailable: inspection.isAvailable,
         sortOrder: inspection.sortOrder,
         version: 1,
       },
     });
+
+    // Unit forms inherit questions — only seed questions on the source inspection.
+    if (inspection.templateInspectionId) {
+      continue;
+    }
 
     for (const question of inspection.questions) {
       await prisma.inspectionQuestion.upsert({
@@ -655,14 +797,16 @@ export async function seedDefaultInspections(): Promise<number> {
     }
 
     const questionIds = inspection.questions.map((question) => question.id);
-    await prisma.inspectionQuestion.updateMany({
-      where: {
-        inspectionId: inspection.id,
-        isActive: true,
-        id: { notIn: questionIds },
-      },
-      data: { isActive: false },
-    });
+    if (questionIds.length > 0) {
+      await prisma.inspectionQuestion.updateMany({
+        where: {
+          inspectionId: inspection.id,
+          isActive: true,
+          id: { notIn: questionIds },
+        },
+        data: { isActive: false },
+      });
+    }
 
     await ensureBaselineInspectionVersion(
       inspection.id,
@@ -719,10 +863,13 @@ export async function createManagedInspection(args: {
     category: row.category,
     href: row.href,
     equipmentLabel: row.equipmentLabel,
+    templateInspectionId: null,
+    fixedEquipmentRef: null,
     isAvailable: row.isAvailable,
     sortOrder: row.sortOrder,
     questionCount: 0,
     version: row.version ?? 1,
+    isQuestionSource: false,
   };
 }
 
@@ -782,6 +929,27 @@ export async function setInspectionAvailability(
   }
 }
 
+async function assertQuestionSourceInspection(
+  inspectionId: string,
+): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+  const row = await prisma.inspection.findUnique({
+    where: { id: inspectionId },
+    select: { templateInspectionId: true, title: true },
+  });
+  if (!row) {
+    throw new Error("Inspection not found.");
+  }
+  if (row.templateInspectionId) {
+    throw new Error(
+      "This form inherits questions from a master template. Edit the template to change questions for all unit forms.",
+    );
+  }
+}
+
 export async function addInspectionQuestion(args: {
   inspectionId: string;
   label: string;
@@ -794,6 +962,7 @@ export async function addInspectionQuestion(args: {
   changeComment: string;
   changedById: string;
 }): Promise<InspectionQuestionDef> {
+  await assertQuestionSourceInspection(args.inspectionId);
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
@@ -880,6 +1049,7 @@ export async function removeInspectionQuestion(args: {
   if (!existing) {
     throw new Error("Question not found.");
   }
+  await assertQuestionSourceInspection(existing.inspectionId);
 
   const updated = await prisma.inspectionQuestion.updateMany({
     where: { id: args.questionId, isActive: true },
@@ -926,6 +1096,7 @@ export async function updateInspectionQuestion(args: {
   if (!existing) {
     throw new Error("Question not found.");
   }
+  await assertQuestionSourceInspection(existing.inspectionId);
 
   const options = questionOptionsForType(args.type, args.options ?? []);
   if (args.type === "RADIO" && options.length < 2) {
@@ -992,6 +1163,7 @@ export async function moveInspectionQuestion(args: {
   if (!current) {
     throw new Error("Question not found.");
   }
+  await assertQuestionSourceInspection(current.inspectionId);
 
   const neighbor = await prisma.inspectionQuestion.findFirst({
     where: {
@@ -1047,8 +1219,15 @@ export async function createInspectionRun(args: {
 
   const inspection = await prisma.inspection.findUnique({
     where: { id: args.inspectionId },
-    select: { version: true },
+    select: {
+      version: true,
+      templateInspectionId: true,
+      template: { select: { version: true } },
+    },
   });
+
+  const inspectionVersion =
+    inspection?.template?.version ?? inspection?.version ?? null;
 
   return prisma.inspectionRun.create({
     data: {
@@ -1061,7 +1240,7 @@ export async function createInspectionRun(args: {
       signature: args.signature ?? null,
       responses: args.answers,
       summary: args.summary,
-      inspectionVersion: inspection?.version ?? null,
+      inspectionVersion,
     },
     select: { id: true },
   });
@@ -1183,6 +1362,8 @@ export async function listInspectionHistory(
 /**
  * Latest submitted answers for an inspection, optionally scoped to a unit.
  * Used so operators can view/adopt values like service date from the prior report.
+ * For unit forms that inherit a template, also falls back to legacy runs on the
+ * template inspection with a matching equipmentRef.
  */
 export async function getLastAnswersForInspection(args: {
   inspectionId: string;
@@ -1195,10 +1376,22 @@ export async function getLastAnswersForInspection(args: {
 
   const equipmentRef = args.equipmentRef?.trim() || null;
 
+  const inspection = await prisma.inspection.findUnique({
+    where: { id: args.inspectionId },
+    select: {
+      id: true,
+      templateInspectionId: true,
+      fixedEquipmentRef: true,
+    },
+  });
+
+  const effectiveEquipmentRef =
+    equipmentRef || inspection?.fixedEquipmentRef?.trim() || null;
+
   const row = await prisma.inspectionRun.findFirst({
     where: {
       inspectionId: args.inspectionId,
-      ...(equipmentRef ? { equipmentRef } : {}),
+      ...(effectiveEquipmentRef ? { equipmentRef: effectiveEquipmentRef } : {}),
     },
     orderBy: { createdAt: "desc" },
     select: {
@@ -1208,15 +1401,38 @@ export async function getLastAnswersForInspection(args: {
     },
   });
 
-  if (!row) {
-    return { answers: {}, runId: null, createdAt: null };
+  if (row) {
+    return {
+      answers: buildLastAnswerMap(parseAnswers(row.responses)),
+      runId: row.id,
+      createdAt: row.createdAt.toISOString(),
+    };
   }
 
-  return {
-    answers: buildLastAnswerMap(parseAnswers(row.responses)),
-    runId: row.id,
-    createdAt: row.createdAt.toISOString(),
-  };
+  // Fall back to legacy combined-form runs on the master template.
+  if (inspection?.templateInspectionId && effectiveEquipmentRef) {
+    const legacy = await prisma.inspectionRun.findFirst({
+      where: {
+        inspectionId: inspection.templateInspectionId,
+        equipmentRef: effectiveEquipmentRef,
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        createdAt: true,
+        responses: true,
+      },
+    });
+    if (legacy) {
+      return {
+        answers: buildLastAnswerMap(parseAnswers(legacy.responses)),
+        runId: legacy.id,
+        createdAt: legacy.createdAt.toISOString(),
+      };
+    }
+  }
+
+  return { answers: {}, runId: null, createdAt: null };
 }
 
 export async function getInspectionRunById(
@@ -1263,7 +1479,13 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
     return;
   }
 
-  for (const definition of INSPECTION_DEFINITIONS) {
+  const ordered = [...INSPECTION_DEFINITIONS].sort((a, b) => {
+    const aChild = a.templateInspectionId ? 1 : 0;
+    const bChild = b.templateInspectionId ? 1 : 0;
+    return aChild - bChild || a.sortOrder - b.sortOrder;
+  });
+
+  for (const definition of ordered) {
     await prisma.inspection.upsert({
       where: { id: definition.id },
       update: {
@@ -1272,7 +1494,9 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
         category: definition.category,
         href: definition.href,
         equipmentLabel: definition.equipmentLabel ?? null,
-        isAvailable: true,
+        templateInspectionId: definition.templateInspectionId ?? null,
+        fixedEquipmentRef: definition.fixedEquipmentRef ?? null,
+        isAvailable: definition.isAvailable,
         sortOrder: definition.sortOrder,
       },
       create: {
@@ -1283,10 +1507,16 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
         category: definition.category,
         href: definition.href,
         equipmentLabel: definition.equipmentLabel ?? null,
-        isAvailable: true,
+        templateInspectionId: definition.templateInspectionId ?? null,
+        fixedEquipmentRef: definition.fixedEquipmentRef ?? null,
+        isAvailable: definition.isAvailable,
         sortOrder: definition.sortOrder,
       },
     });
+
+    if (definition.templateInspectionId) {
+      continue;
+    }
 
     for (const question of definition.questions) {
       await prisma.inspectionQuestion.upsert({

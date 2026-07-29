@@ -72,7 +72,13 @@ async function main() {
     });
   }
 
-  for (const inspection of INSPECTION_DEFINITIONS) {
+  const orderedInspections = [...INSPECTION_DEFINITIONS].sort((a, b) => {
+    const aChild = a.templateInspectionId ? 1 : 0;
+    const bChild = b.templateInspectionId ? 1 : 0;
+    return aChild - bChild || a.sortOrder - b.sortOrder;
+  });
+
+  for (const inspection of orderedInspections) {
     await prisma.inspection.upsert({
       where: { id: inspection.id },
       update: {
@@ -81,7 +87,9 @@ async function main() {
         category: inspection.category,
         href: inspection.href,
         equipmentLabel: inspection.equipmentLabel ?? null,
-        isAvailable: true,
+        templateInspectionId: inspection.templateInspectionId ?? null,
+        fixedEquipmentRef: inspection.fixedEquipmentRef ?? null,
+        isAvailable: inspection.isAvailable,
         sortOrder: inspection.sortOrder,
       },
       create: {
@@ -92,10 +100,16 @@ async function main() {
         category: inspection.category,
         href: inspection.href,
         equipmentLabel: inspection.equipmentLabel ?? null,
-        isAvailable: true,
+        templateInspectionId: inspection.templateInspectionId ?? null,
+        fixedEquipmentRef: inspection.fixedEquipmentRef ?? null,
+        isAvailable: inspection.isAvailable,
         sortOrder: inspection.sortOrder,
       },
     });
+
+    if (inspection.templateInspectionId) {
+      continue;
+    }
 
     for (const question of inspection.questions) {
       await prisma.inspectionQuestion.upsert({
