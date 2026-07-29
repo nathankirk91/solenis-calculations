@@ -20,6 +20,8 @@ export default [
     "calculations/polymer-an04-adipic-deta",
     "routes/polymer-an04-adipic-deta.tsx",
   ),
+  route("inspections", "routes/inspections.tsx"),
+  route("inspections/history", "routes/inspections-history.tsx"),
   route("inspections/manage", "routes/inspections-manage.tsx"),
   route(
     "inspections/manage/:inspectionId",

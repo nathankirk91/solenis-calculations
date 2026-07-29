@@ -140,7 +140,7 @@ export default function ForkliftInspectionsPage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Equipment</Badge>
             <Link
-              to="/#inspections"
+              to="/inspections"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
               ← Inspections

@@ -137,18 +137,19 @@ export default function InspectionsManagePage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Management</Badge>
             <Link
-              to="/"
+              to="/inspections"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              ← Home
+              ← Inspections
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-            Inspections
+            Manage inspections
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Create checklists and add questions (yes/no, text, or radio
-            options). Operators see available inspections on the home page.
+            options). Operators see available inspections on the Inspections
+            page.
           </p>
           {migrateNote ? (
             <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
@@ -195,7 +196,7 @@ export default function InspectionsManagePage({
                     name="description"
                     rows={2}
                     className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    placeholder="Short explanation shown on the home page"
+                    placeholder="Short explanation shown on the Inspections page"
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -231,7 +232,7 @@ export default function InspectionsManagePage({
             <CardHeader>
               <CardTitle>All inspections</CardTitle>
               <CardDescription>
-                Edit questions, or hide an inspection from the plant home page.
+                Edit questions, or hide an inspection from the Inspections page.
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -66,10 +66,10 @@ export default function InspectionPage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{definition.category}</Badge>
             <Link
-              to={backToForklifts ? FORKLIFT_INSPECTIONS_HREF : "/#inspections"}
+              to={backToForklifts ? FORKLIFT_INSPECTIONS_HREF : "/inspections"}
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              {backToForklifts ? "← Forklift inspections" : "← All tools"}
+              {backToForklifts ? "← Forklift inspections" : "← Inspections"}
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
