@@ -20,6 +20,7 @@ import { requireOperatorManager } from "~/lib/auth.server";
 import {
   INSPECTION_QUESTION_TYPES,
   YES_NO_OPTIONS,
+  looksLikeAttentionOption,
   questionTypeLabel,
   type InspectionQuestionDef,
   type InspectionQuestionType,
@@ -286,6 +287,9 @@ function QuestionFields({
           <legend className="text-sm font-medium">
             Flag as needs attention when answer is
           </legend>
+          <p className="text-xs text-muted-foreground">
+            Leave all unchecked if no answer should flag the inspection.
+          </p>
           <div className="flex flex-wrap gap-3">
             {attentionChoices.map((option) => (
               <label
@@ -301,7 +305,7 @@ function QuestionFields({
                       ? defaults.attentionValues.includes(option)
                       : questionType === "YES_NO"
                         ? option === "No"
-                        : /need|fail|no|attention|defect/i.test(option)
+                        : looksLikeAttentionOption(option)
                   }
                   className="size-4 accent-[var(--brand-navy)]"
                 />

@@ -119,7 +119,9 @@ function mapQuestion(row: {
     attentionValues:
       attentionValues.length > 0
         ? attentionValues
-        : defaultAttentionValues(row.type, options),
+        : row.type === "YES_NO"
+          ? defaultAttentionValues(row.type, options)
+          : [],
     required: row.required,
     showLastValue: Boolean(row.showLastValue),
     applicableEquipmentRefs: parseStringArray(row.applicableEquipmentRefs),
@@ -1080,9 +1082,7 @@ export async function addInspectionQuestion(args: {
       attentionValues:
         args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
           ? Prisma.DbNull
-          : normalizedAttention.length
-            ? normalizedAttention
-            : defaultAttentionValues(args.type, options),
+          : normalizedAttention,
       required: args.required ?? true,
       showLastValue: args.showLastValue ?? false,
       applicableEquipmentRefs:
@@ -1206,9 +1206,7 @@ export async function updateInspectionQuestion(args: {
       attentionValues:
         args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
           ? Prisma.DbNull
-          : normalizedAttention.length
-            ? normalizedAttention
-            : defaultAttentionValues(args.type, options),
+          : normalizedAttention,
       required: args.required ?? true,
       showLastValue: args.showLastValue ?? false,
       applicableEquipmentRefs:

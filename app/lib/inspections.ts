@@ -323,6 +323,7 @@ export const FORKLIFT_DAILY_CHECK_TEMPLATE: InspectionDefinition = {
       "Shift details",
       ["Day", "Afternoon"],
       1,
+      { attentionValues: [] },
     ),
     numberQuestion(
       "forklift-daily-check",
@@ -816,6 +817,10 @@ export function questionOptionsForType(
   return options.map((option) => option.trim()).filter(Boolean);
 }
 
+export function looksLikeAttentionOption(option: string): boolean {
+  return /\b(needs?|fails?|no|attention|defects?)\b/i.test(option.trim());
+}
+
 export function defaultAttentionValues(
   type: InspectionQuestionType,
   options: string[],
@@ -824,9 +829,7 @@ export function defaultAttentionValues(
     return [...DEFAULT_YES_NO_ATTENTION];
   }
   if (type === "RADIO") {
-    return options.filter((option) =>
-      /need|fail|no|attention|defect/i.test(option),
-    );
+    return options.filter((option) => looksLikeAttentionOption(option));
   }
   return [];
 }

@@ -139,6 +139,21 @@ function passResponses(definition) {
 }
 
 {
+  const { defaultAttentionValues, looksLikeAttentionOption } = await import(
+    "./inspections.ts"
+  );
+
+  assert.equal(looksLikeAttentionOption("Afternoon"), false);
+  assert.equal(looksLikeAttentionOption("No"), true);
+  assert.equal(looksLikeAttentionOption("Needs attention"), true);
+  assert.deepEqual(defaultAttentionValues("RADIO", ["Day", "Afternoon"]), []);
+  assert.deepEqual(
+    defaultAttentionValues("RADIO", ["OK", "Needs attention", "N/A"]),
+    ["Needs attention"],
+  );
+}
+
+{
   const {
     FORKLIFT_DAILY_CHECK_TEMPLATE,
     FORKLIFT_UNIT_FORMS,

@@ -103,6 +103,7 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
     `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "show_last_value" BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "applicable_equipment_refs" JSONB`,
     `UPDATE "inspection_questions" SET "show_last_value" = true WHERE "id" = 'forklift-daily-check__service-date'`,
+    `UPDATE "inspection_questions" SET "attention_values" = '[]'::jsonb WHERE "id" = 'forklift-daily-check__shift'`,
     `CREATE INDEX IF NOT EXISTS "inspection_questions_inspection_id_is_active_sort_order_idx"
       ON "inspection_questions"("inspection_id", "is_active", "sort_order")`,
     `DO $$ BEGIN
@@ -248,6 +249,7 @@ export async function applyPendingMigrations(): Promise<AppliedMigration[]> {
       name.includes("_inspection_templates") ||
       name.includes("_inspection_question_show_last_value") ||
       name.includes("_inspection_question_unit_applicability") ||
+      name.includes("_clear_shift_attention_values") ||
       name.includes("_inspection_run_signature")
     ) {
       const sqlPath = path.join(
