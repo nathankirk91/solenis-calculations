@@ -24,6 +24,11 @@ export type InspectionQuestionDef = {
    * (configured by managers; not a per-submission toggle).
    */
   showLastValue: boolean;
+  /**
+   * Unit refs this question applies to (e.g. forklift H57168).
+   * Empty means all units that inherit this template.
+   */
+  applicableEquipmentRefs: string[];
   sortOrder: number;
 };
 
@@ -119,6 +124,7 @@ function statusQuestion(
     attentionValues: [...DEFAULT_STATUS_ATTENTION],
     required: true,
     showLastValue: false,
+    applicableEquipmentRefs: [],
     sortOrder,
   };
 }
@@ -134,6 +140,7 @@ function yesNoQuestion(
     helpText?: string;
     attentionValues?: string[];
     showLastValue?: boolean;
+    applicableEquipmentRefs?: string[];
   },
 ): InspectionQuestionDef {
   return {
@@ -145,6 +152,7 @@ function yesNoQuestion(
     attentionValues: opts?.attentionValues ?? [...DEFAULT_YES_NO_ATTENTION],
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
+    applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -162,6 +170,7 @@ function radioQuestion(
     helpText?: string;
     attentionValues?: string[];
     showLastValue?: boolean;
+    applicableEquipmentRefs?: string[];
   },
 ): InspectionQuestionDef {
   return {
@@ -173,6 +182,7 @@ function radioQuestion(
     attentionValues: opts?.attentionValues ?? [],
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
+    applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -184,7 +194,12 @@ function textQuestion(
   label: string,
   sectionTitle: string,
   sortOrder: number,
-  opts?: { required?: boolean; helpText?: string; showLastValue?: boolean },
+  opts?: {
+    required?: boolean;
+    helpText?: string;
+    showLastValue?: boolean;
+    applicableEquipmentRefs?: string[];
+  },
 ): InspectionQuestionDef {
   return {
     id: `${inspectionId}__${id}`,
@@ -195,6 +210,7 @@ function textQuestion(
     attentionValues: [],
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
+    applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -206,7 +222,12 @@ function numberQuestion(
   label: string,
   sectionTitle: string,
   sortOrder: number,
-  opts?: { required?: boolean; helpText?: string; showLastValue?: boolean },
+  opts?: {
+    required?: boolean;
+    helpText?: string;
+    showLastValue?: boolean;
+    applicableEquipmentRefs?: string[];
+  },
 ): InspectionQuestionDef {
   return {
     id: `${inspectionId}__${id}`,
@@ -217,6 +238,7 @@ function numberQuestion(
     attentionValues: [],
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
+    applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -228,7 +250,12 @@ function dateQuestion(
   label: string,
   sectionTitle: string,
   sortOrder: number,
-  opts?: { required?: boolean; helpText?: string; showLastValue?: boolean },
+  opts?: {
+    required?: boolean;
+    helpText?: string;
+    showLastValue?: boolean;
+    applicableEquipmentRefs?: string[];
+  },
 ): InspectionQuestionDef {
   return {
     id: `${inspectionId}__${id}`,
@@ -239,6 +266,7 @@ function dateQuestion(
     attentionValues: [],
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
+    applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -910,6 +938,32 @@ export function formatLastAnswerDisplay(
     }
   }
   return trimmed;
+}
+
+
+/** Empty applicableEquipmentRefs means the question applies to every unit. */
+export function questionAppliesToEquipment(
+  question: Pick<InspectionQuestionDef, "applicableEquipmentRefs">,
+  equipmentRef: string | null | undefined,
+): boolean {
+  const refs = question.applicableEquipmentRefs ?? [];
+  if (refs.length === 0) {
+    return true;
+  }
+  const value = equipmentRef?.trim();
+  if (!value) {
+    return true;
+  }
+  return refs.includes(value);
+}
+
+export function filterQuestionsForEquipment(
+  questions: InspectionQuestionDef[],
+  equipmentRef: string | null | undefined,
+): InspectionQuestionDef[] {
+  return questions.filter((question) =>
+    questionAppliesToEquipment(question, equipmentRef),
+  );
 }
 
 export function groupQuestionsBySection(

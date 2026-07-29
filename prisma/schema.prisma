@@ -169,6 +169,8 @@ model InspectionQuestion {
   required        Boolean                 @default(true)
   /// When true, operators see the prior report's answer for this question.
   showLastValue   Boolean                 @default(false) @map("show_last_value")
+  /// Unit refs this question applies to; null/empty = all inheriting units.
+  applicableEquipmentRefs Json?           @map("applicable_equipment_refs")
   isActive        Boolean                 @default(true) @map("is_active")
   sortOrder       Int                     @default(0) @map("sort_order")
   createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
