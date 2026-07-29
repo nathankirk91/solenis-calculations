@@ -83,6 +83,8 @@ function passResponses(definition) {
         options: ["Yes", "No"],
         attentionValues: ["No"],
         required: true,
+        showLastValue: false,
+        applicableEquipmentRefs: [],
         sortOrder: 1,
       },
       {
@@ -92,6 +94,8 @@ function passResponses(definition) {
         options: [],
         attentionValues: [],
         required: false,
+        showLastValue: false,
+        applicableEquipmentRefs: [],
         sortOrder: 2,
       },
     ],
@@ -135,6 +139,21 @@ function passResponses(definition) {
 }
 
 {
+  const { defaultAttentionValues, looksLikeAttentionOption } = await import(
+    "./inspections.ts"
+  );
+
+  assert.equal(looksLikeAttentionOption("Afternoon"), false);
+  assert.equal(looksLikeAttentionOption("No"), true);
+  assert.equal(looksLikeAttentionOption("Needs attention"), true);
+  assert.deepEqual(defaultAttentionValues("RADIO", ["Day", "Afternoon"]), []);
+  assert.deepEqual(
+    defaultAttentionValues("RADIO", ["OK", "Needs attention", "N/A"]),
+    ["Needs attention"],
+  );
+}
+
+{
   const {
     FORKLIFT_DAILY_CHECK_TEMPLATE,
     FORKLIFT_UNIT_FORMS,
@@ -155,6 +174,53 @@ function passResponses(definition) {
   const unit = getFallbackInspectionByIdOrSlug("forklift-daily-check-h57168");
   assert.equal(unit?.fixedEquipmentRef, "H57168");
   assert.equal(unit?.templateInspectionId, "forklift-daily-check");
+  const serviceDate = FORKLIFT_DAILY_CHECK_TEMPLATE.questions.find((question) =>
+    question.id.endsWith("__service-date"),
+  );
+  assert.equal(serviceDate?.showLastValue, true);
+}
+
+{
+  const {
+    FORKLIFT_DAILY_CHECK_TEMPLATE,
+    filterQuestionsForEquipment,
+    questionAppliesToEquipment,
+  } = await import("./inspections.ts");
+
+  const limited = {
+    ...FORKLIFT_DAILY_CHECK_TEMPLATE.questions[0],
+    applicableEquipmentRefs: ["H57168", "H15659"],
+  };
+  assert.equal(questionAppliesToEquipment(limited, "H57168"), true);
+  assert.equal(questionAppliesToEquipment(limited, "H20287"), false);
+  assert.equal(
+    questionAppliesToEquipment(
+      { applicableEquipmentRefs: [] },
+      "H20287",
+    ),
+    true,
+  );
+
+  const filtered = filterQuestionsForEquipment(
+    [
+      { ...limited, id: "a" },
+      {
+        ...limited,
+        id: "b",
+        applicableEquipmentRefs: [],
+      },
+      {
+        ...limited,
+        id: "c",
+        applicableEquipmentRefs: ["H20287"],
+      },
+    ],
+    "H57168",
+  );
+  assert.deepEqual(
+    filtered.map((question) => question.id),
+    ["a", "b"],
+  );
 }
 
 console.log("inspections tests passed");

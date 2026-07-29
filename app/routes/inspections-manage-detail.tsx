@@ -20,6 +20,7 @@ import { requireOperatorManager } from "~/lib/auth.server";
 import {
   INSPECTION_QUESTION_TYPES,
   YES_NO_OPTIONS,
+  looksLikeAttentionOption,
   questionTypeLabel,
   type InspectionQuestionDef,
   type InspectionQuestionType,
@@ -89,6 +90,11 @@ export async function action({ request, params }: Route.ActionArgs) {
         .filter(Boolean);
 
       const attentionRaw = formData.getAll("attentionValues").map(String);
+      const applicableEquipmentRefs = formData
+        .getAll("applicableEquipmentRefs")
+        .map(String)
+        .map((value) => value.trim())
+        .filter(Boolean);
       const payload = {
         label: String(formData.get("label") ?? ""),
         helpText: String(formData.get("helpText") ?? ""),
@@ -97,6 +103,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         options,
         attentionValues: attentionRaw,
         required: String(formData.get("required") ?? "") === "on",
+        showLastValue: String(formData.get("showLastValue") ?? "") === "on",
+        applicableEquipmentRefs,
         changeComment,
         changedById: user.id,
       };
@@ -179,17 +187,21 @@ function QuestionFields({
   setQuestionType,
   radioOptions,
   setRadioOptions,
+  unitOptions = [],
   defaults,
 }: {
   questionType: InspectionQuestionType;
   setQuestionType: (type: InspectionQuestionType) => void;
   radioOptions: string;
   setRadioOptions: (value: string) => void;
+  unitOptions?: Array<{ value: string; label: string }>;
   defaults?: {
     label?: string;
     helpText?: string | null;
     sectionTitle?: string | null;
     required?: boolean;
+    showLastValue?: boolean;
+    applicableEquipmentRefs?: string[];
     attentionValues?: string[];
   };
 }) {
@@ -275,6 +287,9 @@ function QuestionFields({
           <legend className="text-sm font-medium">
             Flag as needs attention when answer is
           </legend>
+          <p className="text-xs text-muted-foreground">
+            Leave all unchecked if no answer should flag the inspection.
+          </p>
           <div className="flex flex-wrap gap-3">
             {attentionChoices.map((option) => (
               <label
@@ -290,7 +305,7 @@ function QuestionFields({
                       ? defaults.attentionValues.includes(option)
                       : questionType === "YES_NO"
                         ? option === "No"
-                        : /need|fail|no|attention|defect/i.test(option)
+                        : looksLikeAttentionOption(option)
                   }
                   className="size-4 accent-[var(--brand-navy)]"
                 />
@@ -310,6 +325,49 @@ function QuestionFields({
         />
         Required
       </label>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="showLastValue"
+          defaultChecked={defaults?.showLastValue ?? false}
+          className="mt-0.5 size-4 accent-[var(--brand-navy)]"
+        />
+        <span>
+          Show last value
+          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+            Operators see the prior report’s answer when one exists (useful for
+            service date).
+          </span>
+        </span>
+      </label>
+      {unitOptions.length > 0 ? (
+        <fieldset className="grid gap-2">
+          <legend className="text-sm font-medium">Applies to units</legend>
+          <p className="text-xs text-muted-foreground">
+            Leave all unchecked to include this question on every unit form. Tick
+            specific units to limit it.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {unitOptions.map((unit) => (
+              <label
+                key={unit.value}
+                className="inline-flex items-start gap-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  name="applicableEquipmentRefs"
+                  value={unit.value}
+                  defaultChecked={Boolean(
+                    defaults?.applicableEquipmentRefs?.includes(unit.value),
+                  )}
+                  className="mt-0.5 size-4 accent-[var(--brand-navy)]"
+                />
+                <span>{unit.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
     </>
   );
 }
@@ -353,6 +411,7 @@ function QuestionEditor({
   onCancel,
   changeComment,
   setChangeComment,
+  unitOptions = [],
 }: {
   question: InspectionQuestionDef;
   index: number;
@@ -362,6 +421,7 @@ function QuestionEditor({
   onCancel: () => void;
   changeComment: string;
   setChangeComment: (value: string) => void;
+  unitOptions?: Array<{ value: string; label: string }>;
 }) {
   const [questionType, setQuestionType] = useState<InspectionQuestionType>(
     question.type,
@@ -384,11 +444,14 @@ function QuestionEditor({
             setQuestionType={setQuestionType}
             radioOptions={radioOptions}
             setRadioOptions={setRadioOptions}
+            unitOptions={unitOptions}
             defaults={{
               label: question.label,
               helpText: question.helpText,
               sectionTitle: question.sectionTitle,
               required: question.required,
+              showLastValue: question.showLastValue,
+              applicableEquipmentRefs: question.applicableEquipmentRefs,
               attentionValues: question.attentionValues,
             }}
           />
@@ -420,6 +483,16 @@ function QuestionEditor({
             </Badge>
             {!question.required ? (
               <Badge variant="outline">Optional</Badge>
+            ) : null}
+            {question.showLastValue ? (
+              <Badge variant="outline">Shows last value</Badge>
+            ) : null}
+            {question.applicableEquipmentRefs.length > 0 ? (
+              <Badge variant="outline">
+                {question.applicableEquipmentRefs.length === 1
+                  ? question.applicableEquipmentRefs[0]
+                  : `${question.applicableEquipmentRefs.length} units`}
+              </Badge>
             ) : null}
           </div>
           {question.sectionTitle ? (
@@ -785,6 +858,7 @@ export default function InspectionsManageDetailPage({
                     setQuestionType={setQuestionType}
                     radioOptions={radioOptions}
                     setRadioOptions={setRadioOptions}
+                    unitOptions={inspection.unitOptions}
                   />
                   <ChangeCommentField
                     id="changeComment-add"
@@ -838,6 +912,10 @@ export default function InspectionsManageDetailPage({
                           ? ` · ${question.sectionTitle}`
                           : ""}
                         {question.required ? "" : " · Optional"}
+                        {question.showLastValue ? " · Shows last value" : ""}
+                        {question.applicableEquipmentRefs.length > 0
+                          ? ` · ${question.applicableEquipmentRefs.join(", ")}`
+                          : ""}
                       </p>
                     </li>
                   ))}
@@ -866,6 +944,7 @@ export default function InspectionsManageDetailPage({
                           onCancel={() => setEditingQuestionId(null)}
                           changeComment={changeComment}
                           setChangeComment={setChangeComment}
+                          unitOptions={inspection.unitOptions}
                         />
                       ))}
                     </ul>

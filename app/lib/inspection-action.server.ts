@@ -5,7 +5,10 @@ import { data, redirect } from "react-router";
 import { getAppBaseUrl } from "~/lib/app-url.server";
 import { createInspectionSchema } from "~/lib/inspection.schema";
 import type { InspectionDefinition, InspectionSummary } from "~/lib/inspections";
-import { createInspectionRun } from "~/lib/inspections.server";
+import {
+  createInspectionActions,
+  createInspectionRun,
+} from "~/lib/inspections.server";
 import { ensureInspectionSchema } from "~/lib/migrate.server";
 import { getActiveOperatorById } from "~/lib/operators.server";
 import { notifyManagersPush } from "~/lib/push.server";
@@ -58,9 +61,11 @@ export async function handleInspectionSubmit(args: {
     );
   }
 
-  const { answers, summary, equipmentRef, notes, signature } = submission.value;
+  const { answers, summary, equipmentRef, notes, signature, actions } =
+    submission.value;
 
   let runId: string | null = null;
+  let createdActionCount = 0;
   try {
     await ensureInspectionSchema();
     const run = await createInspectionRun({
@@ -74,6 +79,16 @@ export async function handleInspectionSubmit(args: {
       summary,
     });
     runId = run?.id ?? null;
+    if (runId && actions.length > 0) {
+      createdActionCount = await createInspectionActions({
+        createdOnRunId: runId,
+        inspectionId: definition.id,
+        equipmentRef,
+        descriptions: actions,
+        createdByOperatorId: operator.id,
+        createdByUserId: user.id,
+      });
+    }
   } catch {
     return data(
       {
@@ -102,13 +117,30 @@ export async function handleInspectionSubmit(args: {
     );
   }
 
+  const url = `${getAppBaseUrl(request)}/inspections/submissions/${runId}`;
+
   if (summary.status === "NEEDS_ATTENTION") {
-    const url = `${getAppBaseUrl(request)}/inspections/submissions/${runId}`;
     const pushResult = await notifyManagersPush({
       title: "Inspection needs attention",
       message: `${definition.shortName}: ${summary.attentionCount} item(s) (${operator.name})`,
       url,
       tag: `inspection-${runId}`,
+    });
+
+    if (pushResult.sent === 0 && pushResult.reason) {
+      console.warn("Web push skipped/failed:", pushResult.reason);
+    }
+  }
+
+  if (createdActionCount > 0) {
+    const pushResult = await notifyManagersPush({
+      title:
+        createdActionCount === 1
+          ? "New inspection action"
+          : "New inspection actions",
+      message: `${definition.shortName}: ${createdActionCount} open action${createdActionCount === 1 ? "" : "s"} (${operator.name})`,
+      url,
+      tag: `inspection-actions-${runId}`,
     });
 
     if (pushResult.sent === 0 && pushResult.reason) {

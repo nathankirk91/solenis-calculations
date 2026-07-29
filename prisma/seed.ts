@@ -124,6 +124,11 @@ async function main() {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
+          applicableEquipmentRefs:
+            question.applicableEquipmentRefs.length > 0
+              ? question.applicableEquipmentRefs
+              : Prisma.DbNull,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -138,6 +143,11 @@ async function main() {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
+          applicableEquipmentRefs:
+            question.applicableEquipmentRefs.length > 0
+              ? question.applicableEquipmentRefs
+              : Prisma.DbNull,
           isActive: true,
           sortOrder: question.sortOrder,
         },

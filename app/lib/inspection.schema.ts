@@ -81,6 +81,15 @@ export function createInspectionSchema(definition: InspectionDefinition) {
           .max(2000, "Notes must be under 2000 characters.")
           .optional(),
       ),
+      actions: z.preprocess((value) => {
+        if (value == null || value === "") {
+          return [];
+        }
+        if (Array.isArray(value)) {
+          return value;
+        }
+        return [value];
+      }, z.array(z.string().trim().max(2000, "Keep each action under 2000 characters."))),
       signature: z
         .string({ error: "Signature is required." })
         .min(1, "Please sign or initial the form."),
@@ -137,6 +146,7 @@ export function createInspectionSchema(definition: InspectionDefinition) {
         equipmentRef:
           definition.fixedEquipmentRef ?? value.equipmentRef ?? null,
         notes: value.notes ?? null,
+        actions: value.actions.map((item) => item.trim()).filter(Boolean),
         signature: value.signature,
         responses,
         answers,

@@ -1,9 +1,10 @@
-import { Link } from "react-router";
+import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inspection-submission";
 
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,11 +12,16 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import { Label } from "~/components/ui/label";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
 import { formatMelbourneDateTime } from "~/lib/datetime";
 import type { InspectionAnswerRecord } from "~/lib/inspections";
-import { getInspectionRunById } from "~/lib/inspections.server";
+import {
+  closeInspectionAction,
+  getInspectionRunById,
+  type InspectionActionItem,
+} from "~/lib/inspections.server";
 import { canReviewRuns } from "~/lib/roles";
 import { cn } from "~/lib/utils";
 
@@ -44,15 +50,88 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     ? await countPendingRuns()
     : 0;
 
-  return { user, run, pendingCount };
+  return {
+    user,
+    run,
+    pendingCount,
+    canCloseActions: canReviewRuns(user.role),
+  };
+}
+
+export async function action({ request, params }: Route.ActionArgs) {
+  const user = await requireUser(
+    request,
+    `/inspections/submissions/${params.runId}`,
+  );
+
+  if (!canReviewRuns(user.role)) {
+    return {
+      ok: false as const,
+      error: "Only managers can close actions.",
+      actionId: null as string | null,
+    };
+  }
+
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "");
+  if (intent !== "close-action") {
+    return {
+      ok: false as const,
+      error: "Unknown action.",
+      actionId: null as string | null,
+    };
+  }
+
+  const actionId = String(formData.get("actionId") ?? "").trim();
+  const completionComment = String(
+    formData.get("completionComment") ?? "",
+  ).trim();
+
+  if (!actionId) {
+    return {
+      ok: false as const,
+      error: "Action not found.",
+      actionId: null as string | null,
+    };
+  }
+
+  const run = await getInspectionRunById(params.runId);
+  if (!run) {
+    throw new Response("Inspection submission not found", { status: 404 });
+  }
+
+  const belongsToRun = run.actions.some((item) => item.id === actionId);
+  if (!belongsToRun) {
+    return {
+      ok: false as const,
+      error: "That action does not belong to this submission.",
+      actionId,
+    };
+  }
+
+  const result = await closeInspectionAction({
+    actionId,
+    closedByUserId: user.id,
+    completionComment,
+  });
+
+  if (!result.ok) {
+    return { ok: false as const, error: result.error, actionId };
+  }
+
+  return { ok: true as const, error: null as string | null, actionId };
 }
 
 export default function InspectionSubmissionPage({
   loaderData,
+  actionData,
 }: Route.ComponentProps) {
-  const { user, run, pendingCount } = loaderData;
+  const { user, run, pendingCount, canCloseActions } = loaderData;
   const submittedAt = formatMelbourneDateTime(run.createdAt);
   const needsAttention = run.status === "NEEDS_ATTENTION";
+  const openActionCount = run.actions.filter(
+    (item) => item.status === "OPEN",
+  ).length;
 
   return (
     <div className="app-shell">
@@ -76,7 +155,9 @@ export default function InspectionSubmissionPage({
           <p className="mt-2 max-w-2xl text-muted-foreground">
             {needsAttention
               ? "One or more answers were flagged for follow-up. Managers have been notified."
-              : "This inspection passed. The record is saved in history."}
+              : openActionCount > 0
+                ? "This inspection passed. Open actions still need manager follow-up."
+                : "This inspection passed. The record is saved in history."}
           </p>
         </div>
 
@@ -167,6 +248,38 @@ export default function InspectionSubmissionPage({
               ))}
             </div>
 
+            {run.actions.length > 0 ? (
+              <div className="rounded-lg border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-medium">Actions</h3>
+                  {openActionCount > 0 ? (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-600/40 text-amber-800"
+                    >
+                      {openActionCount} open
+                    </Badge>
+                  ) : null}
+                </div>
+                <ul className="mt-4 grid gap-4">
+                  {run.actions.map((item) => (
+                    <ActionRow
+                      key={item.id}
+                      action={item}
+                      canClose={canCloseActions}
+                      error={
+                        actionData &&
+                        !actionData.ok &&
+                        actionData.actionId === item.id
+                          ? actionData.error
+                          : null
+                      }
+                    />
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             {run.notes ? (
               <div className="rounded-lg border border-border/70 bg-background/50 p-4 text-sm">
                 <p className="font-medium">Notes</p>
@@ -205,6 +318,85 @@ export default function InspectionSubmissionPage({
         </Card>
       </main>
     </div>
+  );
+}
+
+function ActionRow({
+  action,
+  canClose,
+  error,
+}: {
+  action: InspectionActionItem;
+  canClose: boolean;
+  error: string | null;
+}) {
+  const navigation = useNavigation();
+  const isClosing =
+    navigation.state !== "idle" &&
+    navigation.formData?.get("intent") === "close-action" &&
+    navigation.formData?.get("actionId") === action.id;
+  const isOpen = action.status === "OPEN";
+
+  return (
+    <li className="rounded-lg border border-border/60 bg-background/80 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="whitespace-pre-wrap text-sm">{action.description}</p>
+        <Badge
+          variant="outline"
+          className={cn(
+            isOpen
+              ? "border-amber-600/40 text-amber-800"
+              : "border-emerald-600/40 text-emerald-700",
+          )}
+        >
+          {isOpen ? "Open" : "Closed"}
+        </Badge>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Reported {formatMelbourneDateTime(action.createdAt)}
+        {action.createdByOperatorName
+          ? ` · ${action.createdByOperatorName}`
+          : ""}
+      </p>
+      {!isOpen ? (
+        <div className="mt-3 rounded-md border border-emerald-600/20 bg-emerald-50/70 p-3 text-sm">
+          <p className="font-medium text-emerald-900">Completed</p>
+          <p className="mt-1 whitespace-pre-wrap text-emerald-950/90">
+            {action.completionComment || "—"}
+          </p>
+          <p className="mt-2 text-xs text-emerald-900/70">
+            Closed {formatMelbourneDateTime(action.closedAt)}
+            {action.closedByName ? ` · ${action.closedByName}` : ""}
+          </p>
+        </div>
+      ) : null}
+      {isOpen && canClose ? (
+        <Form method="post" className="mt-3 grid gap-2">
+          <input type="hidden" name="intent" value="close-action" />
+          <input type="hidden" name="actionId" value={action.id} />
+          <Label htmlFor={`completion-${action.id}`}>
+            Completion comment
+          </Label>
+          <textarea
+            id={`completion-${action.id}`}
+            name="completionComment"
+            required
+            rows={2}
+            className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            placeholder="What was completed to close this action?"
+          />
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button type="submit" size="sm" disabled={isClosing} className="w-fit">
+            {isClosing ? "Closing…" : "Close action"}
+          </Button>
+        </Form>
+      ) : null}
+      {isOpen && !canClose ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Waiting for a manager to complete and close this action.
+        </p>
+      ) : null}
+    </li>
   );
 }
 

@@ -32,6 +32,7 @@ import {
   type InspectionSummary,
   type LastInspectionAnswers,
 } from "~/lib/inspections";
+import type { InspectionActionItem } from "~/lib/inspections.server";
 import type { OperatorOption } from "~/lib/operators.server";
 import { formatMelbourneDateTime } from "~/lib/datetime";
 import { cn } from "~/lib/utils";
@@ -62,25 +63,31 @@ export function InspectionChecklistForm({
   const [equipmentRef, setEquipmentRef] = useState(fixedEquipmentRef);
   const [equipmentRefForFetch, setEquipmentRefForFetch] =
     useState(fixedEquipmentRef);
-  const [showLastByQuestion, setShowLastByQuestion] = useState<
-    Record<string, boolean>
-  >({});
-  const [useLastByQuestion, setUseLastByQuestion] = useState<
-    Record<string, boolean>
-  >({});
   const [responseOverrides, setResponseOverrides] = useState<
     Record<string, string>
   >({});
+  const [actionFields, setActionFields] = useState<string[]>([""]);
+
+  const needsLastAnswers = definition.questions.some(
+    (question) => question.showLastValue,
+  );
 
   const lastAnswersFetcher = useFetcher<LastInspectionAnswers>();
+  const openActionsFetcher = useFetcher<{ actions: InspectionActionItem[] }>();
   const lastAnswers = lastAnswersFetcher.data?.answers ?? {};
   const lastRunAt = lastAnswersFetcher.data?.createdAt ?? null;
+  const openActions = openActionsFetcher.data?.actions ?? [];
   const needsEquipmentPick =
     Boolean(definition.equipmentLabel) && !fixedEquipmentRef;
-  const canLoadLastAnswers = !needsEquipmentPick || Boolean(equipmentRefForFetch.trim());
+  const canLoadScopedData =
+    !needsEquipmentPick || Boolean(equipmentRefForFetch.trim());
+  const canLoadLastAnswers = needsLastAnswers && canLoadScopedData;
   const isLoadingLastAnswers =
     lastAnswersFetcher.state === "loading" ||
     lastAnswersFetcher.state === "submitting";
+  const isLoadingOpenActions =
+    openActionsFetcher.state === "loading" ||
+    openActionsFetcher.state === "submitting";
 
   const defaultResponses = Object.fromEntries(
     definition.questions.map((question) => [question.id, ""]),
@@ -125,7 +132,6 @@ export function InspectionChecklistForm({
   ]);
 
   useEffect(() => {
-    setUseLastByQuestion({});
     setResponseOverrides({});
   }, [equipmentRefForFetch]);
 
@@ -148,22 +154,21 @@ export function InspectionChecklistForm({
   }, [definition.id, equipmentRefForFetch, canLoadLastAnswers]);
 
   useEffect(() => {
-    setResponseOverrides((previous) => {
-      let changed = false;
-      const next = { ...previous };
-      for (const [questionId, enabled] of Object.entries(useLastByQuestion)) {
-        if (!enabled) {
-          continue;
-        }
-        const lastValue = lastAnswers[questionId];
-        if (lastValue && next[questionId] !== lastValue) {
-          next[questionId] = lastValue;
-          changed = true;
-        }
-      }
-      return changed ? next : previous;
-    });
-  }, [lastAnswers, useLastByQuestion]);
+    if (!canLoadScopedData) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (equipmentRefForFetch.trim()) {
+      params.set("equipmentRef", equipmentRefForFetch.trim());
+    }
+    const query = params.toString();
+    const href = `/inspections/${definition.id}/open-actions${
+      query ? `?${query}` : ""
+    }`;
+    openActionsFetcher.load(href);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [definition.id, equipmentRefForFetch, canLoadScopedData]);
 
   function fieldValue(
     questionId: string,
@@ -175,29 +180,37 @@ export function InspectionChecklistForm({
     return typeof initialValue === "string" ? initialValue : "";
   }
 
-  function toggleShowLast(questionId: string, checked: boolean) {
-    setShowLastByQuestion((previous) => ({
-      ...previous,
-      [questionId]: checked,
-    }));
-  }
-
-  function toggleUseLast(questionId: string, checked: boolean) {
-    setUseLastByQuestion((previous) => ({
-      ...previous,
-      [questionId]: checked,
-    }));
-    if (checked) {
-      const lastValue = lastAnswers[questionId];
-      if (lastValue) {
-        setResponseOverrides((previous) => ({
-          ...previous,
-          [questionId]: lastValue,
-        }));
-      }
+  function useLastValue(questionId: string) {
+    const lastValue = lastAnswers[questionId];
+    if (!lastValue) {
+      return;
     }
+    setResponseOverrides((previous) => ({
+      ...previous,
+      [questionId]: lastValue,
+    }));
   }
 
+  function updateActionField(index: number, value: string) {
+    setActionFields((previous) =>
+      previous.map((item, itemIndex) =>
+        itemIndex === index ? value : item,
+      ),
+    );
+  }
+
+  function addActionField() {
+    setActionFields((previous) => [...previous, ""]);
+  }
+
+  function removeActionField(index: number) {
+    setActionFields((previous) => {
+      if (previous.length <= 1) {
+        return [""];
+      }
+      return previous.filter((_, itemIndex) => itemIndex !== index);
+    });
+  }
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
       <Card>
@@ -224,13 +237,15 @@ export function InspectionChecklistForm({
                   </span>{" "}
                   {fixedEquipmentRef}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {isLoadingLastAnswers
-                    ? "Loading previous answers…"
-                    : lastRunAt
-                      ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
-                      : "No previous report for this unit yet."}
-                </p>
+                {needsLastAnswers ? (
+                  <p className="text-xs text-muted-foreground">
+                    {isLoadingLastAnswers
+                      ? "Loading previous answers…"
+                      : lastRunAt
+                        ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
+                        : "No previous report for this unit yet."}
+                  </p>
+                ) : null}
               </section>
             ) : definition.equipmentLabel ? (
               <section className="grid gap-2">
@@ -269,19 +284,24 @@ export function InspectionChecklistForm({
                     {fields.equipmentRef.errors.join(" ")}
                   </p>
                 ) : null}
-                <p className="text-xs text-muted-foreground">
-                  {canLoadLastAnswers
-                    ? isLoadingLastAnswers
-                      ? "Loading previous answers…"
-                      : lastRunAt
-                        ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
-                        : "No previous report for this unit yet."
-                    : "Select a unit to show or use values from the last report."}
-                </p>
+                {needsLastAnswers ? (
+                  <p className="text-xs text-muted-foreground">
+                    {canLoadLastAnswers
+                      ? isLoadingLastAnswers
+                        ? "Loading previous answers…"
+                        : lastRunAt
+                          ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
+                          : "No previous report for this unit yet."
+                      : "Select a unit to load previous answers."}
+                  </p>
+                ) : null}
               </section>
             ) : null}
 
-            {!needsEquipmentPick && !fixedEquipmentRef && lastRunAt ? (
+            {needsLastAnswers &&
+            !needsEquipmentPick &&
+            !fixedEquipmentRef &&
+            lastRunAt ? (
               <p className="text-xs text-muted-foreground">
                 Previous report: {formatMelbourneDateTime(lastRunAt)}
               </p>
@@ -324,7 +344,10 @@ export function InspectionChecklistForm({
                           : [];
                     const value = fieldValue(question.id, field.initialValue);
                     const lastValue = lastAnswers[question.id] ?? "";
-                    const hasLastValue = Boolean(lastValue);
+                    const showConfiguredLastValue =
+                      question.showLastValue &&
+                      canLoadLastAnswers &&
+                      Boolean(lastValue);
                     const inputKey = `${field.key}-${value}`;
 
                     return (
@@ -346,16 +369,13 @@ export function InspectionChecklistForm({
                           </p>
                         ) : null}
 
-                        {canLoadLastAnswers ? (
-                          <LastValueToggles
+                        {showConfiguredLastValue ? (
+                          <LastValueHint
                             questionId={question.id}
                             questionType={question.type}
                             lastValue={lastValue}
-                            hasLastValue={hasLastValue}
-                            showLast={Boolean(showLastByQuestion[question.id])}
-                            useLast={Boolean(useLastByQuestion[question.id])}
-                            onShowChange={toggleShowLast}
-                            onUseChange={toggleUseLast}
+                            currentValue={value}
+                            onUse={() => useLastValue(question.id)}
                           />
                         ) : null}
 
@@ -445,6 +465,95 @@ export function InspectionChecklistForm({
                 </ul>
               </section>
             ))}
+
+            <section className="grid gap-3">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-medium">Actions</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Record follow-up work for managers. Open actions stay
+                    visible on future inspections until closed.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addActionField}
+                >
+                  Add action
+                </Button>
+              </div>
+
+              {canLoadScopedData ? (
+                isLoadingOpenActions && openActions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Checking for open actions…
+                  </p>
+                ) : openActions.length > 0 ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-50/70 p-3">
+                    <p className="text-sm font-medium text-amber-950">
+                      Still open
+                    </p>
+                    <ul className="mt-2 grid gap-2">
+                      {openActions.map((action) => (
+                        <li
+                          key={action.id}
+                          className="text-sm text-amber-950/90"
+                        >
+                          <span className="whitespace-pre-wrap">
+                            {action.description}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-amber-900/70">
+                            Open since{" "}
+                            {formatMelbourneDateTime(action.createdAt)}
+                            {action.createdByOperatorName
+                              ? ` · ${action.createdByOperatorName}`
+                              : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Select a unit to see any open actions.
+                </p>
+              )}
+
+              <div className="grid gap-3">
+                {actionFields.map((value, index) => (
+                  <div key={`action-${index}`} className="grid gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor={`action-${index}`}>
+                        Action {index + 1}
+                      </Label>
+                      {actionFields.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeActionField(index)}
+                          className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    <textarea
+                      id={`action-${index}`}
+                      name="actions"
+                      value={value}
+                      onChange={(event) =>
+                        updateActionField(index, event.target.value)
+                      }
+                      rows={2}
+                      className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="Describe the action that needs completing…"
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <section className="grid gap-2">
               <Label htmlFor={fields.notes.id}>Notes (optional)</Label>
@@ -589,68 +698,36 @@ export function InspectionChecklistForm({
   );
 }
 
-function LastValueToggles({
+function LastValueHint({
   questionId,
   questionType,
   lastValue,
-  hasLastValue,
-  showLast,
-  useLast,
-  onShowChange,
-  onUseChange,
+  currentValue,
+  onUse,
 }: {
   questionId: string;
   questionType: InspectionQuestionType;
   lastValue: string;
-  hasLastValue: boolean;
-  showLast: boolean;
-  useLast: boolean;
-  onShowChange: (questionId: string, checked: boolean) => void;
-  onUseChange: (questionId: string, checked: boolean) => void;
+  currentValue: string;
+  onUse: () => void;
 }) {
+  const alreadyUsing = currentValue === lastValue;
   return (
-    <div className="mt-2 grid gap-2">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={showLast}
-            onChange={(event) =>
-              onShowChange(questionId, event.target.checked)
-            }
-            className="size-4 accent-[var(--brand-navy)]"
-          />
-          Show last value
-        </label>
-        <label
-          className={cn(
-            "inline-flex items-center gap-2 text-xs text-muted-foreground",
-            !hasLastValue && "opacity-50",
-          )}
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <p id={`${questionId}-last-value`}>
+        Last value:{" "}
+        <span className="font-medium text-foreground">
+          {formatLastAnswerDisplay(lastValue, questionType)}
+        </span>
+      </p>
+      {!alreadyUsing ? (
+        <button
+          type="button"
+          onClick={onUse}
+          className="font-medium text-brand-navy underline-offset-4 hover:underline"
         >
-          <input
-            type="checkbox"
-            checked={useLast}
-            disabled={!hasLastValue}
-            onChange={(event) => onUseChange(questionId, event.target.checked)}
-            className="size-4 accent-[var(--brand-navy)]"
-          />
-          Use last value
-        </label>
-      </div>
-      {showLast ? (
-        <p className="text-xs text-muted-foreground">
-          {hasLastValue ? (
-            <>
-              Last value:{" "}
-              <span className="font-medium text-foreground">
-                {formatLastAnswerDisplay(lastValue, questionType)}
-              </span>
-            </>
-          ) : (
-            "No previous value for this question."
-          )}
-        </p>
+          Use
+        </button>
       ) : null}
     </div>
   );

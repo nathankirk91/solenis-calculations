@@ -6,6 +6,7 @@ import {
   buildAnswersFromResponses,
   buildLastAnswerMap,
   defaultAttentionValues,
+  filterQuestionsForEquipment,
   getFallbackInspectionByIdOrSlug,
   groupQuestionsBySection,
   parseStringArray,
@@ -69,6 +70,8 @@ export type ManagedInspectionDetail = InspectionDefinition & {
   questionSourceTitle: string | null;
   inheritsQuestions: boolean;
   unitFormCount: number;
+  /** Units that can be ticked on master-template questions. */
+  unitOptions: Array<{ value: string; label: string }>;
 };
 
 export type InspectionHistoryItem = {
@@ -85,6 +88,23 @@ export type InspectionHistoryItem = {
   summary: InspectionSummary;
   answers: InspectionAnswerRecord[];
   responseRows: InspectionResponseRow[];
+  actions: InspectionActionItem[];
+};
+
+export type InspectionActionStatus = "OPEN" | "CLOSED";
+
+export type InspectionActionItem = {
+  id: string;
+  description: string;
+  status: InspectionActionStatus;
+  equipmentRef: string | null;
+  inspectionId: string;
+  createdOnRunId: string;
+  createdAt: Date;
+  createdByOperatorName: string | null;
+  closedAt: Date | null;
+  closedByName: string | null;
+  completionComment: string | null;
 };
 
 function mapQuestion(row: {
@@ -96,6 +116,8 @@ function mapQuestion(row: {
   options: unknown;
   attentionValues: unknown;
   required: boolean;
+  showLastValue?: boolean | null;
+  applicableEquipmentRefs?: unknown;
   sortOrder: number;
 }): InspectionQuestionDef {
   const options = questionOptionsForType(
@@ -114,8 +136,12 @@ function mapQuestion(row: {
     attentionValues:
       attentionValues.length > 0
         ? attentionValues
-        : defaultAttentionValues(row.type, options),
+        : row.type === "YES_NO"
+          ? defaultAttentionValues(row.type, options)
+          : [],
     required: row.required,
+    showLastValue: Boolean(row.showLastValue),
+    applicableEquipmentRefs: parseStringArray(row.applicableEquipmentRefs),
     sortOrder: row.sortOrder,
   };
 }
@@ -141,6 +167,8 @@ function mapDefinition(row: {
     options: unknown;
     attentionValues: unknown;
     required: boolean;
+    showLastValue?: boolean | null;
+    applicableEquipmentRefs?: unknown;
     sortOrder: number;
   }>;
 }): InspectionDefinition {
@@ -254,7 +282,14 @@ export async function getInspectionDefinition(
       definition.shortName = shortNameFallback;
     }
 
-    return mergeStaticDefinitionMeta(definition);
+    const merged = mergeStaticDefinitionMeta(definition);
+    if (merged.fixedEquipmentRef) {
+      merged.questions = filterQuestionsForEquipment(
+        merged.questions,
+        merged.fixedEquipmentRef,
+      );
+    }
+    return merged;
   } catch {
     return resolveFallbackDefinition(idOrSlug);
   }
@@ -271,9 +306,13 @@ function resolveFallbackDefinition(
     const template = getFallbackInspectionByIdOrSlug(
       fallback.templateInspectionId,
     );
+    const questions = filterQuestionsForEquipment(
+      template?.questions ?? [],
+      fallback.fixedEquipmentRef,
+    );
     return {
       ...fallback,
-      questions: template?.questions ?? [],
+      questions,
       instructionNotes:
         fallback.instructionNotes ?? template?.instructionNotes,
     };
@@ -418,6 +457,13 @@ export async function getManagedInspection(
               },
             },
           },
+          unitForms: {
+            orderBy: { sortOrder: "asc" },
+            select: {
+              fixedEquipmentRef: true,
+              title: true,
+            },
+          },
         },
       },
       versions: {
@@ -426,6 +472,13 @@ export async function getManagedInspection(
           changedBy: {
             select: { name: true, email: true },
           },
+        },
+      },
+      unitForms: {
+        orderBy: { sortOrder: "asc" },
+        select: {
+          fixedEquipmentRef: true,
+          title: true,
         },
       },
       _count: {
@@ -460,6 +513,27 @@ export async function getManagedInspection(
     }),
   );
 
+  if (inheritsQuestions && definition.fixedEquipmentRef) {
+    definition.questions = filterQuestionsForEquipment(
+      definition.questions,
+      definition.fixedEquipmentRef,
+    );
+  }
+
+  const unitSource = inheritsQuestions ? row.template?.unitForms : row.unitForms;
+  const unitOptions = (unitSource ?? [])
+    .map((unit) => {
+      const value = unit.fixedEquipmentRef?.trim();
+      if (!value) {
+        return null;
+      }
+      return {
+        value,
+        label: unit.title.includes(value) ? unit.title : `${value} — ${unit.title}`,
+      };
+    })
+    .filter((unit): unit is { value: string; label: string } => Boolean(unit));
+
   return {
     ...definition,
     version: versionNumber,
@@ -470,6 +544,7 @@ export async function getManagedInspection(
       : row.title,
     inheritsQuestions,
     unitFormCount: row._count.unitForms,
+    unitOptions,
   };
 }
 
@@ -500,6 +575,10 @@ function parseVersionSnapshot(value: unknown): InspectionVersionSnapshot {
             ? row.attentionValues.map(String)
             : [],
           required: Boolean(row.required ?? true),
+          showLastValue: Boolean(row.showLastValue),
+          applicableEquipmentRefs: Array.isArray(row.applicableEquipmentRefs)
+            ? row.applicableEquipmentRefs.map(String)
+            : [],
           sortOrder: Number(row.sortOrder ?? 0),
         } satisfies InspectionQuestionDef;
       })
@@ -776,6 +855,11 @@ export async function seedDefaultInspections(): Promise<number> {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
+          applicableEquipmentRefs:
+            question.applicableEquipmentRefs.length > 0
+              ? question.applicableEquipmentRefs
+              : Prisma.DbNull,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -790,6 +874,11 @@ export async function seedDefaultInspections(): Promise<number> {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
+          applicableEquipmentRefs:
+            question.applicableEquipmentRefs.length > 0
+              ? question.applicableEquipmentRefs
+              : Prisma.DbNull,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -959,6 +1048,8 @@ export async function addInspectionQuestion(args: {
   options?: string[];
   attentionValues?: string[];
   required?: boolean;
+  showLastValue?: boolean;
+  applicableEquipmentRefs?: string[];
   changeComment: string;
   changedById: string;
 }): Promise<InspectionQuestionDef> {
@@ -1008,10 +1099,13 @@ export async function addInspectionQuestion(args: {
       attentionValues:
         args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
           ? Prisma.DbNull
-          : normalizedAttention.length
-            ? normalizedAttention
-            : defaultAttentionValues(args.type, options),
+          : normalizedAttention,
       required: args.required ?? true,
+      showLastValue: args.showLastValue ?? false,
+      applicableEquipmentRefs:
+        (args.applicableEquipmentRefs ?? []).length > 0
+          ? args.applicableEquipmentRefs
+          : Prisma.DbNull,
       isActive: true,
       sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
     },
@@ -1075,6 +1169,8 @@ export async function updateInspectionQuestion(args: {
   options?: string[];
   attentionValues?: string[];
   required?: boolean;
+  showLastValue?: boolean;
+  applicableEquipmentRefs?: string[];
   changeComment: string;
   changedById: string;
 }): Promise<InspectionQuestionDef> {
@@ -1127,10 +1223,13 @@ export async function updateInspectionQuestion(args: {
       attentionValues:
         args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
           ? Prisma.DbNull
-          : normalizedAttention.length
-            ? normalizedAttention
-            : defaultAttentionValues(args.type, options),
+          : normalizedAttention,
       required: args.required ?? true,
+      showLastValue: args.showLastValue ?? false,
+      applicableEquipmentRefs:
+        (args.applicableEquipmentRefs ?? []).length > 0
+          ? args.applicableEquipmentRefs
+          : Prisma.DbNull,
     },
   });
 
@@ -1355,6 +1454,7 @@ export async function listInspectionHistory(
       // Full answers are loaded on the submission detail page only.
       answers: [],
       responseRows: [],
+      actions: [],
     };
   });
 }
@@ -1455,7 +1555,18 @@ export async function getInspectionRunById(
     return null;
   }
 
-  const answers = parseAnswers(row.responses);
+  const [answers, actionRows] = await Promise.all([
+    Promise.resolve(parseAnswers(row.responses)),
+    prisma.inspectionAction.findMany({
+      where: { createdOnRunId: id },
+      include: {
+        createdByOperator: { select: { name: true } },
+        closedBy: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+
   return {
     id: row.id,
     status: row.status,
@@ -1470,7 +1581,160 @@ export async function getInspectionRunById(
     summary: parseSummary(row.summary),
     answers,
     responseRows: answers,
+    actions: actionRows.map(mapInspectionAction),
   };
+}
+
+function mapInspectionAction(row: {
+  id: string;
+  description: string;
+  status: InspectionActionStatus;
+  equipmentRef: string | null;
+  inspectionId: string;
+  createdOnRunId: string;
+  createdAt: Date;
+  createdByOperator: { name: string | null } | null;
+  closedAt: Date | null;
+  closedBy: { name: string | null } | null;
+  completionComment: string | null;
+}): InspectionActionItem {
+  return {
+    id: row.id,
+    description: row.description,
+    status: row.status,
+    equipmentRef: row.equipmentRef,
+    inspectionId: row.inspectionId,
+    createdOnRunId: row.createdOnRunId,
+    createdAt: row.createdAt,
+    createdByOperatorName: row.createdByOperator?.name ?? null,
+    closedAt: row.closedAt,
+    closedByName: row.closedBy?.name ?? null,
+    completionComment: row.completionComment,
+  };
+}
+
+export async function listOpenInspectionActions(args: {
+  inspectionId: string;
+  equipmentRef?: string | null;
+}): Promise<InspectionActionItem[]> {
+  const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+  await ensureInspectionSchema();
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return [];
+  }
+
+  const equipmentRef = args.equipmentRef?.trim() || null;
+  const inspection = await prisma.inspection.findUnique({
+    where: { id: args.inspectionId },
+    select: { fixedEquipmentRef: true },
+  });
+  const effectiveEquipmentRef =
+    equipmentRef || inspection?.fixedEquipmentRef?.trim() || null;
+
+  const rows = await prisma.inspectionAction.findMany({
+    where: effectiveEquipmentRef
+      ? {
+          status: "OPEN",
+          equipmentRef: effectiveEquipmentRef,
+        }
+      : {
+          status: "OPEN",
+          inspectionId: args.inspectionId,
+          OR: [{ equipmentRef: null }, { equipmentRef: "" }],
+        },
+    include: {
+      createdByOperator: { select: { name: true } },
+      closedBy: { select: { name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return rows.map(mapInspectionAction);
+}
+
+export async function createInspectionActions(args: {
+  createdOnRunId: string;
+  inspectionId: string;
+  equipmentRef?: string | null;
+  descriptions: string[];
+  createdByOperatorId?: string | null;
+  createdByUserId?: string | null;
+}): Promise<number> {
+  const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+  await ensureInspectionSchema();
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return 0;
+  }
+
+  const descriptions = args.descriptions
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (descriptions.length === 0) {
+    return 0;
+  }
+
+  await prisma.inspectionAction.createMany({
+    data: descriptions.map((description) => ({
+      createdOnRunId: args.createdOnRunId,
+      inspectionId: args.inspectionId,
+      equipmentRef: args.equipmentRef?.trim() || null,
+      description,
+      status: "OPEN",
+      createdByOperatorId: args.createdByOperatorId ?? null,
+      createdByUserId: args.createdByUserId ?? null,
+    })),
+  });
+
+  return descriptions.length;
+}
+
+export async function closeInspectionAction(args: {
+  actionId: string;
+  closedByUserId: string;
+  completionComment: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+  await ensureInspectionSchema();
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return { ok: false, error: "Database is not configured." };
+  }
+
+  const completionComment = args.completionComment.trim();
+  if (!completionComment) {
+    return {
+      ok: false,
+      error: "A completion comment is required to close an action.",
+    };
+  }
+
+  const existing = await prisma.inspectionAction.findUnique({
+    where: { id: args.actionId },
+    select: { id: true, status: true },
+  });
+  if (!existing) {
+    return { ok: false, error: "Action not found." };
+  }
+  if (existing.status === "CLOSED") {
+    return { ok: false, error: "This action is already closed." };
+  }
+
+  await prisma.inspectionAction.update({
+    where: { id: args.actionId },
+    data: {
+      status: "CLOSED",
+      completionComment,
+      closedAt: new Date(),
+      closedById: args.closedByUserId,
+    },
+  });
+
+  return { ok: true };
 }
 
 export async function ensureSeededInspectionQuestions(): Promise<void> {
@@ -1530,6 +1794,11 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
+          applicableEquipmentRefs:
+            question.applicableEquipmentRefs.length > 0
+              ? question.applicableEquipmentRefs
+              : Prisma.DbNull,
           isActive: true,
           sortOrder: question.sortOrder,
           inspectionId: definition.id,
@@ -1545,6 +1814,11 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
             question.type === "RADIO" ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
+          showLastValue: question.showLastValue,
+          applicableEquipmentRefs:
+            question.applicableEquipmentRefs.length > 0
+              ? question.applicableEquipmentRefs
+              : Prisma.DbNull,
           isActive: true,
           sortOrder: question.sortOrder,
         },

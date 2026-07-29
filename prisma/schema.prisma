@@ -33,6 +33,13 @@ enum InspectionRunStatus {
   @@map("inspection_run_status")
 }
 
+enum InspectionActionStatus {
+  OPEN
+  CLOSED
+
+  @@map("inspection_action_status")
+}
+
 enum InspectionQuestionType {
   YES_NO
   TEXT
@@ -56,6 +63,8 @@ model User {
   reviewedRuns            CalculationRun[]  @relation("ReviewedBy")
   submittedInspectionRuns InspectionRun[]   @relation("InspectionSubmittedBy")
   inspectionVersions      InspectionVersion[] @relation("InspectionVersionChangedBy")
+  createdInspectionActions InspectionAction[] @relation("InspectionActionCreatedBy")
+  closedInspectionActions InspectionAction[] @relation("InspectionActionClosedBy")
   pushSubscriptions       PushSubscription[]
 
   @@map("users")
@@ -70,6 +79,7 @@ model Operator {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   runs           CalculationRun[]
   inspectionRuns InspectionRun[]
+  inspectionActions InspectionAction[]
 
   @@index([isActive, sortOrder])
   @@map("operators")
@@ -135,6 +145,7 @@ model Inspection {
   runs                 InspectionRun[]
   questions            InspectionQuestion[]
   versions             InspectionVersion[]
+  actions              InspectionAction[]
 
   @@index([templateInspectionId])
   @@map("inspections")
@@ -167,6 +178,10 @@ model InspectionQuestion {
   options         Json?
   attentionValues Json?                   @map("attention_values")
   required        Boolean                 @default(true)
+  /// When true, operators see the prior report's answer for this question.
+  showLastValue   Boolean                 @default(false) @map("show_last_value")
+  /// Unit refs this question applies to; null/empty = all inheriting units.
+  applicableEquipmentRefs Json?           @map("applicable_equipment_refs")
   isActive        Boolean                 @default(true) @map("is_active")
   sortOrder       Int                     @default(0) @map("sort_order")
   createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -192,11 +207,39 @@ model InspectionRun {
   notes              String?
   signature          String?
   createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  actions            InspectionAction[]   @relation("ActionsCreatedOnRun")
 
   @@index([inspectionId])
   @@index([status, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@map("inspection_runs")
+}
+
+model InspectionAction {
+  id                  String                 @id @default(cuid())
+  createdOnRunId      String                 @map("created_on_run_id")
+  createdOnRun        InspectionRun          @relation("ActionsCreatedOnRun", fields: [createdOnRunId], references: [id], onDelete: Cascade)
+  inspectionId        String                 @map("inspection_id")
+  inspection          Inspection             @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  /// Unit scope for carry-forward (e.g. forklift H57168).
+  equipmentRef        String?                @map("equipment_ref")
+  description         String
+  status              InspectionActionStatus @default(OPEN)
+  createdByOperatorId String?                @map("created_by_operator_id")
+  createdByOperator   Operator?              @relation(fields: [createdByOperatorId], references: [id], onDelete: SetNull)
+  createdByUserId     String?                @map("created_by_user_id")
+  createdByUser       User?                  @relation("InspectionActionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  closedAt            DateTime?              @map("closed_at") @db.Timestamptz(6)
+  closedById          String?                @map("closed_by_id")
+  closedBy            User?                  @relation("InspectionActionClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  completionComment   String?                @map("completion_comment")
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, equipmentRef, createdAt(sort: Desc)])
+  @@index([status, inspectionId, createdAt(sort: Desc)])
+  @@index([createdOnRunId])
+  @@map("inspection_actions")
 }
 
 model PushSubscription {
