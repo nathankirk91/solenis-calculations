@@ -88,6 +88,23 @@ export type InspectionHistoryItem = {
   summary: InspectionSummary;
   answers: InspectionAnswerRecord[];
   responseRows: InspectionResponseRow[];
+  actions: InspectionActionItem[];
+};
+
+export type InspectionActionStatus = "OPEN" | "CLOSED";
+
+export type InspectionActionItem = {
+  id: string;
+  description: string;
+  status: InspectionActionStatus;
+  equipmentRef: string | null;
+  inspectionId: string;
+  createdOnRunId: string;
+  createdAt: Date;
+  createdByOperatorName: string | null;
+  closedAt: Date | null;
+  closedByName: string | null;
+  completionComment: string | null;
 };
 
 function mapQuestion(row: {
@@ -1437,6 +1454,7 @@ export async function listInspectionHistory(
       // Full answers are loaded on the submission detail page only.
       answers: [],
       responseRows: [],
+      actions: [],
     };
   });
 }
@@ -1537,7 +1555,18 @@ export async function getInspectionRunById(
     return null;
   }
 
-  const answers = parseAnswers(row.responses);
+  const [answers, actionRows] = await Promise.all([
+    Promise.resolve(parseAnswers(row.responses)),
+    prisma.inspectionAction.findMany({
+      where: { createdOnRunId: id },
+      include: {
+        createdByOperator: { select: { name: true } },
+        closedBy: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+
   return {
     id: row.id,
     status: row.status,
@@ -1552,7 +1581,160 @@ export async function getInspectionRunById(
     summary: parseSummary(row.summary),
     answers,
     responseRows: answers,
+    actions: actionRows.map(mapInspectionAction),
   };
+}
+
+function mapInspectionAction(row: {
+  id: string;
+  description: string;
+  status: InspectionActionStatus;
+  equipmentRef: string | null;
+  inspectionId: string;
+  createdOnRunId: string;
+  createdAt: Date;
+  createdByOperator: { name: string | null } | null;
+  closedAt: Date | null;
+  closedBy: { name: string | null } | null;
+  completionComment: string | null;
+}): InspectionActionItem {
+  return {
+    id: row.id,
+    description: row.description,
+    status: row.status,
+    equipmentRef: row.equipmentRef,
+    inspectionId: row.inspectionId,
+    createdOnRunId: row.createdOnRunId,
+    createdAt: row.createdAt,
+    createdByOperatorName: row.createdByOperator?.name ?? null,
+    closedAt: row.closedAt,
+    closedByName: row.closedBy?.name ?? null,
+    completionComment: row.completionComment,
+  };
+}
+
+export async function listOpenInspectionActions(args: {
+  inspectionId: string;
+  equipmentRef?: string | null;
+}): Promise<InspectionActionItem[]> {
+  const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+  await ensureInspectionSchema();
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return [];
+  }
+
+  const equipmentRef = args.equipmentRef?.trim() || null;
+  const inspection = await prisma.inspection.findUnique({
+    where: { id: args.inspectionId },
+    select: { fixedEquipmentRef: true },
+  });
+  const effectiveEquipmentRef =
+    equipmentRef || inspection?.fixedEquipmentRef?.trim() || null;
+
+  const rows = await prisma.inspectionAction.findMany({
+    where: effectiveEquipmentRef
+      ? {
+          status: "OPEN",
+          equipmentRef: effectiveEquipmentRef,
+        }
+      : {
+          status: "OPEN",
+          inspectionId: args.inspectionId,
+          OR: [{ equipmentRef: null }, { equipmentRef: "" }],
+        },
+    include: {
+      createdByOperator: { select: { name: true } },
+      closedBy: { select: { name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return rows.map(mapInspectionAction);
+}
+
+export async function createInspectionActions(args: {
+  createdOnRunId: string;
+  inspectionId: string;
+  equipmentRef?: string | null;
+  descriptions: string[];
+  createdByOperatorId?: string | null;
+  createdByUserId?: string | null;
+}): Promise<number> {
+  const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+  await ensureInspectionSchema();
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return 0;
+  }
+
+  const descriptions = args.descriptions
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (descriptions.length === 0) {
+    return 0;
+  }
+
+  await prisma.inspectionAction.createMany({
+    data: descriptions.map((description) => ({
+      createdOnRunId: args.createdOnRunId,
+      inspectionId: args.inspectionId,
+      equipmentRef: args.equipmentRef?.trim() || null,
+      description,
+      status: "OPEN",
+      createdByOperatorId: args.createdByOperatorId ?? null,
+      createdByUserId: args.createdByUserId ?? null,
+    })),
+  });
+
+  return descriptions.length;
+}
+
+export async function closeInspectionAction(args: {
+  actionId: string;
+  closedByUserId: string;
+  completionComment: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+  await ensureInspectionSchema();
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return { ok: false, error: "Database is not configured." };
+  }
+
+  const completionComment = args.completionComment.trim();
+  if (!completionComment) {
+    return {
+      ok: false,
+      error: "A completion comment is required to close an action.",
+    };
+  }
+
+  const existing = await prisma.inspectionAction.findUnique({
+    where: { id: args.actionId },
+    select: { id: true, status: true },
+  });
+  if (!existing) {
+    return { ok: false, error: "Action not found." };
+  }
+  if (existing.status === "CLOSED") {
+    return { ok: false, error: "This action is already closed." };
+  }
+
+  await prisma.inspectionAction.update({
+    where: { id: args.actionId },
+    data: {
+      status: "CLOSED",
+      completionComment,
+      closedAt: new Date(),
+      closedById: args.closedByUserId,
+    },
+  });
+
+  return { ok: true };
 }
 
 export async function ensureSeededInspectionQuestions(): Promise<void> {

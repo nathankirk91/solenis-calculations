@@ -30,5 +30,9 @@ export default [
     "inspections/:inspectionId/last-answers",
     "routes/inspection-last-answers.tsx",
   ),
+  route(
+    "inspections/:inspectionId/open-actions",
+    "routes/inspection-open-actions.tsx",
+  ),
   route("inspections/:inspectionId", "routes/inspection-page.tsx"),
 ] satisfies RouteConfig;

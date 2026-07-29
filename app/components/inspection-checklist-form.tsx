@@ -32,6 +32,7 @@ import {
   type InspectionSummary,
   type LastInspectionAnswers,
 } from "~/lib/inspections";
+import type { InspectionActionItem } from "~/lib/inspections.server";
 import type { OperatorOption } from "~/lib/operators.server";
 import { formatMelbourneDateTime } from "~/lib/datetime";
 import { cn } from "~/lib/utils";
@@ -65,22 +66,28 @@ export function InspectionChecklistForm({
   const [responseOverrides, setResponseOverrides] = useState<
     Record<string, string>
   >({});
+  const [actionFields, setActionFields] = useState<string[]>([""]);
 
   const needsLastAnswers = definition.questions.some(
     (question) => question.showLastValue,
   );
 
   const lastAnswersFetcher = useFetcher<LastInspectionAnswers>();
+  const openActionsFetcher = useFetcher<{ actions: InspectionActionItem[] }>();
   const lastAnswers = lastAnswersFetcher.data?.answers ?? {};
   const lastRunAt = lastAnswersFetcher.data?.createdAt ?? null;
+  const openActions = openActionsFetcher.data?.actions ?? [];
   const needsEquipmentPick =
     Boolean(definition.equipmentLabel) && !fixedEquipmentRef;
-  const canLoadLastAnswers =
-    needsLastAnswers &&
-    (!needsEquipmentPick || Boolean(equipmentRefForFetch.trim()));
+  const canLoadScopedData =
+    !needsEquipmentPick || Boolean(equipmentRefForFetch.trim());
+  const canLoadLastAnswers = needsLastAnswers && canLoadScopedData;
   const isLoadingLastAnswers =
     lastAnswersFetcher.state === "loading" ||
     lastAnswersFetcher.state === "submitting";
+  const isLoadingOpenActions =
+    openActionsFetcher.state === "loading" ||
+    openActionsFetcher.state === "submitting";
 
   const defaultResponses = Object.fromEntries(
     definition.questions.map((question) => [question.id, ""]),
@@ -146,6 +153,23 @@ export function InspectionChecklistForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [definition.id, equipmentRefForFetch, canLoadLastAnswers]);
 
+  useEffect(() => {
+    if (!canLoadScopedData) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (equipmentRefForFetch.trim()) {
+      params.set("equipmentRef", equipmentRefForFetch.trim());
+    }
+    const query = params.toString();
+    const href = `/inspections/${definition.id}/open-actions${
+      query ? `?${query}` : ""
+    }`;
+    openActionsFetcher.load(href);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [definition.id, equipmentRefForFetch, canLoadScopedData]);
+
   function fieldValue(
     questionId: string,
     initialValue: unknown,
@@ -167,7 +191,26 @@ export function InspectionChecklistForm({
     }));
   }
 
+  function updateActionField(index: number, value: string) {
+    setActionFields((previous) =>
+      previous.map((item, itemIndex) =>
+        itemIndex === index ? value : item,
+      ),
+    );
+  }
 
+  function addActionField() {
+    setActionFields((previous) => [...previous, ""]);
+  }
+
+  function removeActionField(index: number) {
+    setActionFields((previous) => {
+      if (previous.length <= 1) {
+        return [""];
+      }
+      return previous.filter((_, itemIndex) => itemIndex !== index);
+    });
+  }
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
       <Card>
@@ -422,6 +465,95 @@ export function InspectionChecklistForm({
                 </ul>
               </section>
             ))}
+
+            <section className="grid gap-3">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-medium">Actions</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Record follow-up work for managers. Open actions stay
+                    visible on future inspections until closed.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addActionField}
+                >
+                  Add action
+                </Button>
+              </div>
+
+              {canLoadScopedData ? (
+                isLoadingOpenActions && openActions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Checking for open actions…
+                  </p>
+                ) : openActions.length > 0 ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-50/70 p-3">
+                    <p className="text-sm font-medium text-amber-950">
+                      Still open
+                    </p>
+                    <ul className="mt-2 grid gap-2">
+                      {openActions.map((action) => (
+                        <li
+                          key={action.id}
+                          className="text-sm text-amber-950/90"
+                        >
+                          <span className="whitespace-pre-wrap">
+                            {action.description}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-amber-900/70">
+                            Open since{" "}
+                            {formatMelbourneDateTime(action.createdAt)}
+                            {action.createdByOperatorName
+                              ? ` · ${action.createdByOperatorName}`
+                              : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Select a unit to see any open actions.
+                </p>
+              )}
+
+              <div className="grid gap-3">
+                {actionFields.map((value, index) => (
+                  <div key={`action-${index}`} className="grid gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor={`action-${index}`}>
+                        Action {index + 1}
+                      </Label>
+                      {actionFields.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeActionField(index)}
+                          className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    <textarea
+                      id={`action-${index}`}
+                      name="actions"
+                      value={value}
+                      onChange={(event) =>
+                        updateActionField(index, event.target.value)
+                      }
+                      rows={2}
+                      className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="Describe the action that needs completing…"
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <section className="grid gap-2">
               <Label htmlFor={fields.notes.id}>Notes (optional)</Label>
