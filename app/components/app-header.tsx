@@ -58,10 +58,6 @@ function SolenisMark({ className }: { className?: string }) {
   );
 }
 
-function pathOnly(to: string) {
-  return to.split("#")[0] || "/";
-}
-
 function pathMatches(
   location: { pathname: string; hash: string },
   to: string,
