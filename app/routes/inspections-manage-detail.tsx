@@ -801,7 +801,7 @@ export default function InspectionsManageDetailPage({
                     defaultChecked={inspection.isAvailable}
                     className="size-4 accent-[var(--brand-navy)]"
                   />
-                  Show on home page
+                  Show on Inspections page
                 </label>
                 <div>
                   <Button type="submit">Save details</Button>

@@ -141,10 +141,10 @@ export default function InspectionSubmissionPage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Inspection</Badge>
             <Link
-              to="/#inspections"
+              to="/inspections"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              ← All tools
+              ← Inspections
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -310,7 +310,10 @@ export default function InspectionSubmissionPage({
                 Run this inspection again
               </Link>
               {" · "}
-              <Link to="/history" className="underline-offset-4 hover:underline">
+              <Link
+                to="/inspections/history"
+                className="underline-offset-4 hover:underline"
+              >
                 View history
               </Link>
             </p>

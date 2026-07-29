@@ -64,11 +64,17 @@ function pathMatches(
 ) {
   const [targetPath = "/", targetHash = ""] = to.split("#");
   const hash = targetHash ? `#${targetHash}` : "";
-  const pathOk =
-    targetPath === "/"
-      ? location.pathname === "/"
-      : location.pathname === targetPath ||
-        location.pathname.startsWith(`${targetPath}/`);
+
+  // Hub pages should only match exactly so nested routes don't steal active state.
+  const exactOnly =
+    targetPath === "/" ||
+    targetPath === "/inspections" ||
+    targetPath === "/history";
+
+  const pathOk = exactOnly
+    ? location.pathname === targetPath
+    : location.pathname === targetPath ||
+      location.pathname.startsWith(`${targetPath}/`);
 
   if (!pathOk) {
     return false;
@@ -294,12 +300,12 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
             label: "Calculations",
             children: [
               {
-                to: "/#calculations",
+                to: "/",
                 label: "Calculators",
                 description: "Batch make-up calculators",
               },
               {
-                to: "/history#calculations",
+                to: "/history",
                 label: "History",
                 description: "Past submissions and approvals",
               },
@@ -311,12 +317,12 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
             label: "Inspections",
             children: [
               {
-                to: "/#inspections",
+                to: "/inspections",
                 label: "Checklists",
                 description: "Run equipment and shift checks",
               },
               {
-                to: "/history#inspections",
+                to: "/inspections/history",
                 label: "Records",
                 description: "Completed inspection history",
               },

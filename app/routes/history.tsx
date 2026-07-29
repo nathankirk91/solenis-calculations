@@ -18,37 +18,32 @@ import {
   listCalculationHistory,
   type CalculationRunStatus,
 } from "~/lib/history.server";
-import {
-  listInspectionHistory,
-  type InspectionRunStatus,
-} from "~/lib/inspections.server";
 import { canReviewRuns } from "~/lib/roles";
 import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "History | Springvale Solenis" },
+    { title: "Calculation history | Springvale Solenis" },
     {
       name: "description",
       content:
-        "Previous calculations and inspections with status and Melbourne timestamps.",
+        "Previous calculations with approval status and Melbourne timestamps.",
     },
   ];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request, "/history");
-  const [runs, inspections, pendingCount] = await Promise.all([
+  const [runs, pendingCount] = await Promise.all([
     listCalculationHistory(),
-    listInspectionHistory(),
     canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
   ]);
 
-  return { user, runs, inspections, pendingCount };
+  return { user, runs, pendingCount };
 }
 
 export default function HistoryPage({ loaderData }: Route.ComponentProps) {
-  const { user, runs, inspections, pendingCount } = loaderData;
+  const { user, runs, pendingCount } = loaderData;
 
   return (
     <div className="app-shell">
@@ -56,255 +51,159 @@ export default function HistoryPage({ loaderData }: Route.ComponentProps) {
       <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">History</Badge>
+            <Badge variant="secondary">Calculations</Badge>
             <Link
               to="/"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              ← Home
+              ← Calculations
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-            History
+            Calculation history
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Past calculation approvals and completed inspections, with Melbourne
+            Past calculation submissions and approvals, with Melbourne
             timestamps.
           </p>
         </div>
 
-        <section
-          id="calculations"
-          className="mb-14 scroll-mt-24"
-          aria-labelledby="calc-history-heading"
-        >
-          <h2
-            id="calc-history-heading"
-            className="mb-4 font-heading text-2xl font-semibold tracking-tight text-brand-navy"
-          >
-            Calculations
-          </h2>
-          {runs.length === 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>No calculations yet</CardTitle>
-                <CardDescription>
-                  Submitted calculations will appear here with their approval
-                  status.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {runs.map((run, index) => {
-                const submittedAt = formatMelbourneDateTime(run.createdAt);
-                const reviewedAt = formatMelbourneDateTime(run.reviewedAt);
-                const reviewer =
-                  run.reviewedByName?.trim() ||
-                  run.reviewedByEmail ||
-                  null;
+        {runs.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>No calculations yet</CardTitle>
+              <CardDescription>
+                Submitted calculations will appear here with their approval
+                status.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {runs.map((run, index) => {
+              const submittedAt = formatMelbourneDateTime(run.createdAt);
+              const reviewedAt = formatMelbourneDateTime(run.reviewedAt);
+              const reviewer =
+                run.reviewedByName?.trim() ||
+                run.reviewedByEmail ||
+                null;
 
-                return (
-                  <Card
-                    key={run.id}
-                    className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500"
-                    style={{ animationDelay: `${60 + index * 30}ms` }}
-                  >
-                    <CardHeader className="gap-2">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-xl">
-                            <Link
-                              to={`/submissions/${run.id}`}
-                              className="underline-offset-4 hover:underline"
-                            >
-                              {run.calculationTitle}
-                            </Link>
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            Operator: {run.operatorName ?? "Unknown"}
-                            {submittedAt ? ` · Submitted ${submittedAt}` : null}
-                          </CardDescription>
+              return (
+                <Card
+                  key={run.id}
+                  className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500"
+                  style={{ animationDelay: `${60 + index * 30}ms` }}
+                >
+                  <CardHeader className="gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-xl">
+                          <Link
+                            to={`/submissions/${run.id}`}
+                            className="underline-offset-4 hover:underline"
+                          >
+                            {run.calculationTitle}
+                          </Link>
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          Operator: {run.operatorName ?? "Unknown"}
+                          {submittedAt ? ` · Submitted ${submittedAt}` : null}
+                        </CardDescription>
+                      </div>
+                      <StatusBadge status={run.status} />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <Stat
+                        label="Extra DETA"
+                        value={`${run.outputs.extraDetaKg ?? "—"} kg`}
+                        emphasize
+                      />
+                      <Stat
+                        label="Target DETA"
+                        value={`${run.outputs.targetDetaKg ?? "—"} kg`}
+                      />
+                      <Stat
+                        label="DETA total"
+                        value={`${run.loads.detaChargedKg} kg`}
+                      />
+                      <Stat
+                        label="Adipic total"
+                        value={`${run.loads.adipicAcidKg} kg`}
+                      />
+                    </dl>
+
+                    <div className="rounded-lg border border-border/70 bg-background/50 p-4">
+                      <h3 className="text-sm font-medium">Approval</h3>
+                      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                        <div className="flex justify-between gap-3 sm:block">
+                          <dt className="text-muted-foreground">Status</dt>
+                          <dd className="font-medium capitalize">
+                            {run.status.toLowerCase()}
+                          </dd>
                         </div>
-                        <StatusBadge status={run.status} />
-                      </div>
-                    </CardHeader>
-                    <CardContent className="grid gap-4">
-                      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <Stat
-                          label="Extra DETA"
-                          value={`${run.outputs.extraDetaKg ?? "—"} kg`}
-                          emphasize
-                        />
-                        <Stat
-                          label="Target DETA"
-                          value={`${run.outputs.targetDetaKg ?? "—"} kg`}
-                        />
-                        <Stat
-                          label="DETA total"
-                          value={`${run.loads.detaChargedKg} kg`}
-                        />
-                        <Stat
-                          label="Adipic total"
-                          value={`${run.loads.adipicAcidKg} kg`}
-                        />
-                      </dl>
-
-                      <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-                        <h3 className="text-sm font-medium">Approval</h3>
-                        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                          <div className="flex justify-between gap-3 sm:block">
-                            <dt className="text-muted-foreground">Status</dt>
-                            <dd className="font-medium capitalize">
-                              {run.status.toLowerCase()}
-                            </dd>
-                          </div>
-                          <div className="flex justify-between gap-3 sm:block">
-                            <dt className="text-muted-foreground">
-                              Reviewed by
-                            </dt>
-                            <dd className="font-medium">
-                              {run.status === "PENDING"
-                                ? "—"
-                                : reviewer ?? "Unknown"}
-                            </dd>
-                          </div>
-                          <div className="flex justify-between gap-3 sm:block">
-                            <dt className="text-muted-foreground">
-                              Reviewed at (Melbourne)
-                            </dt>
-                            <dd className="font-medium tabular-nums">
-                              {run.status === "PENDING"
-                                ? "—"
-                                : reviewedAt ?? "—"}
-                            </dd>
-                          </div>
-                          {run.status === "REJECTED" && run.reviewNote ? (
-                            <div className="sm:col-span-2">
-                              <dt className="text-muted-foreground">
-                                Rejection note
-                              </dt>
-                              <dd className="mt-1 font-medium">
-                                {run.reviewNote}
-                              </dd>
-                            </div>
-                          ) : null}
-                        </dl>
-                      </div>
-
-                      <div className="grid gap-4 lg:grid-cols-2">
-                        <LoadBreakdown
-                          title="DETA loads (IBC / pallet)"
-                          emptyLabel="No DETA loads recorded."
-                          totalLabel="DETA total"
-                          totalKg={run.loads.detaChargedKg}
-                          rows={run.loads.detaLoads.map((kg, loadIndex) => ({
-                            label: `DETA load ${loadIndex + 1}`,
-                            kg,
-                          }))}
-                        />
-                        <LoadBreakdown
-                          title="Adipic Acid mix"
-                          emptyLabel="No Adipic Acid weights recorded."
-                          totalLabel="Adipic total"
-                          totalKg={run.loads.adipicAcidKg}
-                          rows={run.loads.adipicBags.map((kg, bagIndex) => ({
-                            label: `Adipic ${bagIndex + 1}`,
-                            kg,
-                          }))}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section
-          id="inspections"
-          className="scroll-mt-24"
-          aria-labelledby="inspection-history-heading"
-        >
-          <h2
-            id="inspection-history-heading"
-            className="mb-4 font-heading text-2xl font-semibold tracking-tight text-brand-navy"
-          >
-            Inspections
-          </h2>
-          {inspections.length === 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>No inspections yet</CardTitle>
-                <CardDescription>
-                  Completed checklists will appear here with pass / needs
-                  attention status.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {inspections.map((run, index) => {
-                const submittedAt = formatMelbourneDateTime(run.createdAt);
-
-                return (
-                  <Card
-                    key={run.id}
-                    className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500"
-                    style={{ animationDelay: `${60 + index * 30}ms` }}
-                  >
-                    <CardHeader className="gap-2">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-xl">
-                            <Link
-                              to={`/inspections/submissions/${run.id}`}
-                              className="underline-offset-4 hover:underline"
-                            >
-                              {run.inspectionTitle}
-                            </Link>
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            Operator: {run.operatorName ?? "Unknown"}
-                            {run.equipmentRef
-                              ? ` · ${run.equipmentRef}`
-                              : null}
-                            {submittedAt ? ` · ${submittedAt}` : null}
-                          </CardDescription>
+                        <div className="flex justify-between gap-3 sm:block">
+                          <dt className="text-muted-foreground">
+                            Reviewed by
+                          </dt>
+                          <dd className="font-medium">
+                            {run.status === "PENDING"
+                              ? "—"
+                              : reviewer ?? "Unknown"}
+                          </dd>
                         </div>
-                        <InspectionStatusBadge status={run.status} />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <dl className="grid gap-3 sm:grid-cols-2">
-                        <Stat
-                          label="Answered"
-                          value={String(run.summary.answeredCount)}
-                        />
-                        <Stat
-                          label="Needs attention"
-                          value={String(run.summary.attentionCount)}
-                          emphasize={run.summary.attentionCount > 0}
-                        />
+                        <div className="flex justify-between gap-3 sm:block">
+                          <dt className="text-muted-foreground">
+                            Reviewed at (Melbourne)
+                          </dt>
+                          <dd className="font-medium tabular-nums">
+                            {run.status === "PENDING"
+                              ? "—"
+                              : reviewedAt ?? "—"}
+                          </dd>
+                        </div>
+                        {run.status === "REJECTED" && run.reviewNote ? (
+                          <div className="sm:col-span-2">
+                            <dt className="text-muted-foreground">
+                              Rejection note
+                            </dt>
+                            <dd className="mt-1 font-medium">
+                              {run.reviewNote}
+                            </dd>
+                          </div>
+                        ) : null}
                       </dl>
-                      {run.summary.attentionItems.length > 0 ? (
-                        <ul className="mt-4 grid gap-1 text-sm text-amber-900">
-                          {run.summary.attentionItems.map((item) => (
-                            <li key={item.itemId}>
-                              • {item.label}
-                              {item.answer ? ` (${item.answer})` : null}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </section>
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <LoadBreakdown
+                        title="DETA loads (IBC / pallet)"
+                        emptyLabel="No DETA loads recorded."
+                        totalLabel="DETA total"
+                        totalKg={run.loads.detaChargedKg}
+                        rows={run.loads.detaLoads.map((kg, loadIndex) => ({
+                          label: `DETA load ${loadIndex + 1}`,
+                          kg,
+                        }))}
+                      />
+                      <LoadBreakdown
+                        title="Adipic Acid mix"
+                        emptyLabel="No Adipic Acid weights recorded."
+                        totalLabel="Adipic total"
+                        totalKg={run.loads.adipicAcidKg}
+                        rows={run.loads.adipicBags.map((kg, bagIndex) => ({
+                          label: `Adipic ${bagIndex + 1}`,
+                          kg,
+                        }))}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </main>
     </div>
   );
@@ -325,20 +224,6 @@ function StatusBadge({ status }: { status: CalculationRunStatus }) {
         : status === "APPROVED"
           ? "Approved"
           : "Rejected"}
-    </Badge>
-  );
-}
-
-function InspectionStatusBadge({ status }: { status: InspectionRunStatus }) {
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        status === "PASSED" && "border-emerald-600/40 text-emerald-700",
-        status === "NEEDS_ATTENTION" && "border-amber-600/40 text-amber-800",
-      )}
-    >
-      {status === "PASSED" ? "Passed" : "Needs attention"}
     </Badge>
   );
 }

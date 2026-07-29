@@ -48,7 +48,9 @@ Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` 
 - `/logout` — clears the session cookie
 - Home and calculator routes require a signed-in user
 - `/approvals` — managers and admin review pending runs
-- `/history` — operators, managers, and admin view past submissions and approval status
+- `/history` — calculation submission history and approval status
+- `/inspections` — inspection checklist catalog
+- `/inspections/history` — completed inspection records
 - `/settings` — managers and admin enable/test phone push notifications
 - `/operators` — managers and admin add/remove operator names
 
@@ -131,7 +133,7 @@ Weights shown for charged/extra/target DETA and Adipic are whole kilograms.
 
 ## Inspections
 
-The home page lists inspections alongside calculators. Managers (and admin) can create inspections and questions from **Inspections** in the nav.
+Inspections live on `/inspections` (separate from calculations on the home page). Managers (and admin) can create inspections and questions from **Inspections → Manage** in the nav.
 
 Question types:
 

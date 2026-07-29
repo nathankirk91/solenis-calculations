@@ -9,20 +9,14 @@ import {
   type CalculationCard,
 } from "~/lib/calculations";
 import { getPrisma } from "~/lib/db.server";
-import {
-  FALLBACK_INSPECTIONS,
-  buildHomeInspectionCatalog,
-  type InspectionCard,
-} from "~/lib/inspections";
 import { canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Springvale Solenis" },
+    { title: "Calculations | Springvale Solenis" },
     {
       name: "description",
-      content:
-        "Plant calculations and inspections for Solenis Springvale production.",
+      content: "Plant calculations for Solenis Springvale production.",
     },
   ];
 }
@@ -38,39 +32,24 @@ export async function loader({ request }: Route.LoaderArgs) {
     return {
       user,
       calculations: FALLBACK_CALCULATIONS,
-      inspections: buildHomeInspectionCatalog(FALLBACK_INSPECTIONS),
       pendingCount,
       source: "fallback" as const,
     };
   }
 
   try {
-    const [calculationRows, inspectionRows] = await Promise.all([
-      prisma.calculation.findMany({
-        orderBy: { sortOrder: "asc" },
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          description: true,
-          category: true,
-          href: true,
-          isAvailable: true,
-        },
-      }),
-      prisma.inspection.findMany({
-        orderBy: { sortOrder: "asc" },
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          description: true,
-          category: true,
-          href: true,
-          isAvailable: true,
-        },
-      }),
-    ]);
+    const calculationRows = await prisma.calculation.findMany({
+      orderBy: { sortOrder: "asc" },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        description: true,
+        category: true,
+        href: true,
+        isAvailable: true,
+      },
+    });
 
     const calculations: CalculationCard[] = calculationRows.length
       ? calculationRows.map((row) => ({
@@ -84,24 +63,9 @@ export async function loader({ request }: Route.LoaderArgs) {
         }))
       : FALLBACK_CALCULATIONS;
 
-    const inspections: InspectionCard[] = buildHomeInspectionCatalog(
-      inspectionRows.length
-        ? inspectionRows.map((row) => ({
-            id: row.id,
-            slug: row.slug,
-            title: row.title,
-            description: row.description,
-            category: row.category,
-            href: row.href,
-            isAvailable: row.isAvailable,
-          }))
-        : FALLBACK_INSPECTIONS,
-    );
-
     return {
       user,
       calculations,
-      inspections,
       pendingCount,
       source: "prisma" as const,
     };
@@ -109,7 +73,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     return {
       user,
       calculations: FALLBACK_CALCULATIONS,
-      inspections: buildHomeInspectionCatalog(FALLBACK_INSPECTIONS),
       pendingCount,
       source: "fallback" as const,
     };
@@ -117,7 +80,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { calculations, inspections, user, pendingCount } = loaderData;
+  const { calculations, user, pendingCount } = loaderData;
 
   return (
     <div className="app-shell">
@@ -128,31 +91,18 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             Solenis
           </p>
           <h1 className="font-heading text-4xl font-semibold tracking-tight text-brand-navy sm:text-5xl">
-            Springvale
+            Calculations
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-            Calculations for batch make-up and inspections for equipment and
-            shift checks — all in one place.
+            Open a calculator, enter loads, and submit for management approval
+            before vessel charge.
           </p>
         </section>
 
-        <section
-          id="calculations"
-          aria-labelledby="calculations-heading"
-          className="mb-14 scroll-mt-24"
-        >
-          <div className="mb-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <h2
-              id="calculations-heading"
-              className="font-heading text-2xl font-semibold tracking-tight text-brand-navy sm:text-3xl"
-            >
-              Calculations
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              Open a calculator, enter loads, and submit for management approval
-              before vessel charge.
-            </p>
-          </div>
+        <section aria-labelledby="calculations-heading">
+          <h2 id="calculations-heading" className="sr-only">
+            Available calculations
+          </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {calculations.map((calculation, index) => (
               <div
@@ -161,37 +111,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 style={{ animationDelay: `${80 + index * 60}ms` }}
               >
                 <CatalogLinkCard item={calculation} />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section
-          id="inspections"
-          aria-labelledby="inspections-heading"
-          className="scroll-mt-24"
-        >
-          <div className="mb-6 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <h2
-              id="inspections-heading"
-              className="font-heading text-2xl font-semibold tracking-tight text-brand-navy sm:text-3xl"
-            >
-              Inspections
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              Open forklift checks by unit, or complete daily start-up /
-              shut-down checklists. Anything marked for attention notifies
-              managers.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {inspections.map((inspection, index) => (
-              <div
-                key={inspection.id}
-                className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500"
-                style={{ animationDelay: `${120 + index * 60}ms` }}
-              >
-                <CatalogLinkCard item={inspection} />
               </div>
             ))}
           </div>
