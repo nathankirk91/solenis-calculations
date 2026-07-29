@@ -34,6 +34,13 @@ export type InspectionDefinition = {
   equipmentLabel?: string | null;
   /** When set, operators pick a unit from this list instead of free text. */
   equipmentChoices?: Array<{ value: string; label: string }>;
+  /**
+   * When set, this form inherits checklist questions from the template
+   * inspection (e.g. shared forklift questions across unit forms).
+   */
+  templateInspectionId?: string | null;
+  /** Locked unit for per-equipment forms (skips the unit picker). */
+  fixedEquipmentRef?: string | null;
   /** Extra guidance shown above the checklist (e.g. Form 78 instructions). */
   instructionNotes?: string | null;
   isAvailable: boolean;
@@ -252,21 +259,21 @@ export const FORKLIFT_UNITS = [
   },
 ] as const;
 
-export const FORKLIFT_DAILY_CHECK: InspectionDefinition = {
+/** Shared Form 78 checklist — questions live here; unit forms inherit them. */
+export const FORKLIFT_DAILY_CHECK_TEMPLATE: InspectionDefinition = {
   id: "forklift-daily-check",
   slug: "forklift-daily-check",
-  title: "Forklift — Daily Safety Check (Form 78)",
-  shortName: "Forklift check",
+  title: "Forklift — Daily Safety Check (master template)",
+  shortName: "Forklift template",
   description:
-    "Start-of-shift forklift safety check for each unit before use. Complete one form per forklift at the beginning of each shift (day and afternoon), Monday–Friday. Checks must be done outside restricted areas (DG warehouse), in a clear area away from people and other vehicles.",
+    "Master checklist for all forklift unit forms. Edit questions here and they apply to every unit. Not shown to operators.",
   category: "Equipment",
   href: "/inspections/forklift-daily-check",
   sortOrder: 1,
-  equipmentLabel: "Unit No.",
-  equipmentChoices: [...FORKLIFT_UNITS],
+  equipmentLabel: null,
   instructionNotes:
     "First operator of each shift must complete this check. All items must be Yes (or repaired before use). If faults are found or service is overdue, call ADAPT-A-LIFT on (03) 9547 8000 — report the unit number (e.g. H57168) and schedule service. Note defects in comments for the next shift and management.",
-  isAvailable: true,
+  isAvailable: false,
   questions: [
     radioQuestion(
       "forklift-daily-check",
@@ -544,6 +551,37 @@ export const FORKLIFT_DAILY_CHECK: InspectionDefinition = {
   ],
 };
 
+/** @deprecated Prefer FORKLIFT_DAILY_CHECK_TEMPLATE — alias kept for tests. */
+export const FORKLIFT_DAILY_CHECK = FORKLIFT_DAILY_CHECK_TEMPLATE;
+
+function forkliftUnitForm(
+  unit: (typeof FORKLIFT_UNITS)[number],
+  sortOrder: number,
+): InspectionDefinition {
+  const id = `forklift-daily-check-${unit.value.toLowerCase()}`;
+  return {
+    id,
+    slug: id,
+    title: `Forklift ${unit.value} — Daily Safety Check`,
+    shortName: `Forklift ${unit.value}`,
+    description: `${unit.label}. Start-of-shift safety check before use (Form 78). Complete at the beginning of each shift (day and afternoon), Monday–Friday, outside restricted areas in a clear area away from people and other vehicles.`,
+    category: "Equipment",
+    href: `/inspections/${id}`,
+    sortOrder,
+    equipmentLabel: "Unit No.",
+    templateInspectionId: FORKLIFT_DAILY_CHECK_TEMPLATE.id,
+    fixedEquipmentRef: unit.value,
+    instructionNotes: FORKLIFT_DAILY_CHECK_TEMPLATE.instructionNotes,
+    isAvailable: true,
+    questions: [],
+  };
+}
+
+export const FORKLIFT_UNIT_FORMS: InspectionDefinition[] = FORKLIFT_UNITS.map(
+  (unit, index) => forkliftUnitForm(unit, 2 + index),
+);
+
+
 export const DAILY_STARTUP: InspectionDefinition = {
   id: "daily-startup",
   slug: "daily-startup",
@@ -553,7 +591,7 @@ export const DAILY_STARTUP: InspectionDefinition = {
     "Plant start-of-shift checks before production begins. Confirm the area is safe and ready.",
   category: "Shift",
   href: "/inspections/daily-startup",
-  sortOrder: 2,
+  sortOrder: 10,
   isAvailable: true,
   questions: [
     statusQuestion("daily-startup", "ppe", "Required PPE available and worn", "People & area", 1),
@@ -625,7 +663,7 @@ export const DAILY_SHUTDOWN: InspectionDefinition = {
     "End-of-shift checks to leave the plant secure, tidy, and ready for the next crew.",
   category: "Shift",
   href: "/inspections/daily-shutdown",
-  sortOrder: 3,
+  sortOrder: 11,
   isAvailable: true,
   questions: [
     statusQuestion(
@@ -689,7 +727,8 @@ export const DAILY_SHUTDOWN: InspectionDefinition = {
 };
 
 export const INSPECTION_DEFINITIONS: InspectionDefinition[] = [
-  FORKLIFT_DAILY_CHECK,
+  FORKLIFT_DAILY_CHECK_TEMPLATE,
+  ...FORKLIFT_UNIT_FORMS,
   DAILY_STARTUP,
   DAILY_SHUTDOWN,
 ];
@@ -805,6 +844,56 @@ export function buildAnswersFromResponses(
       flagged: Boolean(answer) && isAnswerFlagged(question, answer),
     };
   });
+}
+
+/** Map questionId → non-empty answer from a prior inspection run. */
+export function buildLastAnswerMap(
+  answers: Array<Pick<InspectionAnswerRecord, "questionId" | "answer">>,
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const item of answers) {
+    const questionId = String(item.questionId ?? "").trim();
+    const answer = String(item.answer ?? "").trim();
+    if (questionId && answer) {
+      map[questionId] = answer;
+    }
+  }
+  return map;
+}
+
+export type LastInspectionAnswers = {
+  answers: Record<string, string>;
+  runId: string | null;
+  createdAt: string | null;
+};
+
+/** Human-readable last value for checklist display (esp. DATE). */
+export function formatLastAnswerDisplay(
+  value: string,
+  type: InspectionQuestionType,
+): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (type === "DATE") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (match) {
+      const date = new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+      );
+      if (!Number.isNaN(date.getTime())) {
+        return date.toLocaleDateString("en-AU", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+      }
+    }
+  }
+  return trimmed;
 }
 
 export function groupQuestionsBySection(

@@ -114,22 +114,29 @@ model CalculationRun {
 }
 
 model Inspection {
-  id             String   @id @default(cuid())
-  slug           String   @unique
-  title          String
-  description    String   @default("")
-  category       String   @default("general")
-  href           String
-  equipmentLabel String?  @map("equipment_label")
-  isAvailable    Boolean  @default(true) @map("is_available")
-  sortOrder      Int      @default(0) @map("sort_order")
-  version        Int      @default(1)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  runs           InspectionRun[]
-  questions      InspectionQuestion[]
-  versions       InspectionVersion[]
+  id                   String   @id @default(cuid())
+  slug                 String   @unique
+  title                String
+  description          String   @default("")
+  category             String   @default("general")
+  href                 String
+  equipmentLabel       String?  @map("equipment_label")
+  /// When set, this form inherits questions from the template inspection.
+  templateInspectionId String?  @map("template_inspection_id")
+  template             Inspection?  @relation("InspectionTemplate", fields: [templateInspectionId], references: [id], onDelete: Restrict)
+  unitForms            Inspection[] @relation("InspectionTemplate")
+  /// Locked equipment unit for child forms (e.g. forklift H57168).
+  fixedEquipmentRef    String?  @map("fixed_equipment_ref")
+  isAvailable          Boolean  @default(true) @map("is_available")
+  sortOrder            Int      @default(0) @map("sort_order")
+  version              Int      @default(1)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  runs                 InspectionRun[]
+  questions            InspectionQuestion[]
+  versions             InspectionVersion[]
 
+  @@index([templateInspectionId])
   @@map("inspections")
 }
 

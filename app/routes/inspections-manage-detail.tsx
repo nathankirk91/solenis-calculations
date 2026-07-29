@@ -606,6 +606,19 @@ export default function InspectionsManageDetailPage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Management</Badge>
             <Badge variant="outline">Version {inspection.version}</Badge>
+            {inspection.unitFormCount > 0 ? (
+              <Badge variant="outline">
+                Master template · {inspection.unitFormCount} unit forms
+              </Badge>
+            ) : null}
+            {inspection.inheritsQuestions ? (
+              <Badge variant="outline">Shared questions</Badge>
+            ) : null}
+            {inspection.fixedEquipmentRef ? (
+              <Badge variant="outline">
+                Unit {inspection.fixedEquipmentRef}
+              </Badge>
+            ) : null}
             <Link
               to="/inspections/manage"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
@@ -617,16 +630,39 @@ export default function InspectionsManageDetailPage({
             {inspection.title}
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Update details, edit questions, and change their order. Question
-            changes bump the checklist version and require a manager comment.
-            Operators fill these out on{" "}
-            <Link
-              to={inspection.href}
-              className="underline-offset-4 hover:underline"
-            >
-              the inspection form
-            </Link>
-            .
+            {inspection.inheritsQuestions ? (
+              <>
+                This unit form inherits its checklist from the master template.
+                Change questions once on the template and every unit form updates.
+                Operators fill this out on{" "}
+                <Link
+                  to={inspection.href}
+                  className="underline-offset-4 hover:underline"
+                >
+                  the inspection form
+                </Link>
+                .
+              </>
+            ) : inspection.unitFormCount > 0 ? (
+              <>
+                This is the master forklift checklist. Question edits here apply
+                to all {inspection.unitFormCount} unit forms. The template itself
+                is hidden from operators.
+              </>
+            ) : (
+              <>
+                Update details, edit questions, and change their order. Question
+                changes bump the checklist version and require a manager comment.
+                Operators fill these out on{" "}
+                <Link
+                  to={inspection.href}
+                  className="underline-offset-4 hover:underline"
+                >
+                  the inspection form
+                </Link>
+                .
+              </>
+            )}
           </p>
           {actionData && "error" in actionData && actionData.error ? (
             <p className="mt-3 text-sm text-destructive">{actionData.error}</p>
@@ -705,29 +741,61 @@ export default function InspectionsManageDetailPage({
             <CardHeader>
               <CardTitle>Add question</CardTitle>
               <CardDescription>
-                Choose yes/no, number, date, a text box, or radio options. Mark
-                which answers should flag “needs attention”. Saving creates a
-                new version.
+                {inspection.inheritsQuestions ? (
+                  <>
+                    Questions are edited on the master template, not this unit
+                    form.
+                  </>
+                ) : (
+                  <>
+                    Choose yes/no, number, date, a text box, or radio options.
+                    Mark which answers should flag “needs attention”. Saving
+                    creates a new version
+                    {inspection.unitFormCount > 0
+                      ? " that applies to every unit form."
+                      : "."}
+                  </>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Form method="post" className="grid gap-4">
-                <input type="hidden" name="intent" value="add-question" />
-                <QuestionFields
-                  questionType={questionType}
-                  setQuestionType={setQuestionType}
-                  radioOptions={radioOptions}
-                  setRadioOptions={setRadioOptions}
-                />
-                <ChangeCommentField
-                  id="changeComment-add"
-                  value={changeComment}
-                  onChange={setChangeComment}
-                />
-                <div>
-                  <Button type="submit">Add question</Button>
+              {inspection.inheritsQuestions && inspection.questionSourceId ? (
+                <div className="grid gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    Shared checklist:{" "}
+                    <span className="font-medium text-foreground">
+                      {inspection.questionSourceTitle}
+                    </span>
+                  </p>
+                  <div>
+                    <Button asChild>
+                      <Link
+                        to={`/inspections/manage/${inspection.questionSourceId}`}
+                      >
+                        Edit shared questions
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
-              </Form>
+              ) : (
+                <Form method="post" className="grid gap-4">
+                  <input type="hidden" name="intent" value="add-question" />
+                  <QuestionFields
+                    questionType={questionType}
+                    setQuestionType={setQuestionType}
+                    radioOptions={radioOptions}
+                    setRadioOptions={setRadioOptions}
+                  />
+                  <ChangeCommentField
+                    id="changeComment-add"
+                    value={changeComment}
+                    onChange={setChangeComment}
+                  />
+                  <div>
+                    <Button type="submit">Add question</Button>
+                  </div>
+                </Form>
+              )}
             </CardContent>
           </Card>
 
@@ -735,38 +803,74 @@ export default function InspectionsManageDetailPage({
             <CardHeader>
               <CardTitle>Questions ({inspection.questions.length})</CardTitle>
               <CardDescription>
-                Edit wording and options, or move questions up and down.
-                Removing a question hides it from new submissions; past runs
-                keep their answers. Enter a change comment before moving or
-                removing.
+                {inspection.inheritsQuestions ? (
+                  <>
+                    Read-only preview of the shared checklist. Use “Edit shared
+                    questions” above to change wording, options, or order.
+                  </>
+                ) : (
+                  <>
+                    Edit wording and options, or move questions up and down.
+                    Removing a question hides it from new submissions; past runs
+                    keep their answers. Enter a change comment before moving or
+                    removing.
+                  </>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
-              <ChangeCommentField
-                id="changeComment-list"
-                value={changeComment}
-                onChange={setChangeComment}
-              />
-              {inspection.questions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No questions yet. Add one above.
-                </p>
-              ) : (
-                <ul className="grid gap-3">
+              {inspection.inheritsQuestions ? (
+                <ol className="grid gap-3">
                   {inspection.questions.map((question, index) => (
-                    <QuestionEditor
+                    <li
                       key={question.id}
-                      question={question}
-                      index={index}
-                      total={inspection.questions.length}
-                      isEditing={editingQuestionId === question.id}
-                      onEdit={() => setEditingQuestionId(question.id)}
-                      onCancel={() => setEditingQuestionId(null)}
-                      changeComment={changeComment}
-                      setChangeComment={setChangeComment}
-                    />
+                      className="rounded-lg border border-border/70 px-3 py-3 text-sm"
+                    >
+                      <p className="font-medium text-brand-navy">
+                        <span className="text-muted-foreground">
+                          #{index + 1}
+                        </span>{" "}
+                        {question.label}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {questionTypeLabel(question.type)}
+                        {question.sectionTitle
+                          ? ` · ${question.sectionTitle}`
+                          : ""}
+                        {question.required ? "" : " · Optional"}
+                      </p>
+                    </li>
                   ))}
-                </ul>
+                </ol>
+              ) : (
+                <>
+                  <ChangeCommentField
+                    id="changeComment-list"
+                    value={changeComment}
+                    onChange={setChangeComment}
+                  />
+                  {inspection.questions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No questions yet. Add one above.
+                    </p>
+                  ) : (
+                    <ul className="grid gap-3">
+                      {inspection.questions.map((question, index) => (
+                        <QuestionEditor
+                          key={question.id}
+                          question={question}
+                          index={index}
+                          total={inspection.questions.length}
+                          isEditing={editingQuestionId === question.id}
+                          onEdit={() => setEditingQuestionId(question.id)}
+                          onCancel={() => setEditingQuestionId(null)}
+                          changeComment={changeComment}
+                          setChangeComment={setChangeComment}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -775,8 +879,9 @@ export default function InspectionsManageDetailPage({
             <CardHeader>
               <CardTitle>Version history</CardTitle>
               <CardDescription>
-                Each question change creates a revision with the manager’s
-                comment and a snapshot of the checklist at that time.
+                {inspection.inheritsQuestions
+                  ? "Version history for the shared master checklist."
+                  : "Each question change creates a revision with the manager’s comment and a snapshot of the checklist at that time."}
               </CardDescription>
             </CardHeader>
             <CardContent>

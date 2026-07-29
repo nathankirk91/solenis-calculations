@@ -54,6 +54,20 @@ export async function loader({ request }: Route.LoaderArgs) {
           ? error.message
           : "Could not create inspection tables.";
     }
+  } else if (
+    !inspections.some((inspection) => inspection.fixedEquipmentRef)
+  ) {
+    // Upgrade path: split the combined forklift form into per-unit forms.
+    try {
+      const seeded = await seedDefaultInspections();
+      migrateNote = `Updated default inspections (${seeded}), including per-unit forklift forms.`;
+      inspections = await listManagedInspections();
+    } catch (error) {
+      migrateNote =
+        error instanceof Error
+          ? error.message
+          : "Could not update forklift unit forms.";
+    }
   }
 
   const pendingCount = await countPendingRuns();
@@ -143,8 +157,9 @@ export default function InspectionsManagePage({
           ) : null}
           {actionData && "seeded" in actionData && actionData.seeded != null ? (
             <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
-              Loaded {actionData.seeded} default inspections (forklift, start-up,
-              shut-down). You can edit their questions below.
+              Loaded {actionData.seeded} default inspections (forklift template +
+              unit forms, start-up, shut-down). Edit shared forklift questions on
+              the master template.
             </p>
           ) : null}
           {actionData && "error" in actionData && actionData.error ? (
@@ -246,6 +261,14 @@ export default function InspectionsManagePage({
                           </p>
                           <Badge variant="secondary">{inspection.category}</Badge>
                           <Badge variant="outline">v{inspection.version}</Badge>
+                          {inspection.isQuestionSource ? (
+                            <Badge variant="outline">Master template</Badge>
+                          ) : null}
+                          {inspection.fixedEquipmentRef ? (
+                            <Badge variant="outline">
+                              {inspection.fixedEquipmentRef}
+                            </Badge>
+                          ) : null}
                           {!inspection.isAvailable ? (
                             <Badge variant="outline">Hidden</Badge>
                           ) : null}

@@ -6,8 +6,8 @@ import {
   type SubmissionResult,
 } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
-import { Form, useNavigation } from "react-router";
-import { useState } from "react";
+import { Form, useFetcher, useNavigation } from "react-router";
+import { useEffect, useState } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -25,11 +25,15 @@ import { SignaturePad } from "~/components/signature-pad";
 import { createInspectionSchema } from "~/lib/inspection.schema";
 import {
   YES_NO_OPTIONS,
+  formatLastAnswerDisplay,
   groupQuestionsBySection,
   type InspectionDefinition,
+  type InspectionQuestionType,
   type InspectionSummary,
+  type LastInspectionAnswers,
 } from "~/lib/inspections";
 import type { OperatorOption } from "~/lib/operators.server";
+import { formatMelbourneDateTime } from "~/lib/datetime";
 import { cn } from "~/lib/utils";
 
 type Props = {
@@ -54,6 +58,29 @@ export function InspectionChecklistForm({
   const schema = createInspectionSchema(definition);
   const sections = groupQuestionsBySection(definition.questions);
   const [signature, setSignature] = useState("");
+  const fixedEquipmentRef = definition.fixedEquipmentRef?.trim() || "";
+  const [equipmentRef, setEquipmentRef] = useState(fixedEquipmentRef);
+  const [equipmentRefForFetch, setEquipmentRefForFetch] =
+    useState(fixedEquipmentRef);
+  const [showLastByQuestion, setShowLastByQuestion] = useState<
+    Record<string, boolean>
+  >({});
+  const [useLastByQuestion, setUseLastByQuestion] = useState<
+    Record<string, boolean>
+  >({});
+  const [responseOverrides, setResponseOverrides] = useState<
+    Record<string, string>
+  >({});
+
+  const lastAnswersFetcher = useFetcher<LastInspectionAnswers>();
+  const lastAnswers = lastAnswersFetcher.data?.answers ?? {};
+  const lastRunAt = lastAnswersFetcher.data?.createdAt ?? null;
+  const needsEquipmentPick =
+    Boolean(definition.equipmentLabel) && !fixedEquipmentRef;
+  const canLoadLastAnswers = !needsEquipmentPick || Boolean(equipmentRefForFetch.trim());
+  const isLoadingLastAnswers =
+    lastAnswersFetcher.state === "loading" ||
+    lastAnswersFetcher.state === "submitting";
 
   const defaultResponses = Object.fromEntries(
     definition.questions.map((question) => [question.id, ""]),
@@ -68,7 +95,7 @@ export function InspectionChecklistForm({
     shouldRevalidate: "onInput",
     defaultValue: {
       operatorId: "",
-      equipmentRef: "",
+      equipmentRef: fixedEquipmentRef,
       notes: "",
       signature: "",
       responses: defaultResponses,
@@ -76,6 +103,100 @@ export function InspectionChecklistForm({
   });
 
   const responseFields = fields.responses.getFieldset();
+
+  useEffect(() => {
+    if (fixedEquipmentRef) {
+      setEquipmentRef(fixedEquipmentRef);
+      setEquipmentRefForFetch(fixedEquipmentRef);
+      return;
+    }
+    if (definition.equipmentChoices?.length) {
+      setEquipmentRefForFetch(equipmentRef);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setEquipmentRefForFetch(equipmentRef.trim());
+    }, 400);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    equipmentRef,
+    definition.equipmentChoices?.length,
+    fixedEquipmentRef,
+  ]);
+
+  useEffect(() => {
+    setUseLastByQuestion({});
+    setResponseOverrides({});
+  }, [equipmentRefForFetch]);
+
+  useEffect(() => {
+    if (!canLoadLastAnswers) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (equipmentRefForFetch.trim()) {
+      params.set("equipmentRef", equipmentRefForFetch.trim());
+    }
+    const query = params.toString();
+    const href = `/inspections/${definition.id}/last-answers${
+      query ? `?${query}` : ""
+    }`;
+    lastAnswersFetcher.load(href);
+    // fetcher identity is unstable; load when inspection/equipment changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [definition.id, equipmentRefForFetch, canLoadLastAnswers]);
+
+  useEffect(() => {
+    setResponseOverrides((previous) => {
+      let changed = false;
+      const next = { ...previous };
+      for (const [questionId, enabled] of Object.entries(useLastByQuestion)) {
+        if (!enabled) {
+          continue;
+        }
+        const lastValue = lastAnswers[questionId];
+        if (lastValue && next[questionId] !== lastValue) {
+          next[questionId] = lastValue;
+          changed = true;
+        }
+      }
+      return changed ? next : previous;
+    });
+  }, [lastAnswers, useLastByQuestion]);
+
+  function fieldValue(
+    questionId: string,
+    initialValue: unknown,
+  ): string {
+    if (Object.prototype.hasOwnProperty.call(responseOverrides, questionId)) {
+      return responseOverrides[questionId] ?? "";
+    }
+    return typeof initialValue === "string" ? initialValue : "";
+  }
+
+  function toggleShowLast(questionId: string, checked: boolean) {
+    setShowLastByQuestion((previous) => ({
+      ...previous,
+      [questionId]: checked,
+    }));
+  }
+
+  function toggleUseLast(questionId: string, checked: boolean) {
+    setUseLastByQuestion((previous) => ({
+      ...previous,
+      [questionId]: checked,
+    }));
+    if (checked) {
+      const lastValue = lastAnswers[questionId];
+      if (lastValue) {
+        setResponseOverrides((previous) => ({
+          ...previous,
+          [questionId]: lastValue,
+        }));
+      }
+    }
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -89,7 +210,29 @@ export function InspectionChecklistForm({
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
           <CardContent className="grid gap-8 pb-6">
-            {definition.equipmentLabel ? (
+            {fixedEquipmentRef ? (
+              <section className="grid gap-2">
+                <input
+                  type="hidden"
+                  name={fields.equipmentRef.name}
+                  value={fixedEquipmentRef}
+                  readOnly
+                />
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-brand-navy">
+                    {definition.equipmentLabel ?? "Unit"}:
+                  </span>{" "}
+                  {fixedEquipmentRef}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isLoadingLastAnswers
+                    ? "Loading previous answers…"
+                    : lastRunAt
+                      ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
+                      : "No previous report for this unit yet."}
+                </p>
+              </section>
+            ) : definition.equipmentLabel ? (
               <section className="grid gap-2">
                 <Label htmlFor={fields.equipmentRef.id}>
                   {definition.equipmentLabel}
@@ -100,6 +243,7 @@ export function InspectionChecklistForm({
                     key={fields.equipmentRef.key}
                     className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
                     required
+                    onChange={(event) => setEquipmentRef(event.target.value)}
                   >
                     <option value="">Select unit…</option>
                     {definition.equipmentChoices.map((choice) => (
@@ -114,6 +258,10 @@ export function InspectionChecklistForm({
                     key={fields.equipmentRef.key}
                     placeholder="e.g. FL-01"
                     autoComplete="off"
+                    onChange={(event) => setEquipmentRef(event.target.value)}
+                    onBlur={(event) =>
+                      setEquipmentRef(event.target.value.trim())
+                    }
                   />
                 )}
                 {fields.equipmentRef.errors ? (
@@ -121,7 +269,22 @@ export function InspectionChecklistForm({
                     {fields.equipmentRef.errors.join(" ")}
                   </p>
                 ) : null}
+                <p className="text-xs text-muted-foreground">
+                  {canLoadLastAnswers
+                    ? isLoadingLastAnswers
+                      ? "Loading previous answers…"
+                      : lastRunAt
+                        ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
+                        : "No previous report for this unit yet."
+                    : "Select a unit to show or use values from the last report."}
+                </p>
               </section>
+            ) : null}
+
+            {!needsEquipmentPick && !fixedEquipmentRef && lastRunAt ? (
+              <p className="text-xs text-muted-foreground">
+                Previous report: {formatMelbourneDateTime(lastRunAt)}
+              </p>
             ) : null}
 
             {definition.instructionNotes ? (
@@ -159,6 +322,10 @@ export function InspectionChecklistForm({
                         : question.type === "RADIO"
                           ? question.options
                           : [];
+                    const value = fieldValue(question.id, field.initialValue);
+                    const lastValue = lastAnswers[question.id] ?? "";
+                    const hasLastValue = Boolean(lastValue);
+                    const inputKey = `${field.key}-${value}`;
 
                     return (
                       <li
@@ -179,17 +346,26 @@ export function InspectionChecklistForm({
                           </p>
                         ) : null}
 
+                        {canLoadLastAnswers ? (
+                          <LastValueToggles
+                            questionId={question.id}
+                            questionType={question.type}
+                            lastValue={lastValue}
+                            hasLastValue={hasLastValue}
+                            showLast={Boolean(showLastByQuestion[question.id])}
+                            useLast={Boolean(useLastByQuestion[question.id])}
+                            onShowChange={toggleShowLast}
+                            onUseChange={toggleUseLast}
+                          />
+                        ) : null}
+
                         {question.type === "TEXT" ? (
                           <div className="mt-3">
                             <textarea
                               id={field.id}
                               name={field.name}
-                              key={field.key}
-                              defaultValue={
-                                typeof field.initialValue === "string"
-                                  ? field.initialValue
-                                  : ""
-                              }
+                              key={inputKey}
+                              defaultValue={value}
                               rows={3}
                               className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
                               placeholder="Enter details…"
@@ -199,20 +375,28 @@ export function InspectionChecklistForm({
                         ) : question.type === "NUMBER" ? (
                           <div className="mt-3">
                             <Input
-                              {...getInputProps(field, { type: "number" })}
-                              key={field.key}
+                              id={field.id}
+                              name={field.name}
+                              key={inputKey}
+                              type="number"
+                              defaultValue={value}
                               inputMode="decimal"
                               step="any"
                               placeholder="e.g. 4025.3"
                               className="max-w-xs"
+                              aria-invalid={Boolean(field.errors)}
                             />
                           </div>
                         ) : question.type === "DATE" ? (
                           <div className="mt-3">
                             <Input
-                              {...getInputProps(field, { type: "date" })}
-                              key={field.key}
+                              id={field.id}
+                              name={field.name}
+                              key={inputKey}
+                              type="date"
+                              defaultValue={value}
                               className="max-w-xs"
+                              aria-invalid={Boolean(field.errors)}
                             />
                           </div>
                         ) : (
@@ -234,12 +418,12 @@ export function InspectionChecklistForm({
                                     )}
                                   >
                                     <input
-                                      {...getInputProps(field, {
-                                        type: "radio",
-                                        value: option,
-                                      })}
+                                      type="radio"
                                       id={optionId}
-                                      key={`${field.key}-${option}`}
+                                      name={field.name}
+                                      value={option}
+                                      key={`${inputKey}-${option}`}
+                                      defaultChecked={value === option}
                                       className="size-4 accent-[var(--brand-navy)]"
                                     />
                                     {option}
@@ -401,6 +585,73 @@ export function InspectionChecklistForm({
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function LastValueToggles({
+  questionId,
+  questionType,
+  lastValue,
+  hasLastValue,
+  showLast,
+  useLast,
+  onShowChange,
+  onUseChange,
+}: {
+  questionId: string;
+  questionType: InspectionQuestionType;
+  lastValue: string;
+  hasLastValue: boolean;
+  showLast: boolean;
+  useLast: boolean;
+  onShowChange: (questionId: string, checked: boolean) => void;
+  onUseChange: (questionId: string, checked: boolean) => void;
+}) {
+  return (
+    <div className="mt-2 grid gap-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={showLast}
+            onChange={(event) =>
+              onShowChange(questionId, event.target.checked)
+            }
+            className="size-4 accent-[var(--brand-navy)]"
+          />
+          Show last value
+        </label>
+        <label
+          className={cn(
+            "inline-flex items-center gap-2 text-xs text-muted-foreground",
+            !hasLastValue && "opacity-50",
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={useLast}
+            disabled={!hasLastValue}
+            onChange={(event) => onUseChange(questionId, event.target.checked)}
+            className="size-4 accent-[var(--brand-navy)]"
+          />
+          Use last value
+        </label>
+      </div>
+      {showLast ? (
+        <p className="text-xs text-muted-foreground">
+          {hasLastValue ? (
+            <>
+              Last value:{" "}
+              <span className="font-medium text-foreground">
+                {formatLastAnswerDisplay(lastValue, questionType)}
+              </span>
+            </>
+          ) : (
+            "No previous value for this question."
+          )}
+        </p>
+      ) : null}
     </div>
   );
 }

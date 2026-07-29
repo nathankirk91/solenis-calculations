@@ -87,7 +87,9 @@ export function createInspectionSchema(definition: InspectionDefinition) {
       responses: z.object(responseShape),
     })
     .superRefine((value, ctx) => {
-      if (definition.equipmentChoices?.length) {
+      if (definition.fixedEquipmentRef) {
+        // Unit is locked on the form; no picker validation needed.
+      } else if (definition.equipmentChoices?.length) {
         const allowed = new Set(
           definition.equipmentChoices.map((choice) => choice.value),
         );
@@ -132,7 +134,8 @@ export function createInspectionSchema(definition: InspectionDefinition) {
 
       return {
         operatorId: value.operatorId,
-        equipmentRef: value.equipmentRef ?? null,
+        equipmentRef:
+          definition.fixedEquipmentRef ?? value.equipmentRef ?? null,
         notes: value.notes ?? null,
         signature: value.signature,
         responses,

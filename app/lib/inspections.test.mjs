@@ -108,4 +108,53 @@ function passResponses(definition) {
   assert.equal(answers[1]?.answer, "Spill near bay 2");
 }
 
+{
+  const { buildLastAnswerMap, formatLastAnswerDisplay } = await import(
+    "./inspections.ts"
+  );
+
+  const map = buildLastAnswerMap([
+    {
+      questionId: "forklift-daily-check__service-date",
+      answer: "2026-07-15",
+    },
+    { questionId: "forklift-daily-check__hour-meter", answer: "4025.3" },
+    { questionId: "empty", answer: "   " },
+    { questionId: "", answer: "ignored" },
+  ]);
+
+  assert.deepEqual(map, {
+    "forklift-daily-check__service-date": "2026-07-15",
+    "forklift-daily-check__hour-meter": "4025.3",
+  });
+  assert.equal(
+    formatLastAnswerDisplay("2026-07-15", "DATE"),
+    "15 July 2026",
+  );
+  assert.equal(formatLastAnswerDisplay("4025.3", "NUMBER"), "4025.3");
+}
+
+{
+  const {
+    FORKLIFT_DAILY_CHECK_TEMPLATE,
+    FORKLIFT_UNIT_FORMS,
+    getFallbackInspectionByIdOrSlug,
+  } = await import("./inspections.ts");
+
+  assert.equal(FORKLIFT_DAILY_CHECK_TEMPLATE.isAvailable, false);
+  assert.equal(FORKLIFT_UNIT_FORMS.length, 6);
+  for (const form of FORKLIFT_UNIT_FORMS) {
+    assert.equal(
+      form.templateInspectionId,
+      FORKLIFT_DAILY_CHECK_TEMPLATE.id,
+    );
+    assert.ok(form.fixedEquipmentRef);
+    assert.equal(form.isAvailable, true);
+    assert.equal(form.questions.length, 0);
+  }
+  const unit = getFallbackInspectionByIdOrSlug("forklift-daily-check-h57168");
+  assert.equal(unit?.fixedEquipmentRef, "H57168");
+  assert.equal(unit?.templateInspectionId, "forklift-daily-check");
+}
+
 console.log("inspections tests passed");
