@@ -10,7 +10,7 @@
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "test:calc": "node --experimental-strip-types app/lib/polymer-adipic-deta.test.mjs && node --experimental-strip-types app/lib/pending-run-loads.test.mjs && node --experimental-strip-types app/lib/datetime.test.mjs && node --experimental-strip-types app/lib/inspections.test.mjs",
+    "test:calc": "node --experimental-strip-types app/lib/polymer-adipic-deta.test.mjs && node --experimental-strip-types app/lib/pending-run-loads.test.mjs && node --experimental-strip-types app/lib/datetime.test.mjs && node --experimental-strip-types app/lib/inspections.test.mjs && node --experimental-strip-types app/lib/inspection-history.test.mjs",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

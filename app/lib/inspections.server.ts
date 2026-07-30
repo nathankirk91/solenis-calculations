@@ -1,8 +1,14 @@
 import { Prisma } from "../../generated/prisma/client";
 import { getPrisma } from "~/lib/db.server";
-import { startOfMelbourneWeek } from "~/lib/datetime";
+import { melbourneDayBounds, startOfMelbourneWeek } from "~/lib/datetime";
+import {
+  parseInspectionHistorySort,
+  sortInspectionHistoryItems,
+  type InspectionHistorySort,
+} from "~/lib/inspection-history";
 import {
   FALLBACK_INSPECTIONS,
+  FORKLIFT_UNITS,
   INSPECTION_DEFINITIONS,
   buildAnswersFromResponses,
   buildLastAnswerMap,
@@ -24,6 +30,8 @@ import {
   type InspectionSummary,
   type LastInspectionAnswers,
 } from "~/lib/inspections";
+
+export type { InspectionHistorySort };
 
 export type InspectionRunStatus = "PASSED" | "NEEDS_ATTENTION";
 
@@ -88,9 +96,35 @@ export type InspectionHistoryItem = {
   notes: string | null;
   signature: string | null;
   summary: InspectionSummary;
+  /** Actions raised on this run (open + closed). */
+  actionCount: number;
   answers: InspectionAnswerRecord[];
   responseRows: InspectionResponseRow[];
   actions: InspectionActionItem[];
+};
+
+export type ForkliftDayUnitStatus = {
+  value: string;
+  label: string;
+  checked: boolean;
+  runCount: number;
+  latest: {
+    id: string;
+    status: InspectionRunStatus;
+    createdAt: Date;
+    operatorName: string | null;
+    attentionCount: number;
+    actionCount: number;
+  } | null;
+};
+
+export type ForkliftDayDashboard = {
+  date: string;
+  units: ForkliftDayUnitStatus[];
+  checkedCount: number;
+  totalUnits: number;
+  needsAttentionCount: number;
+  actionsRaisedCount: number;
 };
 
 export type InspectionActionStatus = "OPEN" | "CLOSED";
@@ -1507,14 +1541,31 @@ function parseAnswers(value: unknown): InspectionAnswerRecord[] {
 }
 
 export async function listInspectionHistory(
-  limit = 50,
+  options: {
+    limit?: number;
+    /** Melbourne civil date YYYY-MM-DD. */
+    date?: string | null;
+    sort?: InspectionHistorySort | string | null;
+  } = {},
 ): Promise<InspectionHistoryItem[]> {
   const prisma = getPrisma();
   if (!prisma) {
     return [];
   }
 
+  const limit = options.limit ?? 50;
+  const sort = parseInspectionHistorySort(options.sort ?? null);
+  const bounds = options.date ? melbourneDayBounds(options.date) : null;
+
   const rows = await prisma.inspectionRun.findMany({
+    where: bounds
+      ? {
+          createdAt: {
+            gte: bounds.start,
+            lt: bounds.end,
+          },
+        }
+      : undefined,
     orderBy: { createdAt: "desc" },
     take: limit,
     select: {
@@ -1526,10 +1577,11 @@ export async function listInspectionHistory(
       summary: true,
       inspection: { select: { id: true, title: true, href: true } },
       operator: { select: { name: true } },
+      _count: { select: { actions: true } },
     },
   });
 
-  return rows.map((row) => {
+  const items = rows.map((row) => {
     const summary = parseSummary(row.summary);
     return {
       id: row.id,
@@ -1543,12 +1595,130 @@ export async function listInspectionHistory(
       notes: row.notes,
       signature: null,
       summary,
+      actionCount: row._count.actions,
       // Full answers are loaded on the submission detail page only.
-      answers: [],
-      responseRows: [],
-      actions: [],
+      answers: [] as InspectionAnswerRecord[],
+      responseRows: [] as InspectionResponseRow[],
+      actions: [] as InspectionActionItem[],
     };
   });
+
+  return sortInspectionHistoryItems(items, sort);
+}
+
+/**
+ * Per-unit forklift check status for a Melbourne civil day.
+ * Used by the home dashboard and records quick view.
+ */
+export async function listForkliftChecksForDay(
+  dateYmd: string,
+): Promise<ForkliftDayDashboard> {
+  const empty: ForkliftDayDashboard = {
+    date: dateYmd,
+    units: FORKLIFT_UNITS.map((unit) => ({
+      value: unit.value,
+      label: unit.label,
+      checked: false,
+      runCount: 0,
+      latest: null,
+    })),
+    checkedCount: 0,
+    totalUnits: FORKLIFT_UNITS.length,
+    needsAttentionCount: 0,
+    actionsRaisedCount: 0,
+  };
+
+  const prisma = getPrisma();
+  const bounds = melbourneDayBounds(dateYmd);
+  if (!prisma || !bounds) {
+    return empty;
+  }
+
+  const unitValues = FORKLIFT_UNITS.map((unit) => unit.value);
+
+  const rows = await prisma.inspectionRun.findMany({
+    where: {
+      equipmentRef: { in: [...unitValues] },
+      createdAt: {
+        gte: bounds.start,
+        lt: bounds.end,
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      createdAt: true,
+      equipmentRef: true,
+      summary: true,
+      operator: { select: { name: true } },
+      _count: { select: { actions: true } },
+    },
+  });
+
+  const byUnit = new Map<
+    string,
+    Array<{
+      id: string;
+      status: InspectionRunStatus;
+      createdAt: Date;
+      operatorName: string | null;
+      attentionCount: number;
+      actionCount: number;
+    }>
+  >();
+
+  for (const row of rows) {
+    const ref = row.equipmentRef?.trim();
+    if (!ref) {
+      continue;
+    }
+    const summary = parseSummary(row.summary);
+    const list = byUnit.get(ref) ?? [];
+    list.push({
+      id: row.id,
+      status: row.status,
+      createdAt: row.createdAt,
+      operatorName: row.operator?.name ?? null,
+      attentionCount: summary.attentionCount,
+      actionCount: row._count.actions,
+    });
+    byUnit.set(ref, list);
+  }
+
+  let checkedCount = 0;
+  let needsAttentionCount = 0;
+  let actionsRaisedCount = 0;
+
+  const units: ForkliftDayUnitStatus[] = FORKLIFT_UNITS.map((unit) => {
+    const runs = byUnit.get(unit.value) ?? [];
+    const latest = runs[0] ?? null;
+    if (runs.length > 0) {
+      checkedCount += 1;
+    }
+    for (const run of runs) {
+      if (run.status === "NEEDS_ATTENTION") {
+        needsAttentionCount += 1;
+      }
+      actionsRaisedCount += run.actionCount;
+    }
+    return {
+      value: unit.value,
+      label: unit.label,
+      checked: runs.length > 0,
+      runCount: runs.length,
+      latest,
+    };
+  });
+
+  return {
+    date: dateYmd,
+    units,
+    checkedCount,
+    totalUnits: FORKLIFT_UNITS.length,
+    needsAttentionCount,
+    actionsRaisedCount,
+  };
 }
 
 /**
@@ -1757,6 +1927,7 @@ export async function getInspectionRunById(
     notes: row.notes,
     signature: row.signature ?? null,
     summary: parseSummary(row.summary),
+    actionCount: actionRows.length,
     answers,
     responseRows: answers,
     actions: actionRows.map(mapInspectionAction),

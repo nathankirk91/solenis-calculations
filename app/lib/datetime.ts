@@ -1,5 +1,7 @@
 const MELBOURNE_TIME_ZONE = "Australia/Melbourne";
 
+const YMD_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 export function formatMelbourneDateTime(value: Date | string | null | undefined) {
   if (!value) {
     return null;
@@ -15,6 +17,110 @@ export function formatMelbourneDateTime(value: Date | string | null | undefined)
     timeStyle: "short",
     timeZone: MELBOURNE_TIME_ZONE,
   });
+}
+
+/** Melbourne calendar date only, e.g. "24 July 2026". */
+export function formatMelbourneDate(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleDateString("en-AU", {
+    dateStyle: "medium",
+    timeZone: MELBOURNE_TIME_ZONE,
+  });
+}
+
+/** Melbourne clock time only, e.g. "2:05 pm". */
+export function formatMelbourneTime(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleTimeString("en-AU", {
+    timeStyle: "short",
+    timeZone: MELBOURNE_TIME_ZONE,
+  });
+}
+
+/** Melbourne civil date as YYYY-MM-DD (for date inputs / filters). */
+export function melbourneDateYmd(date: Date = new Date()): string {
+  const { year, month, day } = melbourneYmd(date);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Display label for a YYYY-MM-DD Melbourne civil date, e.g. "30 July 2026". */
+export function formatMelbourneYmd(ymd: string): string | null {
+  const bounds = melbourneDayBounds(ymd);
+  if (!bounds) {
+    return null;
+  }
+  // Midday Melbourne avoids edge cases around midnight DST transitions.
+  const midday = new Date(bounds.start.getTime() + 12 * 60 * 60 * 1000);
+  return formatMelbourneDate(midday);
+}
+
+/** Parse YYYY-MM-DD; returns null if invalid. */
+export function parseYmd(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const match = YMD_RE.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  // Reject impossible dates (e.g. 2026-02-31) via round-trip in UTC.
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+/**
+ * Inclusive Melbourne civil-day bounds as UTC instants:
+ * [start, end) where end is the next Melbourne midnight.
+ */
+export function melbourneDayBounds(ymd: string): { start: Date; end: Date } | null {
+  const parsed = parseYmd(ymd);
+  if (!parsed) {
+    return null;
+  }
+  const [, yearStr, monthStr, dayStr] = YMD_RE.exec(parsed)!;
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const start = melbourneLocalToUtc(year, month, day, 0, 0, 0);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  const end = melbourneLocalToUtc(
+    next.getUTCFullYear(),
+    next.getUTCMonth() + 1,
+    next.getUTCDate(),
+    0,
+    0,
+    0,
+  );
+  return { start, end };
 }
 
 function melbourneYmd(date: Date): { year: number; month: number; day: number } {

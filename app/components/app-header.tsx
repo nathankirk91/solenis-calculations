@@ -300,7 +300,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
             label: "Calculations",
             children: [
               {
-                to: "/",
+                to: "/#calculations",
                 label: "Calculators",
                 description: "Batch make-up calculators",
               },

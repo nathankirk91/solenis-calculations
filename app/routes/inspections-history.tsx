@@ -1,9 +1,11 @@
-import { Link } from "react-router";
+import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inspections-history";
 
 import { AppHeader } from "~/components/app-header";
+import { ForkliftDayDashboardCard } from "~/components/forklift-day-dashboard";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,10 +13,22 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
-import { formatMelbourneDateTime } from "~/lib/datetime";
 import {
+  formatMelbourneDate,
+  formatMelbourneTime,
+  melbourneDateYmd,
+  parseYmd,
+} from "~/lib/datetime";
+import {
+  parseInspectionHistorySort,
+  type InspectionHistorySort,
+} from "~/lib/inspection-history";
+import {
+  listForkliftChecksForDay,
   listInspectionHistory,
   type InspectionRunStatus,
 } from "~/lib/inspections.server";
@@ -27,25 +41,40 @@ export function meta({}: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Completed inspection checklists with pass / needs-attention status.",
+        "Completed inspection checklists with pass / needs-attention status and actions raised.",
     },
   ];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request, "/inspections/history");
-  const [inspections, pendingCount] = await Promise.all([
-    listInspectionHistory(),
+  const url = new URL(request.url);
+  const date =
+    parseYmd(url.searchParams.get("date")) ?? melbourneDateYmd();
+  const sort = parseInspectionHistorySort(url.searchParams.get("sort"));
+
+  const [inspections, forkliftDay, pendingCount] = await Promise.all([
+    listInspectionHistory({ date, sort, limit: 100 }),
+    listForkliftChecksForDay(date),
     canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
   ]);
 
-  return { user, inspections, pendingCount };
+  return { user, inspections, forkliftDay, pendingCount, date, sort };
 }
+
+const SORT_OPTIONS: Array<{ value: InspectionHistorySort; label: string }> = [
+  { value: "newest", label: "Newest first" },
+  { value: "attention", label: "Needs attention first" },
+  { value: "actions", label: "Actions raised first" },
+];
 
 export default function InspectionsHistoryPage({
   loaderData,
 }: Route.ComponentProps) {
-  const { user, inspections, pendingCount } = loaderData;
+  const { user, inspections, forkliftDay, pendingCount, date, sort } =
+    loaderData;
+  const navigation = useNavigation();
+  const filtering = navigation.state !== "idle";
 
   return (
     <div className="app-shell">
@@ -65,25 +94,70 @@ export default function InspectionsHistoryPage({
             Inspection records
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Completed checklists with pass / needs-attention status and
-            Melbourne timestamps.
+            See which forklifts were checked on a given day, filter records by
+            date, and surface runs that need attention or have actions raised.
           </p>
         </div>
+
+        <div className="mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <ForkliftDayDashboardCard
+            dashboard={forkliftDay}
+            filterAction="/inspections/history"
+            hiddenFields={{ sort }}
+          />
+        </div>
+
+        <Form
+          method="get"
+          className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-border/70 bg-background/60 p-4"
+        >
+          <div className="grid gap-1.5">
+            <Label htmlFor="records-date">Filter by date</Label>
+            <Input
+              id="records-date"
+              name="date"
+              type="date"
+              defaultValue={date}
+              className="w-auto"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="records-sort">Sort</Label>
+            <select
+              id="records-sort"
+              name="sort"
+              defaultValue={sort}
+              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button type="submit" variant="secondary" disabled={filtering}>
+            {filtering ? "Updating…" : "Apply"}
+          </Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/inspections/history">Today</Link>
+          </Button>
+        </Form>
 
         {inspections.length === 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>No inspections yet</CardTitle>
+              <CardTitle>No inspections for this day</CardTitle>
               <CardDescription>
-                Completed checklists will appear here with pass / needs
-                attention status.
+                Try another date, or complete a checklist to see it here.
               </CardDescription>
             </CardHeader>
           </Card>
         ) : (
           <div className="grid gap-4">
             {inspections.map((run, index) => {
-              const submittedAt = formatMelbourneDateTime(run.createdAt);
+              const dayLabel = formatMelbourneDate(run.createdAt);
+              const timeLabel = formatMelbourneTime(run.createdAt);
 
               return (
                 <Card
@@ -91,10 +165,18 @@ export default function InspectionsHistoryPage({
                   className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500"
                   style={{ animationDelay: `${60 + index * 30}ms` }}
                 >
-                  <CardHeader className="gap-2">
+                  <CardHeader className="gap-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-xl">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-heading text-2xl font-semibold tracking-tight text-brand-navy sm:text-3xl">
+                          {dayLabel}
+                          {timeLabel ? (
+                            <span className="ml-2 text-lg font-medium text-muted-foreground sm:text-xl">
+                              {timeLabel}
+                            </span>
+                          ) : null}
+                        </p>
+                        <CardTitle className="mt-2 text-lg">
                           <Link
                             to={`/inspections/submissions/${run.id}`}
                             className="underline-offset-4 hover:underline"
@@ -105,14 +187,13 @@ export default function InspectionsHistoryPage({
                         <CardDescription className="mt-1">
                           Operator: {run.operatorName ?? "Unknown"}
                           {run.equipmentRef ? ` · ${run.equipmentRef}` : null}
-                          {submittedAt ? ` · ${submittedAt}` : null}
                         </CardDescription>
                       </div>
                       <InspectionStatusBadge status={run.status} />
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <dl className="grid gap-3 sm:grid-cols-2">
+                    <dl className="grid gap-3 sm:grid-cols-3">
                       <Stat
                         label="Answered"
                         value={String(run.summary.answeredCount)}
@@ -121,6 +202,12 @@ export default function InspectionsHistoryPage({
                         label="Needs attention"
                         value={String(run.summary.attentionCount)}
                         emphasize={run.summary.attentionCount > 0}
+                      />
+                      <Stat
+                        label="Actions raised"
+                        value={String(run.actionCount)}
+                        emphasize={run.actionCount > 0}
+                        emphasizeClassName="text-sky-800"
                       />
                     </dl>
                     {run.summary.attentionItems.length > 0 ? (
@@ -162,10 +249,12 @@ function Stat({
   label,
   value,
   emphasize = false,
+  emphasizeClassName = "text-amber-800",
 }: {
   label: string;
   value: string;
   emphasize?: boolean;
+  emphasizeClassName?: string;
 }) {
   return (
     <div className="grid gap-1">
@@ -175,7 +264,10 @@ function Stat({
       <dd
         className={
           emphasize
-            ? "font-heading text-2xl font-semibold tabular-nums text-amber-800"
+            ? cn(
+                "font-heading text-2xl font-semibold tabular-nums",
+                emphasizeClassName,
+              )
             : "font-heading text-lg font-semibold tabular-nums"
         }
       >
