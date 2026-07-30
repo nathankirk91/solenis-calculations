@@ -109,6 +109,26 @@ export type InspectionActionItem = {
   completionComment: string | null;
 };
 
+/** Missing columns/tables until ensureInspectionSchema (or migrate deploy) runs. */
+function isMissingInspectionSchemaError(error: unknown): boolean {
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String(error.code)
+      : "";
+  if (code === "P2022") {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /applicable_shifts|first_of_week_only|applicable_equipment_refs|show_last_value|template_inspection_id|fixed_equipment_ref|does not exist|ColumnNotFound/i.test(
+    message,
+  );
+}
+
+async function ensureInspectionSchemaReady(): Promise<void> {
+  const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+  await ensureInspectionSchema();
+}
+
 function mapQuestion(row: {
   id: string;
   label: string;
@@ -250,10 +270,50 @@ export async function getInspectionDefinition(
   }
 
   try {
-    const row = await prisma.inspection.findFirst({
-      where: {
-        OR: [{ id: idOrSlug }, { slug: idOrSlug }],
+    return await getInspectionDefinitionOnce(idOrSlug);
+  } catch (error) {
+    if (isMissingInspectionSchemaError(error)) {
+      await ensureInspectionSchemaReady();
+      try {
+        return await getInspectionDefinitionOnce(idOrSlug);
+      } catch {
+        return resolveFallbackDefinition(idOrSlug);
+      }
+    }
+    return resolveFallbackDefinition(idOrSlug);
+  }
+}
+
+async function getInspectionDefinitionOnce(
+  idOrSlug: string,
+): Promise<InspectionDefinition | null> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return resolveFallbackDefinition(idOrSlug);
+  }
+
+  const row = await prisma.inspection.findFirst({
+    where: {
+      OR: [{ id: idOrSlug }, { slug: idOrSlug }],
+    },
+    include: {
+      questions: {
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
       },
+    },
+  });
+
+  if (!row) {
+    return resolveFallbackDefinition(idOrSlug);
+  }
+
+  let questions = row.questions;
+  let shortNameFallback: string | undefined;
+
+  if (row.templateInspectionId) {
+    const template = await prisma.inspection.findUnique({
+      where: { id: row.templateInspectionId },
       include: {
         questions: {
           where: { isActive: true },
@@ -261,46 +321,25 @@ export async function getInspectionDefinition(
         },
       },
     });
-
-    if (!row) {
-      return resolveFallbackDefinition(idOrSlug);
+    if (template) {
+      questions = template.questions;
     }
-
-    let questions = row.questions;
-    let shortNameFallback: string | undefined;
-
-    if (row.templateInspectionId) {
-      const template = await prisma.inspection.findUnique({
-        where: { id: row.templateInspectionId },
-        include: {
-          questions: {
-            where: { isActive: true },
-            orderBy: { sortOrder: "asc" },
-          },
-        },
-      });
-      if (template) {
-        questions = template.questions;
-      }
-      shortNameFallback = getFallbackInspectionByIdOrSlug(row.id)?.shortName;
-    }
-
-    const definition = mapDefinition({ ...row, questions });
-    if (shortNameFallback) {
-      definition.shortName = shortNameFallback;
-    }
-
-    const merged = mergeStaticDefinitionMeta(definition);
-    if (merged.fixedEquipmentRef) {
-      merged.questions = filterQuestionsForEquipment(
-        merged.questions,
-        merged.fixedEquipmentRef,
-      );
-    }
-    return merged;
-  } catch {
-    return resolveFallbackDefinition(idOrSlug);
+    shortNameFallback = getFallbackInspectionByIdOrSlug(row.id)?.shortName;
   }
+
+  const definition = mapDefinition({ ...row, questions });
+  if (shortNameFallback) {
+    definition.shortName = shortNameFallback;
+  }
+
+  const merged = mergeStaticDefinitionMeta(definition);
+  if (merged.fixedEquipmentRef) {
+    merged.questions = filterQuestionsForEquipment(
+      merged.questions,
+      merged.fixedEquipmentRef,
+    );
+  }
+  return merged;
 }
 
 function resolveFallbackDefinition(
@@ -368,21 +407,18 @@ export async function listManagedInspections(): Promise<ManagedInspection[]> {
   try {
     return await listManagedInspectionsOnce();
   } catch (error) {
-    const code =
-      error && typeof error === "object" && "code" in error
-        ? String(error.code)
-        : "";
-    if (code === "P2021") {
-      return [];
+    if (!isMissingInspectionSchemaError(error)) {
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? String(error.code)
+          : "";
+      if (code === "P2021") {
+        return [];
+      }
+      throw error;
     }
-    // New template columns may be missing until embedded schema ensure runs.
-    const message = error instanceof Error ? error.message : String(error);
-    if (/template_inspection_id|fixed_equipment_ref|does not exist/i.test(message)) {
-      const { ensureInspectionSchema } = await import("~/lib/migrate.server");
-      await ensureInspectionSchema();
-      return listManagedInspectionsOnce();
-    }
-    throw error;
+    await ensureInspectionSchemaReady();
+    return listManagedInspectionsOnce();
   }
 }
 
@@ -437,6 +473,20 @@ async function listManagedInspectionsOnce(): Promise<ManagedInspection[]> {
 }
 
 export async function getManagedInspection(
+  id: string,
+): Promise<ManagedInspectionDetail | null> {
+  try {
+    return await getManagedInspectionOnce(id);
+  } catch (error) {
+    if (!isMissingInspectionSchemaError(error)) {
+      throw error;
+    }
+    await ensureInspectionSchemaReady();
+    return getManagedInspectionOnce(id);
+  }
+}
+
+async function getManagedInspectionOnce(
   id: string,
 ): Promise<ManagedInspectionDetail | null> {
   const prisma = getPrisma();
@@ -511,7 +561,7 @@ export async function getManagedInspection(
   // Only backfill version 1 when this question-source inspection has no history yet.
   if (!inheritsQuestions && versionRows.length === 0) {
     await ensureBaselineInspectionVersion(row.id);
-    return getManagedInspection(id);
+    return getManagedInspectionOnce(id);
   }
 
   const definition = mergeStaticDefinitionMeta(
