@@ -101,15 +101,9 @@ export function createInspectionFormSchema(
           .max(2000, "Notes must be under 2000 characters.")
           .optional(),
       ),
-      actions: z.preprocess((value) => {
-        if (value == null || value === "") {
-          return [];
-        }
-        if (Array.isArray(value)) {
-          return value;
-        }
-        return [value];
-      }, z.array(z.string().trim().max(2000, "Keep each action under 2000 characters."))),
+      actions: z
+        .array(z.string().trim().max(2000, "Keep each action under 2000 characters."))
+        .default([]),
       signature: z
         .string({ error: "Signature is required." })
         .min(1, "Please sign or initial the form."),

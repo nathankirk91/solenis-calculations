@@ -167,7 +167,7 @@ function mapQuestion(row: {
     showLastValue: Boolean(row.showLastValue),
     applicableEquipmentRefs: parseStringArray(row.applicableEquipmentRefs),
     applicableShifts: parseStringArray(row.applicableShifts),
-    firstOfWeekOnly: Boolean(row.firstOfWeekOnly),
+    firstOfWeekOnly: row.firstOfWeekOnly === true,
     sortOrder: row.sortOrder,
   };
 }
@@ -270,11 +270,17 @@ export async function getInspectionDefinition(
   }
 
   try {
+    const { ensureForkliftShiftWeekFlags } = await import("~/lib/migrate.server");
+    await ensureForkliftShiftWeekFlags();
     return await getInspectionDefinitionOnce(idOrSlug);
   } catch (error) {
     if (isMissingInspectionSchemaError(error)) {
       await ensureInspectionSchemaReady();
       try {
+        const { ensureForkliftShiftWeekFlags } = await import(
+          "~/lib/migrate.server"
+        );
+        await ensureForkliftShiftWeekFlags();
         return await getInspectionDefinitionOnce(idOrSlug);
       } catch {
         return resolveFallbackDefinition(idOrSlug);
@@ -640,7 +646,7 @@ function parseVersionSnapshot(value: unknown): InspectionVersionSnapshot {
           applicableShifts: Array.isArray(row.applicableShifts)
             ? row.applicableShifts.map(String)
             : [],
-          firstOfWeekOnly: Boolean(row.firstOfWeekOnly),
+          firstOfWeekOnly: row.firstOfWeekOnly === true,
           sortOrder: Number(row.sortOrder ?? 0),
         } satisfies InspectionQuestionDef;
       })

@@ -39,6 +39,66 @@ export async function ensureInspectionSchema(): Promise<void> {
   await inspectionSchemaReady;
 }
 
+/**
+ * Cheap, memoized repair for forklift shift/week question flags.
+ * ensureInspectionSchema only runs on cold schema misses — this still runs
+ * after columns exist so bad flags (e.g. engine oil marked Day-only) get cleared.
+ */
+let forkliftShiftWeekFlagsReady: Promise<void> | null = null;
+
+export async function ensureForkliftShiftWeekFlags(): Promise<void> {
+  if (!forkliftShiftWeekFlagsReady) {
+    forkliftShiftWeekFlagsReady = ensureForkliftShiftWeekFlagsOnce().catch(
+      (error) => {
+        forkliftShiftWeekFlagsReady = null;
+        throw error;
+      },
+    );
+  }
+  await forkliftShiftWeekFlagsReady;
+}
+
+async function ensureForkliftShiftWeekFlagsOnce(): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return;
+  }
+
+  await ensureInspectionSchema();
+
+  await prisma.$executeRawUnsafe(
+    `UPDATE "inspection_questions"
+     SET "applicable_shifts" = '["Day"]'::jsonb,
+         "first_of_week_only" = true,
+         "required" = true
+     WHERE "id" IN (
+       'forklift-daily-check__scrubber-drained',
+       'forklift-daily-check__scrubber-washed',
+       'forklift-daily-check__flameproofers',
+       'forklift-daily-check__anode',
+       'forklift-daily-check__air-receiver'
+     )`,
+  );
+
+  await prisma.$executeRawUnsafe(
+    `UPDATE "inspection_questions"
+     SET "applicable_shifts" = NULL,
+         "first_of_week_only" = false
+     WHERE "id" LIKE 'forklift-daily-check__%'
+       AND "id" NOT IN (
+         'forklift-daily-check__scrubber-drained',
+         'forklift-daily-check__scrubber-washed',
+         'forklift-daily-check__flameproofers',
+         'forklift-daily-check__anode',
+         'forklift-daily-check__air-receiver'
+       )
+       AND (
+         "applicable_shifts" IS NOT NULL
+         OR "first_of_week_only" = true
+       )`,
+  );
+}
+
 async function ensureInspectionSchemaOnce(): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) {

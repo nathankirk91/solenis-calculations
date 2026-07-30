@@ -12,7 +12,12 @@ import {
   FORKLIFT_INSPECTIONS_HREF,
   isForkliftUnitInspection,
 } from "~/lib/inspections";
-import { getInspectionDefinition } from "~/lib/inspections.server";
+import {
+  getInspectionDefinition,
+  getLastAnswersForInspection,
+  isFirstInspectionOfWeek,
+  listOpenInspectionActions,
+} from "~/lib/inspections.server";
 import { listActiveOperators } from "~/lib/operators.server";
 import { canReviewRuns } from "~/lib/roles";
 
@@ -33,12 +38,60 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
 
   const user = await requireUser(request, definition.href);
-  const [operators, pendingCount] = await Promise.all([
-    listActiveOperators(),
-    canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
-  ]);
+  const url = new URL(request.url);
+  const shiftParam = url.searchParams.get("shift")?.trim() || null;
+  const equipmentParam = url.searchParams.get("equipmentRef")?.trim() || null;
+  const equipmentRef =
+    definition.fixedEquipmentRef?.trim() || equipmentParam || null;
 
-  return { user, operators, pendingCount, definition };
+  const needsEquipmentPick =
+    Boolean(definition.equipmentLabel) && !definition.fixedEquipmentRef;
+  const canLoadScopedData = !needsEquipmentPick || Boolean(equipmentRef);
+  const needsWeekStatus = definition.questions.some(
+    (question) => question.firstOfWeekOnly,
+  );
+
+  const [operators, pendingCount, lastAnswersResult, openActions, firstOfWeek] =
+    await Promise.all([
+      listActiveOperators(),
+      canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
+      canLoadScopedData
+        ? getLastAnswersForInspection({
+            inspectionId: definition.id,
+            equipmentRef,
+          })
+        : Promise.resolve({
+            answers: {} as Record<string, string>,
+            runId: null as string | null,
+            createdAt: null as string | null,
+          }),
+      canLoadScopedData
+        ? listOpenInspectionActions({
+            inspectionId: definition.id,
+            equipmentRef,
+          })
+        : Promise.resolve([]),
+      needsWeekStatus && canLoadScopedData && shiftParam
+        ? isFirstInspectionOfWeek({
+            inspectionId: definition.id,
+            equipmentRef,
+            shift: shiftParam,
+          })
+        : Promise.resolve(false),
+    ]);
+
+  return {
+    user,
+    operators,
+    pendingCount,
+    definition,
+    selectedShift: shiftParam,
+    equipmentRef,
+    isFirstInspectionOfWeek: firstOfWeek,
+    lastAnswers: lastAnswersResult.answers,
+    lastRunAt: lastAnswersResult.createdAt,
+    openActions,
+  };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -55,7 +108,18 @@ export default function InspectionPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { definition, user, operators, pendingCount } = loaderData;
+  const {
+    definition,
+    user,
+    operators,
+    pendingCount,
+    selectedShift,
+    equipmentRef,
+    isFirstInspectionOfWeek,
+    lastAnswers,
+    lastRunAt,
+    openActions,
+  } = loaderData;
   const backToForklifts = isForkliftUnitInspection(definition);
 
   return (
@@ -84,6 +148,12 @@ export default function InspectionPage({
           <InspectionChecklistForm
             definition={definition}
             operators={operators}
+            selectedShift={selectedShift}
+            equipmentRef={equipmentRef}
+            isFirstInspectionOfWeek={isFirstInspectionOfWeek}
+            lastAnswers={lastAnswers}
+            lastRunAt={lastRunAt}
+            openActions={openActions}
             lastResult={actionData?.lastResult}
             summary={actionData?.summary}
             status={actionData?.status}

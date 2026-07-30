@@ -6,8 +6,7 @@ import {
   type SubmissionResult,
 } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
-import { Form, useFetcher, useNavigation } from "react-router";
-import { useEffect, useState } from "react";
+import { Form, useNavigation, useSearchParams } from "react-router";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -32,7 +31,6 @@ import {
   type InspectionDefinition,
   type InspectionQuestionType,
   type InspectionSummary,
-  type LastInspectionAnswers,
 } from "~/lib/inspections";
 import type { InspectionActionItem } from "~/lib/inspections.server";
 import type { OperatorOption } from "~/lib/operators.server";
@@ -42,6 +40,14 @@ import { cn } from "~/lib/utils";
 type Props = {
   definition: InspectionDefinition;
   operators: OperatorOption[];
+  /** Shift from the route loader (URL ?shift=). */
+  selectedShift: string | null;
+  /** Equipment from the route loader (fixed unit or ?equipmentRef=). */
+  equipmentRef: string | null;
+  isFirstInspectionOfWeek: boolean;
+  lastAnswers: Record<string, string>;
+  lastRunAt: string | null;
+  openActions: InspectionActionItem[];
   lastResult?: SubmissionResult<string[]> | null;
   summary?: InspectionSummary | null;
   status?: InspectionSummary["status"] | null;
@@ -51,71 +57,55 @@ type Props = {
 export function InspectionChecklistForm({
   definition,
   operators,
+  selectedShift,
+  equipmentRef,
+  isFirstInspectionOfWeek,
+  lastAnswers,
+  lastRunAt,
+  openActions,
   lastResult,
   summary,
   status,
   formError,
 }: Props) {
   const navigation = useNavigation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isSubmitting = navigation.state !== "idle";
+  const isRevalidating =
+    navigation.state === "loading" &&
+    navigation.formMethod == null &&
+    Boolean(navigation.location);
+
   const shiftQuestion = findShiftQuestion(definition.questions);
-  const needsWeekStatus = definition.questions.some(
-    (question) => question.firstOfWeekOnly,
-  );
-  const [selectedShift, setSelectedShift] = useState("");
-  const [isFirstInspectionOfWeek, setIsFirstInspectionOfWeek] = useState(false);
-  const [weekStatusReady, setWeekStatusReady] = useState(!needsWeekStatus);
-  const [signature, setSignature] = useState("");
   const fixedEquipmentRef = definition.fixedEquipmentRef?.trim() || "";
-  const [equipmentRef, setEquipmentRef] = useState(fixedEquipmentRef);
-  const [equipmentRefForFetch, setEquipmentRefForFetch] =
-    useState(fixedEquipmentRef);
-  const [responseOverrides, setResponseOverrides] = useState<
-    Record<string, string>
-  >({});
-  const [actionFields, setActionFields] = useState<string[]>([""]);
-
-  const shiftAnswer = (
-    (shiftQuestion && responseOverrides[shiftQuestion.id]) ||
-    selectedShift
-  ).trim();
-
-  // Hide first-of-week questions until week-status is known for the selected
-  // shift — otherwise they flash on (default) then disappear after the fetch.
-  const weekGateReady = !needsWeekStatus || !shiftAnswer || weekStatusReady;
-  const schema = createInspectionFormSchema(definition, {
-    isFirstInspectionOfWeek: weekGateReady && isFirstInspectionOfWeek,
-  });
-  const visibleQuestions = filterQuestionsForContext(definition.questions, {
-    shift: shiftAnswer || null,
-    isFirstInspectionOfWeek: weekGateReady && isFirstInspectionOfWeek,
-  });
-  const sections = groupQuestionsBySection(visibleQuestions);
-
+  const needsEquipmentPick =
+    Boolean(definition.equipmentLabel) && !fixedEquipmentRef;
+  const canLoadScopedData = !needsEquipmentPick || Boolean(equipmentRef?.trim());
   const needsLastAnswers = definition.questions.some(
     (question) => question.showLastValue,
   );
 
-  const lastAnswersFetcher = useFetcher<LastInspectionAnswers>();
-  const openActionsFetcher = useFetcher<{ actions: InspectionActionItem[] }>();
-  const weekStatusFetcher = useFetcher<{ isFirstInspectionOfWeek: boolean }>();
-  const lastAnswers = lastAnswersFetcher.data?.answers ?? {};
-  const lastRunAt = lastAnswersFetcher.data?.createdAt ?? null;
-  const openActions = openActionsFetcher.data?.actions ?? [];
-  const needsEquipmentPick =
-    Boolean(definition.equipmentLabel) && !fixedEquipmentRef;
-  const canLoadScopedData =
-    !needsEquipmentPick || Boolean(equipmentRefForFetch.trim());
-  const canLoadLastAnswers = needsLastAnswers && canLoadScopedData;
-  const isLoadingLastAnswers =
-    lastAnswersFetcher.state === "loading" ||
-    lastAnswersFetcher.state === "submitting";
-  const isLoadingOpenActions =
-    openActionsFetcher.state === "loading" ||
-    openActionsFetcher.state === "submitting";
+  // Pending URL while the loader revalidates — radio UI only, not filtering.
+  const pendingShift = isRevalidating
+    ? new URLSearchParams(navigation.location?.search ?? "").get("shift")
+    : null;
+  const displayShift = pendingShift ?? selectedShift ?? "";
+
+  // Filtering uses loader data only (shift + week status from the same request).
+  const schema = createInspectionFormSchema(definition, {
+    isFirstInspectionOfWeek,
+  });
+  const visibleQuestions = filterQuestionsForContext(definition.questions, {
+    shift: selectedShift,
+    isFirstInspectionOfWeek,
+  });
+  const sections = groupQuestionsBySection(visibleQuestions);
 
   const defaultResponses = Object.fromEntries(
-    definition.questions.map((question) => [question.id, ""]),
+    definition.questions.map((question) => [
+      question.id,
+      question.id === shiftQuestion?.id && selectedShift ? selectedShift : "",
+    ]),
   );
 
   const [form, fields] = useForm({
@@ -127,157 +117,39 @@ export function InspectionChecklistForm({
     shouldRevalidate: "onInput",
     defaultValue: {
       operatorId: "",
-      equipmentRef: fixedEquipmentRef,
+      equipmentRef: fixedEquipmentRef || equipmentRef || "",
       notes: "",
       signature: "",
+      actions: [""],
       responses: defaultResponses,
     },
   });
 
   const responseFields = fields.responses.getFieldset();
+  const actionFields = fields.actions.getFieldList();
 
-  useEffect(() => {
-    if (fixedEquipmentRef) {
-      setEquipmentRef(fixedEquipmentRef);
-      setEquipmentRefForFetch(fixedEquipmentRef);
-      return;
+  function updateSearchParam(key: string, value: string) {
+    const next = new URLSearchParams(searchParams);
+    if (value.trim()) {
+      next.set(key, value.trim());
+    } else {
+      next.delete(key);
     }
-    if (definition.equipmentChoices?.length) {
-      setEquipmentRefForFetch(equipmentRef);
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      setEquipmentRefForFetch(equipmentRef.trim());
-    }, 400);
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    equipmentRef,
-    definition.equipmentChoices?.length,
-    fixedEquipmentRef,
-  ]);
-
-  useEffect(() => {
-    setResponseOverrides({});
-    setSelectedShift("");
-    setWeekStatusReady(!needsWeekStatus);
-    setIsFirstInspectionOfWeek(false);
-  }, [equipmentRefForFetch, needsWeekStatus]);
-
-  useEffect(() => {
-    if (!canLoadLastAnswers) {
-      return;
-    }
-
-    const params = new URLSearchParams();
-    if (equipmentRefForFetch.trim()) {
-      params.set("equipmentRef", equipmentRefForFetch.trim());
-    }
-    const query = params.toString();
-    const href = `/inspections/${definition.id}/last-answers${
-      query ? `?${query}` : ""
-    }`;
-    lastAnswersFetcher.load(href);
-    // fetcher identity is unstable; load when inspection/equipment changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [definition.id, equipmentRefForFetch, canLoadLastAnswers]);
-
-  useEffect(() => {
-    if (!canLoadScopedData) {
-      return;
-    }
-
-    const params = new URLSearchParams();
-    if (equipmentRefForFetch.trim()) {
-      params.set("equipmentRef", equipmentRefForFetch.trim());
-    }
-    const query = params.toString();
-    const href = `/inspections/${definition.id}/open-actions${
-      query ? `?${query}` : ""
-    }`;
-    openActionsFetcher.load(href);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [definition.id, equipmentRefForFetch, canLoadScopedData]);
-
-  useEffect(() => {
-    if (!needsWeekStatus) {
-      setWeekStatusReady(true);
-      setIsFirstInspectionOfWeek(true);
-      return;
-    }
-    if (!canLoadScopedData || !shiftAnswer) {
-      setWeekStatusReady(false);
-      setIsFirstInspectionOfWeek(false);
-      return;
-    }
-
-    setWeekStatusReady(false);
-    const params = new URLSearchParams();
-    if (equipmentRefForFetch.trim()) {
-      params.set("equipmentRef", equipmentRefForFetch.trim());
-    }
-    params.set("shift", shiftAnswer);
-    const href = `/inspections/${definition.id}/week-status?${params.toString()}`;
-    weekStatusFetcher.load(href);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [
-    definition.id,
-    equipmentRefForFetch,
-    shiftAnswer,
-    needsWeekStatus,
-    canLoadScopedData,
-  ]);
-
-  useEffect(() => {
-    if (weekStatusFetcher.state !== "idle" || !weekStatusFetcher.data) {
-      return;
-    }
-    setIsFirstInspectionOfWeek(
-      Boolean(weekStatusFetcher.data.isFirstInspectionOfWeek),
-    );
-    setWeekStatusReady(true);
-  }, [weekStatusFetcher.state, weekStatusFetcher.data]);
-
-  function fieldValue(
-    questionId: string,
-    initialValue: unknown,
-  ): string {
-    if (Object.prototype.hasOwnProperty.call(responseOverrides, questionId)) {
-      return responseOverrides[questionId] ?? "";
-    }
-    return typeof initialValue === "string" ? initialValue : "";
+    setSearchParams(next, { replace: true, preventScrollReset: true });
   }
 
-  function useLastValue(questionId: string) {
+  function useLastValue(questionId: string, fieldName: string) {
     const lastValue = lastAnswers[questionId];
     if (!lastValue) {
       return;
     }
-    setResponseOverrides((previous) => ({
-      ...previous,
-      [questionId]: lastValue,
-    }));
-  }
-
-  function updateActionField(index: number, value: string) {
-    setActionFields((previous) =>
-      previous.map((item, itemIndex) =>
-        itemIndex === index ? value : item,
-      ),
-    );
-  }
-
-  function addActionField() {
-    setActionFields((previous) => [...previous, ""]);
-  }
-
-  function removeActionField(index: number) {
-    setActionFields((previous) => {
-      if (previous.length <= 1) {
-        return [""];
-      }
-      return previous.filter((_, itemIndex) => itemIndex !== index);
+    form.update({
+      name: fieldName,
+      value: lastValue,
+      validated: false,
     });
   }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
       <Card>
@@ -306,11 +178,9 @@ export function InspectionChecklistForm({
                 </p>
                 {needsLastAnswers ? (
                   <p className="text-xs text-muted-foreground">
-                    {isLoadingLastAnswers
-                      ? "Loading previous answers…"
-                      : lastRunAt
-                        ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
-                        : "No previous report for this unit yet."}
+                    {lastRunAt
+                      ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
+                      : "No previous report for this unit yet."}
                   </p>
                 ) : null}
               </section>
@@ -325,7 +195,10 @@ export function InspectionChecklistForm({
                     key={fields.equipmentRef.key}
                     className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
                     required
-                    onChange={(event) => setEquipmentRef(event.target.value)}
+                    defaultValue={equipmentRef ?? ""}
+                    onChange={(event) =>
+                      updateSearchParam("equipmentRef", event.target.value)
+                    }
                   >
                     <option value="">Select unit…</option>
                     {definition.equipmentChoices.map((choice) => (
@@ -340,9 +213,9 @@ export function InspectionChecklistForm({
                     key={fields.equipmentRef.key}
                     placeholder="e.g. FL-01"
                     autoComplete="off"
-                    onChange={(event) => setEquipmentRef(event.target.value)}
+                    defaultValue={equipmentRef ?? ""}
                     onBlur={(event) =>
-                      setEquipmentRef(event.target.value.trim())
+                      updateSearchParam("equipmentRef", event.target.value)
                     }
                   />
                 )}
@@ -353,25 +226,14 @@ export function InspectionChecklistForm({
                 ) : null}
                 {needsLastAnswers ? (
                   <p className="text-xs text-muted-foreground">
-                    {canLoadLastAnswers
-                      ? isLoadingLastAnswers
-                        ? "Loading previous answers…"
-                        : lastRunAt
-                          ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
-                          : "No previous report for this unit yet."
+                    {canLoadScopedData
+                      ? lastRunAt
+                        ? `Previous report: ${formatMelbourneDateTime(lastRunAt)}`
+                        : "No previous report for this unit yet."
                       : "Select a unit to load previous answers."}
                   </p>
                 ) : null}
               </section>
-            ) : null}
-
-            {needsLastAnswers &&
-            !needsEquipmentPick &&
-            !fixedEquipmentRef &&
-            lastRunAt ? (
-              <p className="text-xs text-muted-foreground">
-                Previous report: {formatMelbourneDateTime(lastRunAt)}
-              </p>
             ) : null}
 
             {definition.instructionNotes ? (
@@ -383,6 +245,12 @@ export function InspectionChecklistForm({
             {definition.questions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 This inspection has no questions yet. Ask a manager to add some.
+              </p>
+            ) : null}
+
+            {isRevalidating && shiftQuestion ? (
+              <p className="text-xs text-muted-foreground">
+                Updating checklist for {displayShift || "selected"} shift…
               </p>
             ) : null}
 
@@ -403,8 +271,10 @@ export function InspectionChecklistForm({
                       field?.name ?? `responses[${question.id}]`;
                     const fieldId = field?.id ?? question.id;
                     const fieldKey = field?.key ?? question.id;
-                    const fieldInitial = field?.initialValue;
                     const fieldErrors = field?.errors;
+                    const isShiftField =
+                      Boolean(shiftQuestion) &&
+                      question.id === shiftQuestion?.id;
 
                     const choices =
                       question.type === "YES_NO"
@@ -412,13 +282,18 @@ export function InspectionChecklistForm({
                         : question.type === "RADIO"
                           ? question.options
                           : [];
-                    const value = fieldValue(question.id, fieldInitial);
+                    const value = isShiftField
+                      ? displayShift
+                      : typeof field?.value === "string"
+                        ? field.value
+                        : typeof field?.initialValue === "string"
+                          ? field.initialValue
+                          : "";
                     const lastValue = lastAnswers[question.id] ?? "";
                     const showConfiguredLastValue =
                       question.showLastValue &&
-                      canLoadLastAnswers &&
+                      canLoadScopedData &&
                       Boolean(lastValue);
-                    const inputKey = `${fieldKey}-${value}`;
 
                     return (
                       <li
@@ -445,7 +320,7 @@ export function InspectionChecklistForm({
                             questionType={question.type}
                             lastValue={lastValue}
                             currentValue={value}
-                            onUse={() => useLastValue(question.id)}
+                            onUse={() => useLastValue(question.id, fieldName)}
                           />
                         ) : null}
 
@@ -454,7 +329,7 @@ export function InspectionChecklistForm({
                             <textarea
                               id={fieldId}
                               name={fieldName}
-                              key={inputKey}
+                              key={fieldKey}
                               defaultValue={value}
                               rows={3}
                               className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
@@ -467,7 +342,7 @@ export function InspectionChecklistForm({
                             <Input
                               id={fieldId}
                               name={fieldName}
-                              key={inputKey}
+                              key={fieldKey}
                               type="number"
                               defaultValue={value}
                               inputMode="decimal"
@@ -482,7 +357,7 @@ export function InspectionChecklistForm({
                             <Input
                               id={fieldId}
                               name={fieldName}
-                              key={inputKey}
+                              key={fieldKey}
                               type="date"
                               defaultValue={value}
                               className="max-w-xs"
@@ -512,21 +387,19 @@ export function InspectionChecklistForm({
                                       id={optionId}
                                       name={fieldName}
                                       value={option}
-                                      key={`${inputKey}-${option}`}
-                                      defaultChecked={value === option}
-                                      className="size-4 accent-[var(--brand-navy)]"
+                                      checked={value === option}
                                       onChange={() => {
-                                        setResponseOverrides((previous) => ({
-                                          ...previous,
-                                          [question.id]: option,
-                                        }));
-                                        if (
-                                          shiftQuestion &&
-                                          question.id === shiftQuestion.id
-                                        ) {
-                                          setSelectedShift(option);
+                                        if (isShiftField) {
+                                          updateSearchParam("shift", option);
+                                        } else {
+                                          form.update({
+                                            name: fieldName,
+                                            value: option,
+                                            validated: false,
+                                          });
                                         }
                                       }}
+                                      className="size-4 accent-[var(--brand-navy)]"
                                     />
                                     {option}
                                   </label>
@@ -561,18 +434,17 @@ export function InspectionChecklistForm({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={addActionField}
+                  {...form.insert.getButtonProps({
+                    name: fields.actions.name,
+                    defaultValue: "",
+                  })}
                 >
                   Add action
                 </Button>
               </div>
 
               {canLoadScopedData ? (
-                isLoadingOpenActions && openActions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    Checking for open actions…
-                  </p>
-                ) : openActions.length > 0 ? (
+                openActions.length > 0 ? (
                   <div className="rounded-lg border border-amber-500/30 bg-amber-50/70 p-3">
                     <p className="text-sm font-medium text-amber-950">
                       Still open
@@ -605,28 +477,31 @@ export function InspectionChecklistForm({
               )}
 
               <div className="grid gap-3">
-                {actionFields.map((value, index) => (
-                  <div key={`action-${index}`} className="grid gap-2">
+                {actionFields.map((field, index) => (
+                  <div key={field.key} className="grid gap-2">
                     <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor={`action-${index}`}>
-                        Action {index + 1}
-                      </Label>
+                      <Label htmlFor={field.id}>Action {index + 1}</Label>
                       {actionFields.length > 1 ? (
                         <button
                           type="button"
-                          onClick={() => removeActionField(index)}
                           className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
+                          {...form.remove.getButtonProps({
+                            name: fields.actions.name,
+                            index,
+                          })}
                         >
                           Remove
                         </button>
                       ) : null}
                     </div>
                     <textarea
-                      id={`action-${index}`}
-                      name="actions"
-                      value={value}
-                      onChange={(event) =>
-                        updateActionField(index, event.target.value)
+                      id={field.id}
+                      name={field.name}
+                      key={field.key}
+                      defaultValue={
+                        typeof field.initialValue === "string"
+                          ? field.initialValue
+                          : ""
                       }
                       rows={2}
                       className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -692,8 +567,6 @@ export function InspectionChecklistForm({
                 name={fields.signature.name}
                 id={fields.signature.id}
                 required
-                value={signature}
-                onChange={setSignature}
                 error={fields.signature.errors?.join(" ")}
               />
             </section>

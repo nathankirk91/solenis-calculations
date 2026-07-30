@@ -1019,7 +1019,9 @@ export function questionAppliesToShift(
   question: Pick<InspectionQuestionDef, "applicableShifts">,
   shift: string | null | undefined,
 ): boolean {
-  const shifts = question.applicableShifts ?? [];
+  const shifts = Array.isArray(question.applicableShifts)
+    ? question.applicableShifts
+    : [];
   if (shifts.length === 0) {
     return true;
   }
