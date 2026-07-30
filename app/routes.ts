@@ -37,5 +37,9 @@ export default [
     "inspections/:inspectionId/open-actions",
     "routes/inspection-open-actions.tsx",
   ),
+  route(
+    "inspections/:inspectionId/week-status",
+    "routes/inspection-week-status.tsx",
+  ),
   route("inspections/:inspectionId", "routes/inspection-page.tsx"),
 ] satisfies RouteConfig;

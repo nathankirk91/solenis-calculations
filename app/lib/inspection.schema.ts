@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import {
   buildAnswersFromResponses,
+  filterQuestionsForContext,
+  readShiftAnswer,
   summarizeInspectionAnswers,
   type InspectionDefinition,
 } from "~/lib/inspections";
@@ -13,8 +15,17 @@ function emptyToUndefined(value: unknown) {
   return value;
 }
 
-export function createInspectionSchema(definition: InspectionDefinition) {
+export type InspectionSchemaContext = {
+  /** Melbourne Mon–Sun week; defaults to true when omitted. */
+  isFirstInspectionOfWeek?: boolean;
+};
+
+export function createInspectionSchema(
+  definition: InspectionDefinition,
+  context: InspectionSchemaContext = {},
+) {
   const responseShape: Record<string, z.ZodType<string | undefined>> = {};
+  const isFirstInspectionOfWeek = context.isFirstInspectionOfWeek ?? true;
 
   for (const question of definition.questions) {
     if (question.type === "TEXT") {
@@ -45,17 +56,22 @@ export function createInspectionSchema(definition: InspectionDefinition) {
           .optional(),
       );
     } else if (question.type === "YES_NO") {
-      responseShape[question.id] = z.enum(["Yes", "No"], {
-        error: "Select Yes or No.",
-      });
+      responseShape[question.id] = z.preprocess(
+        emptyToUndefined,
+        z.enum(["Yes", "No"], { error: "Select Yes or No." }).optional(),
+      );
     } else {
       const options = question.options;
-      responseShape[question.id] =
+      responseShape[question.id] = z.preprocess(
+        emptyToUndefined,
         options.length > 0
-          ? z.enum(options as [string, ...string[]], {
-              error: "Select an option.",
-            })
-          : z.string().min(1, "Select an option.");
+          ? z
+              .enum(options as [string, ...string[]], {
+                error: "Select an option.",
+              })
+              .optional()
+          : z.string().min(1, "Select an option.").optional(),
+      );
     }
   }
 
@@ -117,7 +133,13 @@ export function createInspectionSchema(definition: InspectionDefinition) {
         });
       }
 
-      for (const question of definition.questions) {
+      const shift = readShiftAnswer(definition.questions, value.responses);
+      const applicableQuestions = filterQuestionsForContext(
+        definition.questions,
+        { shift, isFirstInspectionOfWeek },
+      );
+
+      for (const question of applicableQuestions) {
         const answer = value.responses[question.id];
         if (question.required && (answer == null || String(answer).trim() === "")) {
           ctx.addIssue({
@@ -134,11 +156,19 @@ export function createInspectionSchema(definition: InspectionDefinition) {
       }
     })
     .transform((value) => {
+      const shift = readShiftAnswer(definition.questions, value.responses);
+      const applicableQuestions = filterQuestionsForContext(
+        definition.questions,
+        { shift, isFirstInspectionOfWeek },
+      );
       const responses: Record<string, string> = {};
-      for (const question of definition.questions) {
+      for (const question of applicableQuestions) {
         responses[question.id] = String(value.responses[question.id] ?? "");
       }
-      const answers = buildAnswersFromResponses(definition, responses);
+      const answers = buildAnswersFromResponses(
+        { ...definition, questions: applicableQuestions },
+        responses,
+      );
       const summary = summarizeInspectionAnswers(answers);
 
       return {

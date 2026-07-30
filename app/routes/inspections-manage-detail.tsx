@@ -19,6 +19,7 @@ import { countPendingRuns } from "~/lib/approvals.server";
 import { requireOperatorManager } from "~/lib/auth.server";
 import {
   INSPECTION_QUESTION_TYPES,
+  INSPECTION_SHIFT_OPTIONS,
   YES_NO_OPTIONS,
   looksLikeAttentionOption,
   questionTypeLabel,
@@ -95,6 +96,11 @@ export async function action({ request, params }: Route.ActionArgs) {
         .map(String)
         .map((value) => value.trim())
         .filter(Boolean);
+      const applicableShifts = formData
+        .getAll("applicableShifts")
+        .map(String)
+        .map((value) => value.trim())
+        .filter(Boolean);
       const payload = {
         label: String(formData.get("label") ?? ""),
         helpText: String(formData.get("helpText") ?? ""),
@@ -105,6 +111,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         required: String(formData.get("required") ?? "") === "on",
         showLastValue: String(formData.get("showLastValue") ?? "") === "on",
         applicableEquipmentRefs,
+        applicableShifts,
+        firstOfWeekOnly: String(formData.get("firstOfWeekOnly") ?? "") === "on",
         changeComment,
         changedById: user.id,
       };
@@ -202,6 +210,8 @@ function QuestionFields({
     required?: boolean;
     showLastValue?: boolean;
     applicableEquipmentRefs?: string[];
+    applicableShifts?: string[];
+    firstOfWeekOnly?: boolean;
     attentionValues?: string[];
   };
 }) {
@@ -340,6 +350,47 @@ function QuestionFields({
           </span>
         </span>
       </label>
+      <fieldset className="grid gap-2">
+        <legend className="text-sm font-medium">Applies to shifts</legend>
+        <p className="text-xs text-muted-foreground">
+          Leave all unchecked to include this question on every shift. Tick Day
+          and/or Afternoon to limit it (e.g. weekly items on day shift only).
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {INSPECTION_SHIFT_OPTIONS.map((shift) => (
+            <label
+              key={shift}
+              className="inline-flex items-center gap-2 text-sm"
+            >
+              <input
+                type="checkbox"
+                name="applicableShifts"
+                value={shift}
+                defaultChecked={Boolean(
+                  defaults?.applicableShifts?.includes(shift),
+                )}
+                className="size-4 accent-[var(--brand-navy)]"
+              />
+              {shift}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="firstOfWeekOnly"
+          defaultChecked={defaults?.firstOfWeekOnly ?? false}
+          className="mt-0.5 size-4 accent-[var(--brand-navy)]"
+        />
+        <span>
+          First inspection of the week only
+          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+            Week starts Monday (after Sunday) in Melbourne time. Combined with
+            shift limits, this is how weekly day-shift checks work.
+          </span>
+        </span>
+      </label>
       {unitOptions.length > 0 ? (
         <fieldset className="grid gap-2">
           <legend className="text-sm font-medium">Applies to units</legend>
@@ -452,6 +503,8 @@ function QuestionEditor({
               required: question.required,
               showLastValue: question.showLastValue,
               applicableEquipmentRefs: question.applicableEquipmentRefs,
+              applicableShifts: question.applicableShifts,
+              firstOfWeekOnly: question.firstOfWeekOnly,
               attentionValues: question.attentionValues,
             }}
           />
@@ -493,6 +546,14 @@ function QuestionEditor({
                   ? question.applicableEquipmentRefs[0]
                   : `${question.applicableEquipmentRefs.length} units`}
               </Badge>
+            ) : null}
+            {question.applicableShifts.length > 0 ? (
+              <Badge variant="outline">
+                {question.applicableShifts.join(" / ")} shift
+              </Badge>
+            ) : null}
+            {question.firstOfWeekOnly ? (
+              <Badge variant="outline">First of week</Badge>
             ) : null}
           </div>
           {question.sectionTitle ? (
@@ -916,6 +977,10 @@ export default function InspectionsManageDetailPage({
                         {question.applicableEquipmentRefs.length > 0
                           ? ` · ${question.applicableEquipmentRefs.join(", ")}`
                           : ""}
+                        {question.applicableShifts.length > 0
+                          ? ` · ${question.applicableShifts.join("/")} shift`
+                          : ""}
+                        {question.firstOfWeekOnly ? " · First of week" : ""}
                       </p>
                     </li>
                   ))}

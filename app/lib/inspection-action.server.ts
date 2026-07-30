@@ -4,10 +4,15 @@ import { data, redirect } from "react-router";
 
 import { getAppBaseUrl } from "~/lib/app-url.server";
 import { createInspectionSchema } from "~/lib/inspection.schema";
-import type { InspectionDefinition, InspectionSummary } from "~/lib/inspections";
+import {
+  readShiftAnswer,
+  type InspectionDefinition,
+  type InspectionSummary,
+} from "~/lib/inspections";
 import {
   createInspectionActions,
   createInspectionRun,
+  isFirstInspectionOfWeek,
 } from "~/lib/inspections.server";
 import { ensureInspectionSchema } from "~/lib/migrate.server";
 import { getActiveOperatorById } from "~/lib/operators.server";
@@ -28,8 +33,30 @@ export async function handleInspectionSubmit(args: {
   definition: InspectionDefinition;
 }): Promise<InspectionSubmitActionData | ReturnType<typeof data>> {
   const { request, user, definition } = args;
-  const schema = createInspectionSchema(definition);
   const formData = await request.formData();
+
+  const rawEquipmentRef = String(formData.get("equipmentRef") ?? "").trim();
+  const equipmentRefForWeekCheck =
+    definition.fixedEquipmentRef?.trim() || rawEquipmentRef || null;
+  const responseMap: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    const match = /^responses\[(.+)\]$/.exec(key);
+    if (match) {
+      responseMap[match[1]] = String(value);
+    }
+  }
+  const shift = readShiftAnswer(definition.questions, responseMap);
+  const firstOfWeek = definition.questions.some((q) => q.firstOfWeekOnly)
+    ? await isFirstInspectionOfWeek({
+        inspectionId: definition.id,
+        equipmentRef: equipmentRefForWeekCheck,
+        shift,
+      })
+    : true;
+
+  const schema = createInspectionSchema(definition, {
+    isFirstInspectionOfWeek: firstOfWeek,
+  });
   const submission = parseWithZod(formData, { schema });
 
   if (submission.status !== "success") {

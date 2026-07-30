@@ -8,6 +8,9 @@ export const INSPECTION_QUESTION_TYPES = [
 
 export type InspectionQuestionType = (typeof INSPECTION_QUESTION_TYPES)[number];
 
+/** Common shift labels used on forklift (and similar) forms. */
+export const INSPECTION_SHIFT_OPTIONS = ["Day", "Afternoon"] as const;
+
 export type InspectionQuestionDef = {
   id: string;
   label: string;
@@ -29,6 +32,16 @@ export type InspectionQuestionDef = {
    * Empty means all units that inherit this template.
    */
   applicableEquipmentRefs: string[];
+  /**
+   * Shift labels this question applies to (e.g. Day only).
+   * Empty means every shift.
+   */
+  applicableShifts: string[];
+  /**
+   * When true, only show on the first matching inspection of the week
+   * (week starts Monday after Sunday, Australia/Melbourne).
+   */
+  firstOfWeekOnly: boolean;
   sortOrder: number;
 };
 
@@ -125,6 +138,8 @@ function statusQuestion(
     required: true,
     showLastValue: false,
     applicableEquipmentRefs: [],
+    applicableShifts: [],
+    firstOfWeekOnly: false,
     sortOrder,
   };
 }
@@ -141,6 +156,8 @@ function yesNoQuestion(
     attentionValues?: string[];
     showLastValue?: boolean;
     applicableEquipmentRefs?: string[];
+    applicableShifts?: string[];
+    firstOfWeekOnly?: boolean;
   },
 ): InspectionQuestionDef {
   return {
@@ -153,6 +170,8 @@ function yesNoQuestion(
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
     applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
+    applicableShifts: opts?.applicableShifts ?? [],
+    firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -171,6 +190,8 @@ function radioQuestion(
     attentionValues?: string[];
     showLastValue?: boolean;
     applicableEquipmentRefs?: string[];
+    applicableShifts?: string[];
+    firstOfWeekOnly?: boolean;
   },
 ): InspectionQuestionDef {
   return {
@@ -183,6 +204,8 @@ function radioQuestion(
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
     applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
+    applicableShifts: opts?.applicableShifts ?? [],
+    firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -199,6 +222,8 @@ function textQuestion(
     helpText?: string;
     showLastValue?: boolean;
     applicableEquipmentRefs?: string[];
+    applicableShifts?: string[];
+    firstOfWeekOnly?: boolean;
   },
 ): InspectionQuestionDef {
   return {
@@ -211,6 +236,8 @@ function textQuestion(
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
     applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
+    applicableShifts: opts?.applicableShifts ?? [],
+    firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -227,6 +254,8 @@ function numberQuestion(
     helpText?: string;
     showLastValue?: boolean;
     applicableEquipmentRefs?: string[];
+    applicableShifts?: string[];
+    firstOfWeekOnly?: boolean;
   },
 ): InspectionQuestionDef {
   return {
@@ -239,6 +268,8 @@ function numberQuestion(
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
     applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
+    applicableShifts: opts?.applicableShifts ?? [],
+    firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -255,6 +286,8 @@ function dateQuestion(
     helpText?: string;
     showLastValue?: boolean;
     applicableEquipmentRefs?: string[];
+    applicableShifts?: string[];
+    firstOfWeekOnly?: boolean;
   },
 ): InspectionQuestionDef {
   return {
@@ -267,6 +300,8 @@ function dateQuestion(
     required: opts?.required ?? true,
     showLastValue: opts?.showLastValue ?? false,
     applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
+    applicableShifts: opts?.applicableShifts ?? [],
+    firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -425,7 +460,9 @@ export const FORKLIFT_DAILY_CHECK_TEMPLATE: InspectionDefinition = {
       "Weekly (1st day shift of week)",
       14,
       {
-        required: false,
+        required: true,
+        applicableShifts: ["Day"],
+        firstOfWeekOnly: true,
         helpText: "Once per week on the first day shift only.",
       },
     ),
@@ -436,7 +473,9 @@ export const FORKLIFT_DAILY_CHECK_TEMPLATE: InspectionDefinition = {
       "Weekly (1st day shift of week)",
       15,
       {
-        required: false,
+        required: true,
+        applicableShifts: ["Day"],
+        firstOfWeekOnly: true,
         helpText: "Once per week on the first day shift only.",
       },
     ),
@@ -447,7 +486,9 @@ export const FORKLIFT_DAILY_CHECK_TEMPLATE: InspectionDefinition = {
       "Weekly (1st day shift of week)",
       16,
       {
-        required: false,
+        required: true,
+        applicableShifts: ["Day"],
+        firstOfWeekOnly: true,
         helpText: "Zoned units only; once per week on first day shift.",
       },
     ),
@@ -458,7 +499,9 @@ export const FORKLIFT_DAILY_CHECK_TEMPLATE: InspectionDefinition = {
       "Weekly (1st day shift of week)",
       17,
       {
-        required: false,
+        required: true,
+        applicableShifts: ["Day"],
+        firstOfWeekOnly: true,
         helpText: "Once per week on the first day shift only.",
       },
     ),
@@ -469,7 +512,9 @@ export const FORKLIFT_DAILY_CHECK_TEMPLATE: InspectionDefinition = {
       "Weekly (1st day shift of week)",
       18,
       {
-        required: false,
+        required: true,
+        applicableShifts: ["Day"],
+        firstOfWeekOnly: true,
         helpText: "Once per week on the first day shift only.",
       },
     ),
@@ -967,6 +1012,107 @@ export function filterQuestionsForEquipment(
   return questions.filter((question) =>
     questionAppliesToEquipment(question, equipmentRef),
   );
+}
+
+/** Empty applicableShifts means the question applies to every shift. */
+export function questionAppliesToShift(
+  question: Pick<InspectionQuestionDef, "applicableShifts">,
+  shift: string | null | undefined,
+): boolean {
+  const shifts = question.applicableShifts ?? [];
+  if (shifts.length === 0) {
+    return true;
+  }
+  const value = shift?.trim();
+  if (!value) {
+    return false;
+  }
+  return shifts.includes(value);
+}
+
+export function questionAppliesToWeek(
+  question: Pick<InspectionQuestionDef, "firstOfWeekOnly">,
+  isFirstInspectionOfWeek: boolean,
+): boolean {
+  if (!question.firstOfWeekOnly) {
+    return true;
+  }
+  return isFirstInspectionOfWeek;
+}
+
+export type QuestionApplicabilityContext = {
+  shift?: string | null;
+  isFirstInspectionOfWeek?: boolean;
+};
+
+/** Shift + first-of-week filters (equipment filtering is applied separately). */
+export function questionAppliesToContext(
+  question: Pick<
+    InspectionQuestionDef,
+    "applicableShifts" | "firstOfWeekOnly"
+  >,
+  context: QuestionApplicabilityContext = {},
+): boolean {
+  return (
+    questionAppliesToShift(question, context.shift) &&
+    questionAppliesToWeek(question, context.isFirstInspectionOfWeek ?? true)
+  );
+}
+
+export function filterQuestionsForContext(
+  questions: InspectionQuestionDef[],
+  context: QuestionApplicabilityContext = {},
+): InspectionQuestionDef[] {
+  return questions.filter((question) =>
+    questionAppliesToContext(question, context),
+  );
+}
+
+/** Prefer the dedicated Shift radio; fall back to Day/Afternoon options. */
+export function findShiftQuestion(
+  questions: Array<
+    Pick<InspectionQuestionDef, "id" | "label" | "type" | "options">
+  >,
+): { id: string; options: string[] } | null {
+  const byId = questions.find(
+    (question) =>
+      question.type === "RADIO" &&
+      (question.id.endsWith("__shift") ||
+        question.id.toLowerCase().endsWith("-shift")),
+  );
+  if (byId) {
+    return { id: byId.id, options: byId.options };
+  }
+
+  const byLabel = questions.find(
+    (question) =>
+      question.type === "RADIO" &&
+      question.label.trim().toLowerCase() === "shift" &&
+      question.options.some((option) =>
+        INSPECTION_SHIFT_OPTIONS.includes(
+          option as (typeof INSPECTION_SHIFT_OPTIONS)[number],
+        ),
+      ),
+  );
+  if (byLabel) {
+    return { id: byLabel.id, options: byLabel.options };
+  }
+
+  return null;
+}
+
+export function readShiftAnswer(
+  questions: Array<
+    Pick<InspectionQuestionDef, "id" | "label" | "type" | "options">
+  >,
+  responses: Record<string, string | undefined | null>,
+): string | null {
+  const shiftQuestion = findShiftQuestion(questions);
+  if (!shiftQuestion) {
+    return null;
+  }
+  const value = String(responses[shiftQuestion.id] ?? "").trim();
+  return value || null;
 }
 
 export function groupQuestionsBySection(
