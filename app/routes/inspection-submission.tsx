@@ -220,34 +220,6 @@ export default function InspectionSubmissionPage({
               </div>
             ) : null}
 
-            <div className="grid gap-4">
-              {groupAnswersBySection(run.answers).map((group) => (
-                <div
-                  key={group.title ?? "general"}
-                  className="rounded-lg border border-border/70 bg-background/50 p-4"
-                >
-                  {group.title ? (
-                    <h3 className="font-medium">{group.title}</h3>
-                  ) : (
-                    <h3 className="font-medium">Answers</h3>
-                  )}
-                  <ul className="mt-3 grid gap-2">
-                    {group.rows.map((row) => (
-                      <li
-                        key={row.questionId}
-                        className="flex flex-wrap items-start justify-between gap-2 text-sm"
-                      >
-                        <span className="text-muted-foreground">
-                          {row.label}
-                        </span>
-                        <AnswerBadge answer={row.answer} flagged={row.flagged} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-
             {run.actions.length > 0 ? (
               <div className="rounded-lg border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -279,6 +251,34 @@ export default function InspectionSubmissionPage({
                 </ul>
               </div>
             ) : null}
+
+            <div className="grid gap-4">
+              {groupAnswersBySection(run.answers).map((group) => (
+                <div
+                  key={group.title ?? "general"}
+                  className="rounded-lg border border-border/70 bg-background/50 p-4"
+                >
+                  {group.title ? (
+                    <h3 className="font-medium">{group.title}</h3>
+                  ) : (
+                    <h3 className="font-medium">Answers</h3>
+                  )}
+                  <ul className="mt-3 grid gap-2">
+                    {group.rows.map((row) => (
+                      <li
+                        key={row.questionId}
+                        className="flex flex-wrap items-start justify-between gap-2 text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {row.label}
+                        </span>
+                        <AnswerBadge answer={row.answer} flagged={row.flagged} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
 
             {run.notes ? (
               <div className="rounded-lg border border-border/70 bg-background/50 p-4 text-sm">

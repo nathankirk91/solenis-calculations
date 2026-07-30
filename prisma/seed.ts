@@ -129,6 +129,11 @@ async function main() {
             question.applicableEquipmentRefs.length > 0
               ? question.applicableEquipmentRefs
               : Prisma.DbNull,
+          applicableShifts:
+            question.applicableShifts.length > 0
+              ? question.applicableShifts
+              : Prisma.DbNull,
+          firstOfWeekOnly: question.firstOfWeekOnly,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -148,6 +153,11 @@ async function main() {
             question.applicableEquipmentRefs.length > 0
               ? question.applicableEquipmentRefs
               : Prisma.DbNull,
+          applicableShifts:
+            question.applicableShifts.length > 0
+              ? question.applicableShifts
+              : Prisma.DbNull,
+          firstOfWeekOnly: question.firstOfWeekOnly,
           isActive: true,
           sortOrder: question.sortOrder,
         },

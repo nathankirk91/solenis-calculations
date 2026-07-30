@@ -102,8 +102,21 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
     )`,
     `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "show_last_value" BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "applicable_equipment_refs" JSONB`,
+    `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "applicable_shifts" JSONB`,
+    `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "first_of_week_only" BOOLEAN NOT NULL DEFAULT false`,
     `UPDATE "inspection_questions" SET "show_last_value" = true WHERE "id" = 'forklift-daily-check__service-date'`,
     `UPDATE "inspection_questions" SET "attention_values" = '[]'::jsonb WHERE "id" = 'forklift-daily-check__shift'`,
+    `UPDATE "inspection_questions"
+       SET "applicable_shifts" = '["Day"]'::jsonb,
+           "first_of_week_only" = true,
+           "required" = true
+       WHERE "id" IN (
+         'forklift-daily-check__scrubber-drained',
+         'forklift-daily-check__scrubber-washed',
+         'forklift-daily-check__flameproofers',
+         'forklift-daily-check__anode',
+         'forklift-daily-check__air-receiver'
+       )`,
     `CREATE INDEX IF NOT EXISTS "inspection_questions_inspection_id_is_active_sort_order_idx"
       ON "inspection_questions"("inspection_id", "is_active", "sort_order")`,
     `DO $$ BEGIN
@@ -304,6 +317,7 @@ export async function applyPendingMigrations(): Promise<AppliedMigration[]> {
       name.includes("_inspection_templates") ||
       name.includes("_inspection_question_show_last_value") ||
       name.includes("_inspection_question_unit_applicability") ||
+      name.includes("_inspection_question_shift_week") ||
       name.includes("_clear_shift_attention_values") ||
       name.includes("_inspection_actions") ||
       name.includes("_inspection_run_signature")

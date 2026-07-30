@@ -85,6 +85,8 @@ function passResponses(definition) {
         required: true,
         showLastValue: false,
         applicableEquipmentRefs: [],
+        applicableShifts: [],
+        firstOfWeekOnly: false,
         sortOrder: 1,
       },
       {
@@ -96,6 +98,8 @@ function passResponses(definition) {
         required: false,
         showLastValue: false,
         applicableEquipmentRefs: [],
+        applicableShifts: [],
+        firstOfWeekOnly: false,
         sortOrder: 2,
       },
     ],
@@ -220,6 +224,65 @@ function passResponses(definition) {
   assert.deepEqual(
     filtered.map((question) => question.id),
     ["a", "b"],
+  );
+}
+
+{
+  const {
+    FORKLIFT_DAILY_CHECK_TEMPLATE,
+    filterQuestionsForContext,
+    findShiftQuestion,
+    questionAppliesToShift,
+    questionAppliesToWeek,
+    readShiftAnswer,
+  } = await import("./inspections.ts");
+
+  const weekly = FORKLIFT_DAILY_CHECK_TEMPLATE.questions.find((question) =>
+    question.id.endsWith("__scrubber-drained"),
+  );
+  assert.ok(weekly);
+  assert.deepEqual(weekly.applicableShifts, ["Day"]);
+  assert.equal(weekly.firstOfWeekOnly, true);
+  assert.equal(weekly.required, true);
+
+  assert.equal(questionAppliesToShift(weekly, "Day"), true);
+  assert.equal(questionAppliesToShift(weekly, "Afternoon"), false);
+  assert.equal(questionAppliesToShift(weekly, null), false);
+  assert.equal(questionAppliesToShift({ applicableShifts: [] }, "Afternoon"), true);
+  assert.equal(questionAppliesToWeek(weekly, true), true);
+  assert.equal(questionAppliesToWeek(weekly, false), false);
+
+  const shiftQuestion = findShiftQuestion(FORKLIFT_DAILY_CHECK_TEMPLATE.questions);
+  assert.equal(shiftQuestion?.id, "forklift-daily-check__shift");
+  assert.equal(
+    readShiftAnswer(FORKLIFT_DAILY_CHECK_TEMPLATE.questions, {
+      "forklift-daily-check__shift": "Day",
+    }),
+    "Day",
+  );
+
+  const dayFirst = filterQuestionsForContext(
+    FORKLIFT_DAILY_CHECK_TEMPLATE.questions,
+    { shift: "Day", isFirstInspectionOfWeek: true },
+  );
+  assert.ok(dayFirst.some((question) => question.id === weekly.id));
+
+  const afternoon = filterQuestionsForContext(
+    FORKLIFT_DAILY_CHECK_TEMPLATE.questions,
+    { shift: "Afternoon", isFirstInspectionOfWeek: true },
+  );
+  assert.equal(
+    afternoon.some((question) => question.id === weekly.id),
+    false,
+  );
+
+  const dayLater = filterQuestionsForContext(
+    FORKLIFT_DAILY_CHECK_TEMPLATE.questions,
+    { shift: "Day", isFirstInspectionOfWeek: false },
+  );
+  assert.equal(
+    dayLater.some((question) => question.id === weekly.id),
+    false,
   );
 }
 

@@ -25,6 +25,8 @@ import { SignaturePad } from "~/components/signature-pad";
 import { createInspectionSchema } from "~/lib/inspection.schema";
 import {
   YES_NO_OPTIONS,
+  filterQuestionsForContext,
+  findShiftQuestion,
   formatLastAnswerDisplay,
   groupQuestionsBySection,
   type InspectionDefinition,
@@ -56,8 +58,20 @@ export function InspectionChecklistForm({
 }: Props) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const schema = createInspectionSchema(definition);
-  const sections = groupQuestionsBySection(definition.questions);
+  const shiftQuestion = findShiftQuestion(definition.questions);
+  const needsWeekStatus = definition.questions.some(
+    (question) => question.firstOfWeekOnly,
+  );
+  const [selectedShift, setSelectedShift] = useState("");
+  const [isFirstInspectionOfWeek, setIsFirstInspectionOfWeek] = useState(true);
+  const schema = createInspectionSchema(definition, {
+    isFirstInspectionOfWeek,
+  });
+  const visibleQuestions = filterQuestionsForContext(definition.questions, {
+    shift: selectedShift || null,
+    isFirstInspectionOfWeek,
+  });
+  const sections = groupQuestionsBySection(visibleQuestions);
   const [signature, setSignature] = useState("");
   const fixedEquipmentRef = definition.fixedEquipmentRef?.trim() || "";
   const [equipmentRef, setEquipmentRef] = useState(fixedEquipmentRef);
@@ -74,6 +88,7 @@ export function InspectionChecklistForm({
 
   const lastAnswersFetcher = useFetcher<LastInspectionAnswers>();
   const openActionsFetcher = useFetcher<{ actions: InspectionActionItem[] }>();
+  const weekStatusFetcher = useFetcher<{ isFirstInspectionOfWeek: boolean }>();
   const lastAnswers = lastAnswersFetcher.data?.answers ?? {};
   const lastRunAt = lastAnswersFetcher.data?.createdAt ?? null;
   const openActions = openActionsFetcher.data?.actions ?? [];
@@ -133,6 +148,7 @@ export function InspectionChecklistForm({
 
   useEffect(() => {
     setResponseOverrides({});
+    setSelectedShift("");
   }, [equipmentRefForFetch]);
 
   useEffect(() => {
@@ -170,6 +186,40 @@ export function InspectionChecklistForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [definition.id, equipmentRefForFetch, canLoadScopedData]);
 
+  useEffect(() => {
+    if (!needsWeekStatus || !canLoadScopedData) {
+      setIsFirstInspectionOfWeek(true);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (equipmentRefForFetch.trim()) {
+      params.set("equipmentRef", equipmentRefForFetch.trim());
+    }
+    if (selectedShift.trim()) {
+      params.set("shift", selectedShift.trim());
+    }
+    const query = params.toString();
+    const href = `/inspections/${definition.id}/week-status${
+      query ? `?${query}` : ""
+    }`;
+    weekStatusFetcher.load(href);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [
+    definition.id,
+    equipmentRefForFetch,
+    selectedShift,
+    needsWeekStatus,
+    canLoadScopedData,
+  ]);
+
+  useEffect(() => {
+    if (weekStatusFetcher.data) {
+      setIsFirstInspectionOfWeek(
+        Boolean(weekStatusFetcher.data.isFirstInspectionOfWeek),
+      );
+    }
+  }, [weekStatusFetcher.data]);
   function fieldValue(
     questionId: string,
     initialValue: unknown,
@@ -445,6 +495,18 @@ export function InspectionChecklistForm({
                                       key={`${inputKey}-${option}`}
                                       defaultChecked={value === option}
                                       className="size-4 accent-[var(--brand-navy)]"
+                                      onChange={() => {
+                                        setResponseOverrides((previous) => ({
+                                          ...previous,
+                                          [question.id]: option,
+                                        }));
+                                        if (
+                                          shiftQuestion &&
+                                          question.id === shiftQuestion.id
+                                        ) {
+                                          setSelectedShift(option);
+                                        }
+                                      }}
                                     />
                                     {option}
                                   </label>

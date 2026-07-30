@@ -1,5 +1,6 @@
 import { Prisma } from "../../generated/prisma/client";
 import { getPrisma } from "~/lib/db.server";
+import { startOfMelbourneWeek } from "~/lib/datetime";
 import {
   FALLBACK_INSPECTIONS,
   INSPECTION_DEFINITIONS,
@@ -7,6 +8,7 @@ import {
   buildLastAnswerMap,
   defaultAttentionValues,
   filterQuestionsForEquipment,
+  findShiftQuestion,
   getFallbackInspectionByIdOrSlug,
   groupQuestionsBySection,
   parseStringArray,
@@ -118,6 +120,8 @@ function mapQuestion(row: {
   required: boolean;
   showLastValue?: boolean | null;
   applicableEquipmentRefs?: unknown;
+  applicableShifts?: unknown;
+  firstOfWeekOnly?: boolean | null;
   sortOrder: number;
 }): InspectionQuestionDef {
   const options = questionOptionsForType(
@@ -142,6 +146,8 @@ function mapQuestion(row: {
     required: row.required,
     showLastValue: Boolean(row.showLastValue),
     applicableEquipmentRefs: parseStringArray(row.applicableEquipmentRefs),
+    applicableShifts: parseStringArray(row.applicableShifts),
+    firstOfWeekOnly: Boolean(row.firstOfWeekOnly),
     sortOrder: row.sortOrder,
   };
 }
@@ -169,6 +175,8 @@ function mapDefinition(row: {
     required: boolean;
     showLastValue?: boolean | null;
     applicableEquipmentRefs?: unknown;
+    applicableShifts?: unknown;
+    firstOfWeekOnly?: boolean | null;
     sortOrder: number;
   }>;
 }): InspectionDefinition {
@@ -579,6 +587,10 @@ function parseVersionSnapshot(value: unknown): InspectionVersionSnapshot {
           applicableEquipmentRefs: Array.isArray(row.applicableEquipmentRefs)
             ? row.applicableEquipmentRefs.map(String)
             : [],
+          applicableShifts: Array.isArray(row.applicableShifts)
+            ? row.applicableShifts.map(String)
+            : [],
+          firstOfWeekOnly: Boolean(row.firstOfWeekOnly),
           sortOrder: Number(row.sortOrder ?? 0),
         } satisfies InspectionQuestionDef;
       })
@@ -860,6 +872,11 @@ export async function seedDefaultInspections(): Promise<number> {
             question.applicableEquipmentRefs.length > 0
               ? question.applicableEquipmentRefs
               : Prisma.DbNull,
+          applicableShifts:
+            question.applicableShifts.length > 0
+              ? question.applicableShifts
+              : Prisma.DbNull,
+          firstOfWeekOnly: question.firstOfWeekOnly,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -879,6 +896,11 @@ export async function seedDefaultInspections(): Promise<number> {
             question.applicableEquipmentRefs.length > 0
               ? question.applicableEquipmentRefs
               : Prisma.DbNull,
+          applicableShifts:
+            question.applicableShifts.length > 0
+              ? question.applicableShifts
+              : Prisma.DbNull,
+          firstOfWeekOnly: question.firstOfWeekOnly,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -1050,6 +1072,8 @@ export async function addInspectionQuestion(args: {
   required?: boolean;
   showLastValue?: boolean;
   applicableEquipmentRefs?: string[];
+  applicableShifts?: string[];
+  firstOfWeekOnly?: boolean;
   changeComment: string;
   changedById: string;
 }): Promise<InspectionQuestionDef> {
@@ -1106,6 +1130,11 @@ export async function addInspectionQuestion(args: {
         (args.applicableEquipmentRefs ?? []).length > 0
           ? args.applicableEquipmentRefs
           : Prisma.DbNull,
+      applicableShifts:
+        (args.applicableShifts ?? []).length > 0
+          ? args.applicableShifts
+          : Prisma.DbNull,
+      firstOfWeekOnly: args.firstOfWeekOnly ?? false,
       isActive: true,
       sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
     },
@@ -1171,6 +1200,8 @@ export async function updateInspectionQuestion(args: {
   required?: boolean;
   showLastValue?: boolean;
   applicableEquipmentRefs?: string[];
+  applicableShifts?: string[];
+  firstOfWeekOnly?: boolean;
   changeComment: string;
   changedById: string;
 }): Promise<InspectionQuestionDef> {
@@ -1230,6 +1261,11 @@ export async function updateInspectionQuestion(args: {
         (args.applicableEquipmentRefs ?? []).length > 0
           ? args.applicableEquipmentRefs
           : Prisma.DbNull,
+      applicableShifts:
+        (args.applicableShifts ?? []).length > 0
+          ? args.applicableShifts
+          : Prisma.DbNull,
+      firstOfWeekOnly: args.firstOfWeekOnly ?? false,
     },
   });
 
@@ -1535,6 +1571,90 @@ export async function getLastAnswersForInspection(args: {
   return { answers: {}, runId: null, createdAt: null };
 }
 
+/**
+ * True when no prior run exists this calendar week (Mon–Sun, Melbourne) for
+ * the inspection/unit. When `shift` is set, only runs that answered that shift
+ * count — so Day-only weekly items still appear if only Afternoon ran earlier.
+ */
+export async function isFirstInspectionOfWeek(args: {
+  inspectionId: string;
+  equipmentRef?: string | null;
+  shift?: string | null;
+  at?: Date;
+}): Promise<boolean> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return true;
+  }
+
+  const weekStart = startOfMelbourneWeek(args.at ?? new Date());
+  const equipmentRef = args.equipmentRef?.trim() || null;
+  const shift = args.shift?.trim() || null;
+
+  const inspection = await prisma.inspection.findUnique({
+    where: { id: args.inspectionId },
+    select: {
+      id: true,
+      templateInspectionId: true,
+      fixedEquipmentRef: true,
+    },
+  });
+
+  const effectiveEquipmentRef =
+    equipmentRef || inspection?.fixedEquipmentRef?.trim() || null;
+
+  const inspectionIds = [args.inspectionId];
+  if (inspection?.templateInspectionId) {
+    inspectionIds.push(inspection.templateInspectionId);
+  }
+
+  const rows = await prisma.inspectionRun.findMany({
+    where: {
+      inspectionId: { in: inspectionIds },
+      createdAt: { gte: weekStart },
+      ...(effectiveEquipmentRef
+        ? { equipmentRef: effectiveEquipmentRef }
+        : {}),
+    },
+    select: {
+      responses: true,
+      inspectionId: true,
+    },
+    orderBy: { createdAt: "asc" },
+    take: 50,
+  });
+
+  if (rows.length === 0) {
+    return true;
+  }
+
+  if (!shift) {
+    return false;
+  }
+
+  // Resolve shift question from the unit form (or its template).
+  const definition = await getInspectionDefinition(args.inspectionId);
+  const shiftQuestion = definition
+    ? findShiftQuestion(definition.questions)
+    : null;
+  if (!shiftQuestion) {
+    return false;
+  }
+
+  for (const row of rows) {
+    // Legacy template runs: only count when equipment matches (already filtered).
+    const answers = parseAnswers(row.responses);
+    const shiftAnswer = answers.find(
+      (answer) => answer.questionId === shiftQuestion.id,
+    )?.answer;
+    if (String(shiftAnswer ?? "").trim() === shift) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export async function getInspectionRunById(
   id: string,
 ): Promise<InspectionHistoryItem | null> {
@@ -1799,6 +1919,11 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
             question.applicableEquipmentRefs.length > 0
               ? question.applicableEquipmentRefs
               : Prisma.DbNull,
+          applicableShifts:
+            question.applicableShifts.length > 0
+              ? question.applicableShifts
+              : Prisma.DbNull,
+          firstOfWeekOnly: question.firstOfWeekOnly,
           isActive: true,
           sortOrder: question.sortOrder,
           inspectionId: definition.id,
@@ -1819,6 +1944,11 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
             question.applicableEquipmentRefs.length > 0
               ? question.applicableEquipmentRefs
               : Prisma.DbNull,
+          applicableShifts:
+            question.applicableShifts.length > 0
+              ? question.applicableShifts
+              : Prisma.DbNull,
+          firstOfWeekOnly: question.firstOfWeekOnly,
           isActive: true,
           sortOrder: question.sortOrder,
         },

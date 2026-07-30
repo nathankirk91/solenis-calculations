@@ -182,6 +182,10 @@ model InspectionQuestion {
   showLastValue   Boolean                 @default(false) @map("show_last_value")
   /// Unit refs this question applies to; null/empty = all inheriting units.
   applicableEquipmentRefs Json?           @map("applicable_equipment_refs")
+  /// Shift labels this question applies to (e.g. Day); null/empty = all shifts.
+  applicableShifts Json?                  @map("applicable_shifts")
+  /// When true, only show on the first matching inspection of the Mon–Sun week.
+  firstOfWeekOnly Boolean                 @default(false) @map("first_of_week_only")
   isActive        Boolean                 @default(true) @map("is_active")
   sortOrder       Int                     @default(0) @map("sort_order")
   createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
