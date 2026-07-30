@@ -15,3 +15,21 @@ WHERE "id" IN (
   'forklift-daily-check__anode',
   'forklift-daily-check__air-receiver'
 );
+
+-- Keep every other forklift question available on all shifts
+UPDATE "inspection_questions"
+SET
+  "applicable_shifts" = NULL,
+  "first_of_week_only" = false
+WHERE "id" LIKE 'forklift-daily-check__%'
+  AND "id" NOT IN (
+    'forklift-daily-check__scrubber-drained',
+    'forklift-daily-check__scrubber-washed',
+    'forklift-daily-check__flameproofers',
+    'forklift-daily-check__anode',
+    'forklift-daily-check__air-receiver'
+  )
+  AND (
+    "applicable_shifts" IS NOT NULL
+    OR "first_of_week_only" = true
+  );

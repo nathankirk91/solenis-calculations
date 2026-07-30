@@ -117,6 +117,23 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
          'forklift-daily-check__anode',
          'forklift-daily-check__air-receiver'
        )`,
+    // Clear accidental shift/week flags on every other forklift question
+    // (e.g. engine oil must stay visible on every shift).
+    `UPDATE "inspection_questions"
+       SET "applicable_shifts" = NULL,
+           "first_of_week_only" = false
+       WHERE "id" LIKE 'forklift-daily-check__%'
+         AND "id" NOT IN (
+           'forklift-daily-check__scrubber-drained',
+           'forklift-daily-check__scrubber-washed',
+           'forklift-daily-check__flameproofers',
+           'forklift-daily-check__anode',
+           'forklift-daily-check__air-receiver'
+         )
+         AND (
+           "applicable_shifts" IS NOT NULL
+           OR "first_of_week_only" = true
+         )`,
     `CREATE INDEX IF NOT EXISTS "inspection_questions_inspection_id_is_active_sort_order_idx"
       ON "inspection_questions"("inspection_id", "is_active", "sort_order")`,
     `DO $$ BEGIN

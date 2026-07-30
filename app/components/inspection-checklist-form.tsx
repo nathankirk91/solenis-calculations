@@ -22,7 +22,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { SignaturePad } from "~/components/signature-pad";
-import { createInspectionSchema } from "~/lib/inspection.schema";
+import { createInspectionFormSchema } from "~/lib/inspection.schema";
 import {
   YES_NO_OPTIONS,
   filterQuestionsForContext,
@@ -63,15 +63,8 @@ export function InspectionChecklistForm({
     (question) => question.firstOfWeekOnly,
   );
   const [selectedShift, setSelectedShift] = useState("");
-  const [isFirstInspectionOfWeek, setIsFirstInspectionOfWeek] = useState(true);
-  const schema = createInspectionSchema(definition, {
-    isFirstInspectionOfWeek,
-  });
-  const visibleQuestions = filterQuestionsForContext(definition.questions, {
-    shift: selectedShift || null,
-    isFirstInspectionOfWeek,
-  });
-  const sections = groupQuestionsBySection(visibleQuestions);
+  const [isFirstInspectionOfWeek, setIsFirstInspectionOfWeek] = useState(false);
+  const [weekStatusReady, setWeekStatusReady] = useState(!needsWeekStatus);
   const [signature, setSignature] = useState("");
   const fixedEquipmentRef = definition.fixedEquipmentRef?.trim() || "";
   const [equipmentRef, setEquipmentRef] = useState(fixedEquipmentRef);
@@ -81,6 +74,23 @@ export function InspectionChecklistForm({
     Record<string, string>
   >({});
   const [actionFields, setActionFields] = useState<string[]>([""]);
+
+  const shiftAnswer = (
+    (shiftQuestion && responseOverrides[shiftQuestion.id]) ||
+    selectedShift
+  ).trim();
+
+  // Hide first-of-week questions until week-status is known for the selected
+  // shift — otherwise they flash on (default) then disappear after the fetch.
+  const weekGateReady = !needsWeekStatus || !shiftAnswer || weekStatusReady;
+  const schema = createInspectionFormSchema(definition, {
+    isFirstInspectionOfWeek: weekGateReady && isFirstInspectionOfWeek,
+  });
+  const visibleQuestions = filterQuestionsForContext(definition.questions, {
+    shift: shiftAnswer || null,
+    isFirstInspectionOfWeek: weekGateReady && isFirstInspectionOfWeek,
+  });
+  const sections = groupQuestionsBySection(visibleQuestions);
 
   const needsLastAnswers = definition.questions.some(
     (question) => question.showLastValue,
@@ -149,7 +159,9 @@ export function InspectionChecklistForm({
   useEffect(() => {
     setResponseOverrides({});
     setSelectedShift("");
-  }, [equipmentRefForFetch]);
+    setWeekStatusReady(!needsWeekStatus);
+    setIsFirstInspectionOfWeek(false);
+  }, [equipmentRefForFetch, needsWeekStatus]);
 
   useEffect(() => {
     if (!canLoadLastAnswers) {
@@ -187,39 +199,44 @@ export function InspectionChecklistForm({
   }, [definition.id, equipmentRefForFetch, canLoadScopedData]);
 
   useEffect(() => {
-    if (!needsWeekStatus || !canLoadScopedData) {
+    if (!needsWeekStatus) {
+      setWeekStatusReady(true);
       setIsFirstInspectionOfWeek(true);
       return;
     }
+    if (!canLoadScopedData || !shiftAnswer) {
+      setWeekStatusReady(false);
+      setIsFirstInspectionOfWeek(false);
+      return;
+    }
 
+    setWeekStatusReady(false);
     const params = new URLSearchParams();
     if (equipmentRefForFetch.trim()) {
       params.set("equipmentRef", equipmentRefForFetch.trim());
     }
-    if (selectedShift.trim()) {
-      params.set("shift", selectedShift.trim());
-    }
-    const query = params.toString();
-    const href = `/inspections/${definition.id}/week-status${
-      query ? `?${query}` : ""
-    }`;
+    params.set("shift", shiftAnswer);
+    const href = `/inspections/${definition.id}/week-status?${params.toString()}`;
     weekStatusFetcher.load(href);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [
     definition.id,
     equipmentRefForFetch,
-    selectedShift,
+    shiftAnswer,
     needsWeekStatus,
     canLoadScopedData,
   ]);
 
   useEffect(() => {
-    if (weekStatusFetcher.data) {
-      setIsFirstInspectionOfWeek(
-        Boolean(weekStatusFetcher.data.isFirstInspectionOfWeek),
-      );
+    if (weekStatusFetcher.state !== "idle" || !weekStatusFetcher.data) {
+      return;
     }
-  }, [weekStatusFetcher.data]);
+    setIsFirstInspectionOfWeek(
+      Boolean(weekStatusFetcher.data.isFirstInspectionOfWeek),
+    );
+    setWeekStatusReady(true);
+  }, [weekStatusFetcher.state, weekStatusFetcher.data]);
+
   function fieldValue(
     questionId: string,
     initialValue: unknown,
@@ -382,9 +399,12 @@ export function InspectionChecklistForm({
                 <ul className="grid gap-4">
                   {section.questions.map((question) => {
                     const field = responseFields[question.id];
-                    if (!field) {
-                      return null;
-                    }
+                    const fieldName =
+                      field?.name ?? `responses[${question.id}]`;
+                    const fieldId = field?.id ?? question.id;
+                    const fieldKey = field?.key ?? question.id;
+                    const fieldInitial = field?.initialValue;
+                    const fieldErrors = field?.errors;
 
                     const choices =
                       question.type === "YES_NO"
@@ -392,13 +412,13 @@ export function InspectionChecklistForm({
                         : question.type === "RADIO"
                           ? question.options
                           : [];
-                    const value = fieldValue(question.id, field.initialValue);
+                    const value = fieldValue(question.id, fieldInitial);
                     const lastValue = lastAnswers[question.id] ?? "";
                     const showConfiguredLastValue =
                       question.showLastValue &&
                       canLoadLastAnswers &&
                       Boolean(lastValue);
-                    const inputKey = `${field.key}-${value}`;
+                    const inputKey = `${fieldKey}-${value}`;
 
                     return (
                       <li
@@ -432,21 +452,21 @@ export function InspectionChecklistForm({
                         {question.type === "TEXT" ? (
                           <div className="mt-3">
                             <textarea
-                              id={field.id}
-                              name={field.name}
+                              id={fieldId}
+                              name={fieldName}
                               key={inputKey}
                               defaultValue={value}
                               rows={3}
                               className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
                               placeholder="Enter details…"
-                              aria-invalid={Boolean(field.errors)}
+                              aria-invalid={Boolean(fieldErrors)}
                             />
                           </div>
                         ) : question.type === "NUMBER" ? (
                           <div className="mt-3">
                             <Input
-                              id={field.id}
-                              name={field.name}
+                              id={fieldId}
+                              name={fieldName}
                               key={inputKey}
                               type="number"
                               defaultValue={value}
@@ -454,19 +474,19 @@ export function InspectionChecklistForm({
                               step="any"
                               placeholder="e.g. 4025.3"
                               className="max-w-xs"
-                              aria-invalid={Boolean(field.errors)}
+                              aria-invalid={Boolean(fieldErrors)}
                             />
                           </div>
                         ) : question.type === "DATE" ? (
                           <div className="mt-3">
                             <Input
-                              id={field.id}
-                              name={field.name}
+                              id={fieldId}
+                              name={fieldName}
                               key={inputKey}
                               type="date"
                               defaultValue={value}
                               className="max-w-xs"
-                              aria-invalid={Boolean(field.errors)}
+                              aria-invalid={Boolean(fieldErrors)}
                             />
                           </div>
                         ) : (
@@ -474,7 +494,7 @@ export function InspectionChecklistForm({
                             <legend className="sr-only">{question.label}</legend>
                             <div className="flex flex-wrap gap-2">
                               {choices.map((option) => {
-                                const optionId = `${field.id}-${option}`;
+                                const optionId = `${fieldId}-${option}`;
                                 const flagsAttention =
                                   question.attentionValues.includes(option);
                                 return (
@@ -490,7 +510,7 @@ export function InspectionChecklistForm({
                                     <input
                                       type="radio"
                                       id={optionId}
-                                      name={field.name}
+                                      name={fieldName}
                                       value={option}
                                       key={`${inputKey}-${option}`}
                                       defaultChecked={value === option}
@@ -516,9 +536,9 @@ export function InspectionChecklistForm({
                           </fieldset>
                         )}
 
-                        {field.errors ? (
+                        {fieldErrors ? (
                           <p className="mt-2 text-sm text-destructive">
-                            {field.errors.join(" ")}
+                            {fieldErrors.join(" ")}
                           </p>
                         ) : null}
                       </li>

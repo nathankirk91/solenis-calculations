@@ -20,7 +20,11 @@ export type InspectionSchemaContext = {
   isFirstInspectionOfWeek?: boolean;
 };
 
-export function createInspectionSchema(
+/**
+ * Zod schema for Conform client validation (no transform — transforming on
+ * onInput revalidation shrinks `responses` and drops unanswered fields).
+ */
+export function createInspectionFormSchema(
   definition: InspectionDefinition,
   context: InspectionSchemaContext = {},
 ) {
@@ -154,35 +158,43 @@ export function createInspectionSchema(
           });
         }
       }
-    })
-    .transform((value) => {
-      const shift = readShiftAnswer(definition.questions, value.responses);
-      const applicableQuestions = filterQuestionsForContext(
-        definition.questions,
-        { shift, isFirstInspectionOfWeek },
-      );
-      const responses: Record<string, string> = {};
-      for (const question of applicableQuestions) {
-        responses[question.id] = String(value.responses[question.id] ?? "");
-      }
-      const answers = buildAnswersFromResponses(
-        { ...definition, questions: applicableQuestions },
-        responses,
-      );
-      const summary = summarizeInspectionAnswers(answers);
-
-      return {
-        operatorId: value.operatorId,
-        equipmentRef:
-          definition.fixedEquipmentRef ?? value.equipmentRef ?? null,
-        notes: value.notes ?? null,
-        actions: value.actions.map((item) => item.trim()).filter(Boolean),
-        signature: value.signature,
-        responses,
-        answers,
-        summary,
-      };
     });
+}
+
+/** Full schema including submit transform (answers + summary). */
+export function createInspectionSchema(
+  definition: InspectionDefinition,
+  context: InspectionSchemaContext = {},
+) {
+  const isFirstInspectionOfWeek = context.isFirstInspectionOfWeek ?? true;
+
+  return createInspectionFormSchema(definition, context).transform((value) => {
+    const shift = readShiftAnswer(definition.questions, value.responses);
+    const applicableQuestions = filterQuestionsForContext(
+      definition.questions,
+      { shift, isFirstInspectionOfWeek },
+    );
+    const responses: Record<string, string> = {};
+    for (const question of applicableQuestions) {
+      responses[question.id] = String(value.responses[question.id] ?? "");
+    }
+    const answers = buildAnswersFromResponses(
+      { ...definition, questions: applicableQuestions },
+      responses,
+    );
+    const summary = summarizeInspectionAnswers(answers);
+
+    return {
+      operatorId: value.operatorId,
+      equipmentRef: definition.fixedEquipmentRef ?? value.equipmentRef ?? null,
+      notes: value.notes ?? null,
+      actions: value.actions.map((item) => item.trim()).filter(Boolean),
+      signature: value.signature,
+      responses,
+      answers,
+      summary,
+    };
+  });
 }
 
 export type InspectionFormValues = z.infer<

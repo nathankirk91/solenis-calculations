@@ -1679,7 +1679,9 @@ export async function isFirstInspectionOfWeek(args: {
   }
 
   if (!shift) {
-    return false;
+    // Without a shift filter we cannot decide Day-vs-Afternoon weekly items;
+    // treat as first-of-week so callers that omit shift do not hide questions.
+    return true;
   }
 
   // Resolve shift question from the unit form (or its template).
