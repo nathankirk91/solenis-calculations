@@ -30,6 +30,7 @@ import {
   addInspectionQuestion,
   getManagedInspection,
   moveInspectionQuestion,
+  publishInspectionVersion,
   removeInspectionQuestion,
   updateInspectionQuestion,
   updateManagedInspection,
@@ -61,7 +62,6 @@ export async function action({ request, params }: Route.ActionArgs) {
   const inspectionId = params.inspectionId;
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
-  const changeComment = String(formData.get("changeComment") ?? "");
 
   try {
     if (intent === "update") {
@@ -74,6 +74,18 @@ export async function action({ request, params }: Route.ActionArgs) {
         isAvailable: String(formData.get("isAvailable") ?? "") === "on",
       });
       return { ok: true as const, message: "Inspection details saved." };
+    }
+
+    if (intent === "publish-version") {
+      const version = await publishInspectionVersion({
+        inspectionId,
+        changeComment: String(formData.get("changeComment") ?? ""),
+        changedById: user.id,
+      });
+      return {
+        ok: true as const,
+        message: `Checklist published as revision ${version}.`,
+      };
     }
 
     if (intent === "add-question" || intent === "update-question") {
@@ -113,8 +125,6 @@ export async function action({ request, params }: Route.ActionArgs) {
         applicableEquipmentRefs,
         applicableShifts,
         firstOfWeekOnly: String(formData.get("firstOfWeekOnly") ?? "") === "on",
-        changeComment,
-        changedById: user.id,
       };
 
       if (intent === "add-question") {
@@ -124,7 +134,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         });
         return {
           ok: true as const,
-          message: "Question added. Version updated.",
+          message:
+            "Question added. Publish a revision when your checklist edits are ready.",
         };
       }
 
@@ -138,7 +149,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       });
       return {
         ok: true as const,
-        message: "Question updated. Version updated.",
+        message:
+          "Question updated. Publish a revision when your checklist edits are ready.",
       };
     }
 
@@ -149,12 +161,11 @@ export async function action({ request, params }: Route.ActionArgs) {
       }
       await removeInspectionQuestion({
         questionId,
-        changeComment,
-        changedById: user.id,
       });
       return {
         ok: true as const,
-        message: "Question removed. Version updated.",
+        message:
+          "Question removed. Publish a revision when your checklist edits are ready.",
       };
     }
 
@@ -167,12 +178,11 @@ export async function action({ request, params }: Route.ActionArgs) {
       await moveInspectionQuestion({
         questionId,
         direction,
-        changeComment,
-        changedById: user.id,
       });
       return {
         ok: true as const,
-        message: "Question order updated. Version updated.",
+        message:
+          "Question order updated. Publish a revision when your checklist edits are ready.",
       };
     }
   } catch (error) {
@@ -423,36 +433,6 @@ function QuestionFields({
   );
 }
 
-function ChangeCommentField({
-  value,
-  onChange,
-  id = "changeComment",
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  id?: string;
-}) {
-  return (
-    <div className="grid gap-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-3">
-      <Label htmlFor={id}>Change comment (required)</Label>
-      <textarea
-        id={id}
-        name="changeComment"
-        rows={2}
-        required
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="Explain what changed and why (required for version history)"
-        className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-      />
-      <p className="text-xs text-muted-foreground">
-        Adding, editing, removing, or reordering questions creates a new
-        version and stores this comment.
-      </p>
-    </div>
-  );
-}
-
 function QuestionEditor({
   question,
   index,
@@ -460,8 +440,6 @@ function QuestionEditor({
   isEditing,
   onEdit,
   onCancel,
-  changeComment,
-  setChangeComment,
   unitOptions = [],
 }: {
   question: InspectionQuestionDef;
@@ -470,8 +448,6 @@ function QuestionEditor({
   isEditing: boolean;
   onEdit: () => void;
   onCancel: () => void;
-  changeComment: string;
-  setChangeComment: (value: string) => void;
   unitOptions?: Array<{ value: string; label: string }>;
 }) {
   const [questionType, setQuestionType] = useState<InspectionQuestionType>(
@@ -507,11 +483,6 @@ function QuestionEditor({
               firstOfWeekOnly: question.firstOfWeekOnly,
               attentionValues: question.attentionValues,
             }}
-          />
-          <ChangeCommentField
-            id={`changeComment-edit-${question.id}`}
-            value={changeComment}
-            onChange={setChangeComment}
           />
           <div className="flex flex-wrap gap-2">
             <Button type="submit">Save question</Button>
@@ -577,17 +548,11 @@ function QuestionEditor({
             <input type="hidden" name="intent" value="move-question" />
             <input type="hidden" name="questionId" value={question.id} />
             <input type="hidden" name="direction" value="up" />
-            <input type="hidden" name="changeComment" value={changeComment} />
             <Button
               type="submit"
               variant="outline"
               size="sm"
-              disabled={index === 0 || !changeComment.trim()}
-              title={
-                changeComment.trim()
-                  ? undefined
-                  : "Enter a change comment above first"
-              }
+              disabled={index === 0}
             >
               Move up
             </Button>
@@ -596,17 +561,11 @@ function QuestionEditor({
             <input type="hidden" name="intent" value="move-question" />
             <input type="hidden" name="questionId" value={question.id} />
             <input type="hidden" name="direction" value="down" />
-            <input type="hidden" name="changeComment" value={changeComment} />
             <Button
               type="submit"
               variant="outline"
               size="sm"
-              disabled={index >= total - 1 || !changeComment.trim()}
-              title={
-                changeComment.trim()
-                  ? undefined
-                  : "Enter a change comment above first"
-              }
+              disabled={index >= total - 1}
             >
               Move down
             </Button>
@@ -617,18 +576,7 @@ function QuestionEditor({
           <Form method="post">
             <input type="hidden" name="intent" value="remove-question" />
             <input type="hidden" name="questionId" value={question.id} />
-            <input type="hidden" name="changeComment" value={changeComment} />
-            <Button
-              type="submit"
-              variant="outline"
-              size="sm"
-              disabled={!changeComment.trim()}
-              title={
-                changeComment.trim()
-                  ? undefined
-                  : "Enter a change comment above first"
-              }
-            >
+            <Button type="submit" variant="outline" size="sm">
               Remove
             </Button>
           </Form>
@@ -730,7 +678,6 @@ export default function InspectionsManageDetailPage({
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
     null,
   );
-  const [changeComment, setChangeComment] = useState("");
 
   return (
     <div className="app-shell">
@@ -740,6 +687,9 @@ export default function InspectionsManageDetailPage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Management</Badge>
             <Badge variant="outline">Version {inspection.version}</Badge>
+            {inspection.hasUnpublishedChanges ? (
+              <Badge variant="outline">Unpublished changes</Badge>
+            ) : null}
             {inspection.unitFormCount > 0 ? (
               <Badge variant="outline">
                 Master template · {inspection.unitFormCount} unit forms
@@ -780,14 +730,15 @@ export default function InspectionsManageDetailPage({
             ) : inspection.unitFormCount > 0 ? (
               <>
                 This is the master forklift checklist. Question edits here apply
-                to all {inspection.unitFormCount} unit forms. The template itself
+                to all {inspection.unitFormCount} unit forms. Publish one
+                revision when your batch of edits is done. The template itself
                 is hidden from operators.
               </>
             ) : (
               <>
-                Update details, edit questions, and change their order. Question
-                changes bump the checklist version and require a manager comment.
-                Operators fill these out on{" "}
+                Update details and edit questions freely. When you are done,
+                publish one form revision with a single comment. Operators fill
+                these out on{" "}
                 <Link
                   to={inspection.href}
                   className="underline-offset-4 hover:underline"
@@ -811,7 +762,7 @@ export default function InspectionsManageDetailPage({
             <CardHeader>
               <CardTitle>Details</CardTitle>
               <CardDescription>
-                Title and availability changes do not create a new version.
+                Title and availability changes do not create a new revision.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -883,11 +834,12 @@ export default function InspectionsManageDetailPage({
                 ) : (
                   <>
                     Choose yes/no, number, date, a text box, or radio options.
-                    Mark which answers should flag “needs attention”. Saving
-                    creates a new version
+                    Mark which answers should flag “needs attention”. Question
+                    edits go live right away
                     {inspection.unitFormCount > 0
-                      ? " that applies to every unit form."
-                      : "."}
+                      ? " for every unit form"
+                      : ""}
+                    ; publish one revision when the whole batch is ready.
                   </>
                 )}
               </CardDescription>
@@ -921,11 +873,6 @@ export default function InspectionsManageDetailPage({
                     setRadioOptions={setRadioOptions}
                     unitOptions={inspection.unitOptions}
                   />
-                  <ChangeCommentField
-                    id="changeComment-add"
-                    value={changeComment}
-                    onChange={setChangeComment}
-                  />
                   <div>
                     <Button type="submit">Add question</Button>
                   </div>
@@ -947,8 +894,8 @@ export default function InspectionsManageDetailPage({
                   <>
                     Edit wording and options, or move questions up and down.
                     Removing a question hides it from new submissions; past runs
-                    keep their answers. Enter a change comment before moving or
-                    removing.
+                    keep their answers. Publish a form revision when you finish
+                    a set of changes.
                   </>
                 )}
               </CardDescription>
@@ -985,39 +932,80 @@ export default function InspectionsManageDetailPage({
                     </li>
                   ))}
                 </ol>
+              ) : inspection.questions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No questions yet. Add one above.
+                </p>
               ) : (
-                <>
-                  <ChangeCommentField
-                    id="changeComment-list"
-                    value={changeComment}
-                    onChange={setChangeComment}
-                  />
-                  {inspection.questions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No questions yet. Add one above.
-                    </p>
-                  ) : (
-                    <ul className="grid gap-3">
-                      {inspection.questions.map((question, index) => (
-                        <QuestionEditor
-                          key={question.id}
-                          question={question}
-                          index={index}
-                          total={inspection.questions.length}
-                          isEditing={editingQuestionId === question.id}
-                          onEdit={() => setEditingQuestionId(question.id)}
-                          onCancel={() => setEditingQuestionId(null)}
-                          changeComment={changeComment}
-                          setChangeComment={setChangeComment}
-                          unitOptions={inspection.unitOptions}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </>
+                <ul className="grid gap-3">
+                  {inspection.questions.map((question, index) => (
+                    <QuestionEditor
+                      key={question.id}
+                      question={question}
+                      index={index}
+                      total={inspection.questions.length}
+                      isEditing={editingQuestionId === question.id}
+                      onEdit={() => setEditingQuestionId(question.id)}
+                      onCancel={() => setEditingQuestionId(null)}
+                      unitOptions={inspection.unitOptions}
+                    />
+                  ))}
+                </ul>
               )}
             </CardContent>
           </Card>
+
+          {!inspection.inheritsQuestions ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Publish revision</CardTitle>
+                <CardDescription>
+                  Batch any number of question edits into one form revision.
+                  Five question changes still become Rev {inspection.version} →
+                  Rev {inspection.version + 1}, with one overall comment.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {inspection.hasUnpublishedChanges ? (
+                  <Form
+                    method="post"
+                    className="grid gap-4"
+                    key={`publish-${inspection.version}`}
+                  >
+                    <input type="hidden" name="intent" value="publish-version" />
+                    <div className="grid gap-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-3">
+                      <Label htmlFor="changeComment-publish">
+                        Revision comment (required)
+                      </Label>
+                      <textarea
+                        id="changeComment-publish"
+                        name="changeComment"
+                        rows={3}
+                        required
+                        placeholder="Summarise what changed in this checklist revision and why"
+                        className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This creates version {inspection.version + 1} and stores
+                        a snapshot of the full checklist.
+                      </p>
+                    </div>
+                    <div>
+                      <Button type="submit">
+                        Publish as version {inspection.version + 1}
+                      </Button>
+                    </div>
+                  </Form>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Checklist matches published version {inspection.version}.
+                    Edit questions above, then come back here to publish one
+                    revision for the whole batch.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>
@@ -1025,7 +1013,7 @@ export default function InspectionsManageDetailPage({
               <CardDescription>
                 {inspection.inheritsQuestions
                   ? "Version history for the shared master checklist."
-                  : "Each question change creates a revision with the manager’s comment and a snapshot of the checklist at that time."}
+                  : "Each published revision stores one manager comment and a snapshot of the full checklist."}
               </CardDescription>
             </CardHeader>
             <CardContent>

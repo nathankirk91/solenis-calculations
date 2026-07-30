@@ -75,6 +75,11 @@ export type InspectionVersionHistoryItem = {
 export type ManagedInspectionDetail = InspectionDefinition & {
   version: number;
   versions: InspectionVersionHistoryItem[];
+  /**
+   * True when the live checklist differs from the latest published
+   * version snapshot (question edits not yet published as a revision).
+   */
+  hasUnpublishedChanges: boolean;
   /** When inheriting, the template that owns editable questions. */
   questionSourceId: string | null;
   questionSourceTitle: string | null;
@@ -604,6 +609,16 @@ async function getManagedInspectionOnce(
     return getManagedInspectionOnce(id);
   }
 
+  const liveQuestions = questionRows.map(mapQuestion);
+  const latestPublished = versionRows[0]
+    ? parseVersionSnapshot(versionRows[0].snapshot)
+    : null;
+  const hasUnpublishedChanges =
+    !inheritsQuestions &&
+    (latestPublished
+      ? checklistQuestionsDiffer(liveQuestions, latestPublished.questions)
+      : liveQuestions.length > 0);
+
   const definition = mergeStaticDefinitionMeta(
     mapDefinition({
       ...row,
@@ -636,6 +651,7 @@ async function getManagedInspectionOnce(
     ...definition,
     version: versionNumber,
     versions: versionRows.map((version) => mapVersionHistoryItem(version)),
+    hasUnpublishedChanges,
     questionSourceId: inheritsQuestions ? row.templateInspectionId : row.id,
     questionSourceTitle: inheritsQuestions
       ? (row.template?.title ?? null)
@@ -716,6 +732,44 @@ function mapVersionHistoryItem(row: {
     questionCount: snapshot.questions.length,
     snapshot,
   };
+}
+
+/** Stable shape for comparing live questions to a published snapshot. */
+function normalizeQuestionsForCompare(questions: InspectionQuestionDef[]) {
+  return questions.map((question) => {
+    const options = questionOptionsForType(question.type, question.options);
+    const attentionValues =
+      question.attentionValues.length > 0
+        ? question.attentionValues
+        : question.type === "YES_NO"
+          ? defaultAttentionValues(question.type, options)
+          : [];
+    return {
+      id: question.id,
+      label: question.label,
+      helpText: question.helpText ?? null,
+      sectionTitle: question.sectionTitle ?? null,
+      type: question.type,
+      options,
+      attentionValues,
+      required: question.required,
+      showLastValue: question.showLastValue,
+      applicableEquipmentRefs: [...question.applicableEquipmentRefs].sort(),
+      applicableShifts: [...question.applicableShifts].sort(),
+      firstOfWeekOnly: question.firstOfWeekOnly,
+      sortOrder: question.sortOrder,
+    };
+  });
+}
+
+function checklistQuestionsDiffer(
+  left: InspectionQuestionDef[],
+  right: InspectionQuestionDef[],
+): boolean {
+  return (
+    JSON.stringify(normalizeQuestionsForCompare(left)) !==
+    JSON.stringify(normalizeQuestionsForCompare(right))
+  );
 }
 
 async function buildInspectionSnapshot(
@@ -806,7 +860,7 @@ async function bumpInspectionVersion(args: {
   const changeComment = args.changeComment.trim();
   if (!changeComment) {
     throw new Error(
-      "A change comment is required when questions are added, edited, removed, or reordered.",
+      "A change comment is required when publishing a checklist revision.",
     );
   }
 
@@ -865,10 +919,51 @@ function requireChangeComment(changeComment: string | undefined): string {
   const comment = changeComment?.trim() ?? "";
   if (!comment) {
     throw new Error(
-      "A change comment is required when questions are added, edited, removed, or reordered.",
+      "A change comment is required when publishing a checklist revision.",
     );
   }
   return comment;
+}
+
+/**
+ * Publish the current live checklist as the next form revision.
+ * Question edits apply immediately but do not bump the version until this runs.
+ */
+export async function publishInspectionVersion(args: {
+  inspectionId: string;
+  changeComment: string;
+  changedById: string;
+}): Promise<number> {
+  await assertQuestionSourceInspection(args.inspectionId);
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  const changeComment = requireChangeComment(args.changeComment);
+  await ensureBaselineInspectionVersion(args.inspectionId);
+
+  const latest = await prisma.inspectionVersion.findFirst({
+    where: { inspectionId: args.inspectionId },
+    orderBy: { version: "desc" },
+    select: { snapshot: true },
+  });
+  const liveSnapshot = await buildInspectionSnapshot(args.inspectionId);
+  if (
+    latest &&
+    !checklistQuestionsDiffer(
+      liveSnapshot.questions,
+      parseVersionSnapshot(latest.snapshot).questions,
+    )
+  ) {
+    throw new Error("No unpublished checklist changes to publish.");
+  }
+
+  return bumpInspectionVersion({
+    inspectionId: args.inspectionId,
+    changeComment,
+    changedById: args.changedById,
+  });
 }
 
 async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
@@ -1164,8 +1259,6 @@ export async function addInspectionQuestion(args: {
   applicableEquipmentRefs?: string[];
   applicableShifts?: string[];
   firstOfWeekOnly?: boolean;
-  changeComment: string;
-  changedById: string;
 }): Promise<InspectionQuestionDef> {
   await assertQuestionSourceInspection(args.inspectionId);
   const prisma = getPrisma();
@@ -1173,7 +1266,6 @@ export async function addInspectionQuestion(args: {
     throw new Error("Database is not configured.");
   }
 
-  const changeComment = requireChangeComment(args.changeComment);
   const label = args.label.trim();
   if (!label) {
     throw new Error("Question label is required.");
@@ -1230,12 +1322,6 @@ export async function addInspectionQuestion(args: {
     },
   });
 
-  await bumpInspectionVersion({
-    inspectionId: args.inspectionId,
-    changeComment,
-    changedById: args.changedById,
-  });
-
   return mapQuestion(row);
 }
 
@@ -1245,15 +1331,11 @@ function YES_NO_INCLUDES(value: string) {
 
 export async function removeInspectionQuestion(args: {
   questionId: string;
-  changeComment: string;
-  changedById: string;
 }): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
   }
-
-  const changeComment = requireChangeComment(args.changeComment);
 
   const existing = await prisma.inspectionQuestion.findFirst({
     where: { id: args.questionId, isActive: true },
@@ -1271,12 +1353,6 @@ export async function removeInspectionQuestion(args: {
   if (updated.count === 0) {
     throw new Error("Question not found.");
   }
-
-  await bumpInspectionVersion({
-    inspectionId: existing.inspectionId,
-    changeComment,
-    changedById: args.changedById,
-  });
 }
 
 export async function updateInspectionQuestion(args: {
@@ -1292,15 +1368,12 @@ export async function updateInspectionQuestion(args: {
   applicableEquipmentRefs?: string[];
   applicableShifts?: string[];
   firstOfWeekOnly?: boolean;
-  changeComment: string;
-  changedById: string;
 }): Promise<InspectionQuestionDef> {
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
   }
 
-  const changeComment = requireChangeComment(args.changeComment);
   const label = args.label.trim();
   if (!label) {
     throw new Error("Question label is required.");
@@ -1359,27 +1432,17 @@ export async function updateInspectionQuestion(args: {
     },
   });
 
-  await bumpInspectionVersion({
-    inspectionId: existing.inspectionId,
-    changeComment,
-    changedById: args.changedById,
-  });
-
   return mapQuestion(row);
 }
 
 export async function moveInspectionQuestion(args: {
   questionId: string;
   direction: "up" | "down";
-  changeComment: string;
-  changedById: string;
 }): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) {
     throw new Error("Database is not configured.");
   }
-
-  const changeComment = requireChangeComment(args.changeComment);
 
   const current = await prisma.inspectionQuestion.findFirst({
     where: { id: args.questionId, isActive: true },
@@ -1419,12 +1482,6 @@ export async function moveInspectionQuestion(args: {
       data: { sortOrder: current.sortOrder },
     }),
   ]);
-
-  await bumpInspectionVersion({
-    inspectionId: current.inspectionId,
-    changeComment,
-    changedById: args.changedById,
-  });
 }
 
 export async function createInspectionRun(args: {
