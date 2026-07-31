@@ -46,9 +46,17 @@ enum InspectionQuestionType {
   RADIO
   NUMBER
   DATE
+  TIME
   CHECKBOX
 
   @@map("inspection_question_type")
+}
+
+enum PermitRunStatus {
+  OPEN
+  CLOSED
+
+  @@map("permit_run_status")
 }
 
 model User {
@@ -63,6 +71,8 @@ model User {
   submittedRuns           CalculationRun[]  @relation("SubmittedBy")
   reviewedRuns            CalculationRun[]  @relation("ReviewedBy")
   submittedInspectionRuns InspectionRun[]   @relation("InspectionSubmittedBy")
+  submittedPermitRuns     PermitRun[]       @relation("PermitSubmittedBy")
+  closedPermitRuns        PermitRun[]       @relation("PermitClosedBy")
   inspectionVersions      InspectionVersion[] @relation("InspectionVersionChangedBy")
   createdInspectionActions InspectionAction[] @relation("InspectionActionCreatedBy")
   closedInspectionActions InspectionAction[] @relation("InspectionActionClosedBy")
@@ -147,6 +157,7 @@ model Inspection {
   questions            InspectionQuestion[]
   versions             InspectionVersion[]
   actions              InspectionAction[]
+  permitRuns           PermitRun[]
 
   @@index([templateInspectionId])
   @@map("inspections")
@@ -245,6 +256,32 @@ model InspectionAction {
   @@index([status, inspectionId, createdAt(sort: Desc)])
   @@index([createdOnRunId])
   @@map("inspection_actions")
+}
+
+model PermitRun {
+  id                  String          @id @default(cuid())
+  inspectionId        String          @map("inspection_id")
+  inspection          Inspection      @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  submittedById       String?         @map("submitted_by_id")
+  submittedBy         User?           @relation("PermitSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  status              PermitRunStatus @default(OPEN)
+  equipmentRef        String?         @map("equipment_ref")
+  inspectionVersion   Int?            @map("inspection_version")
+  responses           Json
+  summary             Json
+  authorizedPersonnel Json            @map("authorized_personnel")
+  authorization       Json
+  closeout            Json?
+  closedAt            DateTime?       @map("closed_at") @db.Timestamptz(6)
+  closedById          String?         @map("closed_by_id")
+  closedBy            User?           @relation("PermitClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([inspectionId])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("permit_runs")
 }
 
 model PushSubscription {

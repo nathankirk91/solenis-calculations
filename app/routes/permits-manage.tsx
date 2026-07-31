@@ -1,6 +1,6 @@
 import { data, Form, Link, redirect } from "react-router";
 
-import type { Route } from "./+types/inspections-manage";
+import type { Route } from "./+types/permits-manage";
 
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
@@ -16,21 +16,19 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireOperatorManager } from "~/lib/auth.server";
+import { seedDefaultInspections, setInspectionAvailability } from "~/lib/inspections.server";
 import {
-  createManagedInspection,
-  listManagedInspections,
-  seedDefaultInspections,
-  setInspectionAvailability,
-} from "~/lib/inspections.server";
-import { isPermitInspection } from "~/lib/inspections";
+  createManagedPermit,
+  listManagedPermits,
+} from "~/lib/permits.server";
 import { ensureInspectionSchema } from "~/lib/migrate.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Manage inspections | Springvale Solenis" },
+    { title: "Manage permits | Springvale Solenis" },
     {
       name: "description",
-      content: "Create and manage plant inspection checklists and questions.",
+      content: "Create and manage work permit forms and questions.",
     },
   ];
 }
@@ -39,47 +37,24 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireOperatorManager(request);
 
   let migrateNote: string | null = null;
-  let inspections = await listManagedInspections();
+  let permits = await listManagedPermits();
 
-  // First visit after deploy: create missing tables, then seed defaults.
-  // Do not run schema ensure on every navigation — that is ~24 DDL round-trips.
-  if (inspections.length === 0) {
+  if (permits.length === 0) {
     try {
       await ensureInspectionSchema();
       const seeded = await seedDefaultInspections();
-      migrateNote = `Loaded ${seeded} default inspections.`;
-      inspections = await listManagedInspections();
+      migrateNote = `Synced ${seeded} built-in forms (including Safe Work Permit).`;
+      permits = await listManagedPermits();
     } catch (error) {
       migrateNote =
         error instanceof Error
           ? error.message
-          : "Could not create inspection tables.";
-    }
-  } else if (
-    !inspections.some((inspection) => inspection.fixedEquipmentRef)
-  ) {
-    // Upgrade path: split the combined forklift form into per-unit forms.
-    try {
-      const seeded = await seedDefaultInspections();
-      migrateNote = `Updated default inspections (${seeded}), including per-unit forklift forms.`;
-      inspections = await listManagedInspections();
-    } catch (error) {
-      migrateNote =
-        error instanceof Error
-          ? error.message
-          : "Could not update forklift unit forms.";
+          : "Could not load permit forms.";
     }
   }
 
   const pendingCount = await countPendingRuns();
-  return {
-    user,
-    inspections: inspections.filter(
-      (inspection) => !isPermitInspection(inspection),
-    ),
-    pendingCount,
-    migrateNote,
-  };
+  return { user, permits, pendingCount, migrateNote };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -95,30 +70,19 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     if (intent === "create") {
-      const category = String(formData.get("category") ?? "");
-      if (category.trim().toLowerCase() === "permits") {
-        return data(
-          {
-            error:
-              "Create permit forms under Permits → Manage, not Inspections.",
-          },
-          { status: 400 },
-        );
-      }
-      const created = await createManagedInspection({
+      const created = await createManagedPermit({
         title: String(formData.get("title") ?? ""),
         description: String(formData.get("description") ?? ""),
-        category,
         equipmentLabel: String(formData.get("equipmentLabel") ?? ""),
       });
-      throw redirect(`/inspections/manage/${created.id}`);
+      throw redirect(`/permits/manage/${created.id}`);
     }
 
     if (intent === "toggle") {
       const inspectionId = String(formData.get("inspectionId") ?? "");
       const isAvailable = String(formData.get("isAvailable") ?? "") === "true";
       if (!inspectionId) {
-        return data({ error: "Missing inspection." }, { status: 400 });
+        return data({ error: "Missing permit." }, { status: 400 });
       }
       await setInspectionAvailability(inspectionId, !isAvailable);
       return { ok: true as const };
@@ -132,7 +96,7 @@ export async function action({ request }: Route.ActionArgs) {
         error:
           error instanceof Error
             ? error.message
-            : "Could not update inspections.",
+            : "Could not update permits.",
       },
       { status: 400 },
     );
@@ -141,11 +105,11 @@ export async function action({ request }: Route.ActionArgs) {
   return data({ error: "Unknown action." }, { status: 400 });
 }
 
-export default function InspectionsManagePage({
+export default function PermitsManagePage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { user, inspections, pendingCount, migrateNote } = loaderData;
+  const { user, permits, pendingCount, migrateNote } = loaderData;
 
   return (
     <div className="app-shell">
@@ -155,25 +119,18 @@ export default function InspectionsManagePage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Management</Badge>
             <Link
-              to="/inspections"
+              to="/permits"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              ← Inspections
+              ← Permits
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-            Manage inspections
+            Manage permits
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Create equipment and shift checklists, then add questions. Work
-            permits are managed separately under{" "}
-            <Link
-              to="/permits/manage"
-              className="underline-offset-4 hover:underline"
-            >
-              Permits → Manage
-            </Link>
-            .
+            Create permit forms and edit their questions. Issued permits and
+            close-out live on the Permits page.
           </p>
           {migrateNote ? (
             <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
@@ -182,9 +139,7 @@ export default function InspectionsManagePage({
           ) : null}
           {actionData && "seeded" in actionData && actionData.seeded != null ? (
             <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
-              Loaded {actionData.seeded} default inspections (forklift template +
-              unit forms, start-up, shut-down). Edit shared forklift questions on
-              the master template.
+              Synced {actionData.seeded} built-in forms.
             </p>
           ) : null}
           {actionData && "error" in actionData && actionData.error ? (
@@ -193,11 +148,12 @@ export default function InspectionsManagePage({
         </div>
 
         <div className="grid gap-4">
-          <Card className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+          <Card>
             <CardHeader>
-              <CardTitle>Add inspection</CardTitle>
+              <CardTitle>Add permit form</CardTitle>
               <CardDescription>
-                After creating, add the questions operators should answer.
+                After creating, add the questions people complete when issuing
+                the permit.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -209,7 +165,7 @@ export default function InspectionsManagePage({
                     id="title"
                     name="title"
                     required
-                    placeholder="e.g. Boiler room weekly check"
+                    placeholder="e.g. Hot Work Permit"
                     autoComplete="off"
                   />
                 </div>
@@ -220,92 +176,71 @@ export default function InspectionsManagePage({
                     name="description"
                     rows={2}
                     className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    placeholder="Short explanation shown on the catalog page"
+                    placeholder="Short explanation shown on the Permits page"
                   />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      name="category"
-                      placeholder="e.g. Equipment or Shift"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="equipmentLabel">
-                      Equipment ID label (optional)
-                    </Label>
-                    <Input
-                      id="equipmentLabel"
-                      name="equipmentLabel"
-                      placeholder="e.g. Forklift / unit ID"
-                      autoComplete="off"
-                    />
-                  </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="equipmentLabel">
+                    Equipment ID label (optional)
+                  </Label>
+                  <Input
+                    id="equipmentLabel"
+                    name="equipmentLabel"
+                    placeholder="e.g. Equipment number"
+                    autoComplete="off"
+                  />
                 </div>
                 <div>
-                  <Button type="submit">Create inspection</Button>
+                  <Button type="submit">Create permit form</Button>
                 </div>
               </Form>
             </CardContent>
           </Card>
 
-          <Card className="animate-in fade-in slide-in-from-bottom-3 duration-500 delay-75">
+          <Card>
             <CardHeader>
-              <CardTitle>All inspections</CardTitle>
+              <CardTitle>Permit forms</CardTitle>
               <CardDescription>
-                Edit questions, or hide an inspection from the Inspections page.
+                Edit questions, or hide a form from the Permits page.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {inspections.length === 0 ? (
+              {permits.length === 0 ? (
                 <div className="grid gap-3">
                   <p className="text-sm text-muted-foreground">
-                    No inspections in the database yet. Load the built-in
-                    forklift, daily start-up, and daily shut-down checklists to
-                    edit them.
+                    No permit forms yet. Load the built-in Safe Work Permit to
+                    get started.
                   </p>
                   <Form method="post">
                     <input type="hidden" name="intent" value="seed-defaults" />
-                    <Button type="submit">Load default inspections</Button>
+                    <Button type="submit">Load default permits</Button>
                   </Form>
                 </div>
               ) : (
                 <ul className="grid gap-3">
-                  {inspections.map((inspection) => (
+                  {permits.map((permit) => (
                     <li
-                      key={inspection.id}
+                      key={permit.id}
                       className="flex flex-col gap-3 rounded-lg border border-border/70 bg-background/50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-medium text-brand-navy">
-                            {inspection.title}
+                            {permit.title}
                           </p>
-                          <Badge variant="secondary">{inspection.category}</Badge>
-                          <Badge variant="outline">v{inspection.version}</Badge>
-                          {inspection.isQuestionSource ? (
-                            <Badge variant="outline">Master template</Badge>
-                          ) : null}
-                          {inspection.fixedEquipmentRef ? (
-                            <Badge variant="outline">
-                              {inspection.fixedEquipmentRef}
-                            </Badge>
-                          ) : null}
-                          {!inspection.isAvailable ? (
+                          <Badge variant="outline">v{permit.version}</Badge>
+                          {!permit.isAvailable ? (
                             <Badge variant="outline">Hidden</Badge>
                           ) : null}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {inspection.questionCount} question
-                          {inspection.questionCount === 1 ? "" : "s"}
+                          {permit.questionCount} question
+                          {permit.questionCount === 1 ? "" : "s"}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button asChild variant="outline" size="sm">
-                          <Link to={`/inspections/manage/${inspection.id}`}>
+                          <Link to={`/permits/manage/${permit.id}`}>
                             Edit questions
                           </Link>
                         </Button>
@@ -314,15 +249,15 @@ export default function InspectionsManagePage({
                           <input
                             type="hidden"
                             name="inspectionId"
-                            value={inspection.id}
+                            value={permit.id}
                           />
                           <input
                             type="hidden"
                             name="isAvailable"
-                            value={String(inspection.isAvailable)}
+                            value={String(permit.isAvailable)}
                           />
                           <Button type="submit" variant="ghost" size="sm">
-                            {inspection.isAvailable ? "Hide" : "Show"}
+                            {permit.isAvailable ? "Hide" : "Show"}
                           </Button>
                         </Form>
                       </div>
@@ -330,7 +265,7 @@ export default function InspectionsManagePage({
                   ))}
                 </ul>
               )}
-              {inspections.length > 0 ? (
+              {permits.length > 0 ? (
                 <Form method="post" className="mt-4">
                   <input type="hidden" name="intent" value="seed-defaults" />
                   <Button type="submit" variant="outline" size="sm">

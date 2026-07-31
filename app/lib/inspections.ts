@@ -4,6 +4,7 @@ export const INSPECTION_QUESTION_TYPES = [
   "RADIO",
   "NUMBER",
   "DATE",
+  "TIME",
   "CHECKBOX",
 ] as const;
 
@@ -308,6 +309,38 @@ function dateQuestion(
     label,
     sectionTitle,
     type: "DATE",
+    options: [],
+    attentionValues: [],
+    required: opts?.required ?? true,
+    showLastValue: opts?.showLastValue ?? false,
+    applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
+    applicableShifts: opts?.applicableShifts ?? [],
+    firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
+    sortOrder,
+    helpText: opts?.helpText,
+  };
+}
+
+function timeQuestion(
+  inspectionId: string,
+  id: string,
+  label: string,
+  sectionTitle: string,
+  sortOrder: number,
+  opts?: {
+    required?: boolean;
+    helpText?: string;
+    showLastValue?: boolean;
+    applicableEquipmentRefs?: string[];
+    applicableShifts?: string[];
+    firstOfWeekOnly?: boolean;
+  },
+): InspectionQuestionDef {
+  return {
+    id: `${inspectionId}__${id}`,
+    label,
+    sectionTitle,
+    type: "TIME",
     options: [],
     attentionValues: [],
     required: opts?.required ?? true,
@@ -747,7 +780,7 @@ export const FORKLIFT_UNIT_FORMS: InspectionDefinition[] = FORKLIFT_UNITS.map(
   (unit, index) => forkliftUnitForm(unit, 2 + index),
 );
 
-/** Form 42801 — Safe Work Permit (hazard control + PPE + authorisation). */
+/** Form 42801 — Safe Work Permit (hazard control + PPE). */
 export const SAFE_WORK_PERMIT: InspectionDefinition = {
   id: "safe-work-permit",
   slug: "safe-work-permit",
@@ -756,11 +789,11 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
   description:
     "Form 42801 safe work permit: classify the job, confirm hazard controls and PPE, and record authorisation before work starts.",
   category: PERMIT_CATEGORY,
-  href: "/inspections/safe-work-permit",
+  href: "/permits/safe-work-permit",
   sortOrder: 20,
   equipmentLabel: "Equipment number",
   instructionNotes:
-    "Form 42801 (09/14). Top copy is the field copy; bottom copy is the control room copy. Complete hazard control steps and authorisation before work begins. Fill permit close-out when the job is finished.",
+    "Form 42801 (09/14). Top copy is the field copy; bottom copy is the control room copy. Complete hazard control steps and authorisation before work begins. Close the permit out later when the job is finished.",
   isAvailable: true,
   questions: [
     dateQuestion(
@@ -778,95 +811,46 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       2,
       { helpText: "How long this permit remains valid." },
     ),
-    textQuestion(
+    timeQuestion(
       "safe-work-permit",
       "start-time",
       "Start time",
       "Permit details",
       3,
-      { helpText: "e.g. 7:30" },
+      { helpText: "24-hour clock (e.g. 07:30)." },
     ),
-    radioQuestion(
-      "safe-work-permit",
-      "start-ampm",
-      "Start AM / PM",
-      "Permit details",
-      ["AM", "PM"],
-      4,
-      { attentionValues: [] },
-    ),
-    textQuestion(
+    timeQuestion(
       "safe-work-permit",
       "end-time",
       "End time",
       "Permit details",
-      5,
-      { helpText: "e.g. 3:30" },
-    ),
-    radioQuestion(
-      "safe-work-permit",
-      "end-ampm",
-      "End AM / PM",
-      "Permit details",
-      ["AM", "PM"],
-      6,
-      { attentionValues: [] },
+      4,
+      { helpText: "24-hour clock (e.g. 15:30)." },
     ),
     textQuestion(
       "safe-work-permit",
       "area",
       "Area",
       "Permit details",
-      7,
+      5,
     ),
     textQuestion(
       "safe-work-permit",
       "work-to-be-performed",
       "Work to be performed",
       "Work details",
-      8,
+      6,
     ),
     textQuestion(
       "safe-work-permit",
       "last-contained",
       "Equipment or piping last contained",
       "Work details",
-      9,
+      7,
       {
         required: false,
         helpText: "What the equipment or piping last contained, if known.",
       },
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "personnel-1",
-      "Authorized personnel 1",
-      "Authorized personnel",
-      10,
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "personnel-2",
-      "Authorized personnel 2",
-      "Authorized personnel",
-      11,
-      { required: false },
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "personnel-3",
-      "Authorized personnel 3",
-      "Authorized personnel",
-      12,
-      { required: false },
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "personnel-4",
-      "Authorized personnel 4",
-      "Authorized personnel",
-      13,
-      { required: false },
     ),
     radioQuestion(
       "safe-work-permit",
@@ -874,7 +858,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "Work classification",
       "Work classification",
       ["Routine work", "Non-routine work"],
-      14,
+      8,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -883,7 +867,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "1. Has line and/or equipment been cleared of material and any residual pressure?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      15,
+      9,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -892,7 +876,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "2. Has line and/or equipment been decontaminated (steamed, washed, neutralized etc.)?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      16,
+      10,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -901,7 +885,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "3. Has system been locked out to prevent release of any energy source (run-lock-try)?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      17,
+      11,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -910,7 +894,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "4. Are multiple energy sources involved with lockout (if Yes complete lockout procedure form)?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      18,
+      12,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -919,7 +903,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "5. Is a LOCK-BOX being used for this work?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      19,
+      13,
       { attentionValues: [] },
     ),
     textQuestion(
@@ -927,7 +911,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "lock-box-no",
       "Lock-box number",
       "Hazard control steps",
-      20,
+      14,
       {
         required: false,
         helpText: "Required when a lock-box is in place.",
@@ -939,7 +923,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "6. Are check valves in system that prevent proper bleeding off of residual energy?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      21,
+      15,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -948,7 +932,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "7. Are nearest safety shower / eyewash stations identified and operational?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      22,
+      16,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -957,7 +941,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "8. Is a CONFINED SPACE ENTRY PERMIT required for this work? (If Yes, complete Confined Space Permit)",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      23,
+      17,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -966,7 +950,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "9. Is a HOT WORK PERMIT required for this work? (If Yes, complete Hot Work Permit)",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      24,
+      18,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -975,7 +959,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "10. Is a LINE BREAK PERMIT required for this work? (If Yes, complete Line Break Permit)",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      25,
+      19,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -984,7 +968,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "11. Has Non-Routine work plan been developed for performing this work?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      26,
+      20,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -993,7 +977,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "12. Will work require use of a ladder, scaffolding, or man lift?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      27,
+      21,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -1002,7 +986,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "13. Will work require fall protection (> 6 foot / 1.83 meters elevation)?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      28,
+      22,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -1011,7 +995,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "14. Will work be performed on an unprotected roof or structure (complete roof access permit)?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
-      29,
+      23,
       { attentionValues: [] },
     ),
     checkboxQuestion(
@@ -1035,9 +1019,8 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
         "Chemical face shield",
         "Full body harness",
         "Double lanyard",
-        "Other",
       ],
-      30,
+      24,
       {
         required: false,
         helpText: "Select all additional PPE required for this job.",
@@ -1048,10 +1031,10 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "ppe-other",
       "Other PPE (specify)",
       "Required PPE",
-      31,
+      25,
       {
         required: false,
-        helpText: "Complete when Other is selected above.",
+        helpText: "List any additional PPE not shown above.",
       },
     ),
     radioQuestion(
@@ -1060,7 +1043,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "1. Will work be performed by qualified electrical personnel?",
       "Electrical hazard control",
       [...YES_NA_OPTIONS],
-      32,
+      26,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -1069,7 +1052,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "2. Will work be performed on or near live electrical circuits or components?",
       "Electrical hazard control",
       [...YES_NA_OPTIONS],
-      33,
+      27,
       {
         attentionValues: [],
         helpText: "If Yes, ensure a work plan is in place with required PPE.",
@@ -1081,7 +1064,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "3. If work will be performed on a de-energized circuit, have proper isolation and lock out procedures been followed including testing of equipment to verify it has been de-energized?",
       "Electrical hazard control",
       [...YES_NA_OPTIONS],
-      34,
+      28,
       { attentionValues: [] },
     ),
     radioQuestion(
@@ -1090,7 +1073,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "4. Will work be performed on de-energized electrical circuit or equipment which operates at greater than 1,000 volts?",
       "Electrical hazard control",
       [...YES_NA_OPTIONS],
-      35,
+      29,
       {
         attentionValues: [],
         helpText: "If Yes, ensure a work plan is in place with required PPE.",
@@ -1101,75 +1084,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "special-precautions",
       "Special precautions",
       "Special precautions",
-      36,
-      { required: false },
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "ops-rep",
-      "Operations rep",
-      "Authorization to conduct work",
-      37,
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "maint-rep",
-      "Maintenance rep",
-      "Authorization to conduct work",
-      38,
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "safe-work-coordinator",
-      "Safe work coordinator",
-      "Authorization to conduct work",
-      39,
-    ),
-    dateQuestion(
-      "safe-work-permit",
-      "closeout-date",
-      "Close-out date",
-      "Permit close-out",
-      40,
-      {
-        required: false,
-        helpText: "Complete when the job is finished.",
-      },
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "closeout-time",
-      "Close-out time",
-      "Permit close-out",
-      41,
-      {
-        required: false,
-        helpText: "e.g. 4:15",
-      },
-    ),
-    radioQuestion(
-      "safe-work-permit",
-      "closeout-ampm",
-      "Close-out AM / PM",
-      "Permit close-out",
-      ["AM", "PM"],
-      42,
-      { required: false, attentionValues: [] },
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "closeout-ops-initials",
-      "Operators initials",
-      "Permit close-out",
-      43,
-      { required: false },
-    ),
-    textQuestion(
-      "safe-work-permit",
-      "closeout-maint-initials",
-      "Maintenance initials",
-      "Permit close-out",
-      44,
+      30,
       { required: false },
     ),
   ],
@@ -1360,7 +1275,7 @@ export function questionOptionsForType(
   if (type === "YES_NO") {
     return [...YES_NO_OPTIONS];
   }
-  if (type === "TEXT" || type === "NUMBER" || type === "DATE") {
+  if (type === "TEXT" || type === "NUMBER" || type === "DATE" || type === "TIME") {
     return [];
   }
   return options.map((option) => option.trim()).filter(Boolean);
@@ -1395,6 +1310,8 @@ export function questionTypeLabel(type: InspectionQuestionType): string {
       return "Number";
     case "DATE":
       return "Date";
+    case "TIME":
+      return "Time";
     case "CHECKBOX":
       return "Checkboxes";
   }

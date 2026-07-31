@@ -156,18 +156,16 @@ Default seeded inspections:
 
 ## Permits
 
-Permits live on `/permits` (separate catalog from equipment / shift checklists). They reuse the same inspection form engine and history. Seed category **Permits**.
-
-| Permit | Route |
-|---|---|
-| Safe Work Permit (Form 42801) | `/inspections/safe-work-permit` |
-
-Management:
+Permits live on `/permits`, with their own records and management (separate from inspections).
 
 | Page | Route |
 |---|---|
-| Create / list inspections | `/inspections/manage` |
-| Edit questions | `/inspections/manage/:id` |
+| Issue / open permits | `/permits` |
+| Permit records | `/permits/history` |
+| Manage permit forms | `/permits/manage` |
+| Safe Work Permit (Form 42801) | `/permits/safe-work-permit` |
+
+Issuing a permit opens it. Managers close it later from the open list / permit record using the close-out fields.
 
 ## Scripts
 

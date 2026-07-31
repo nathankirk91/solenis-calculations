@@ -30,6 +30,8 @@ function passResponses(definition) {
       responses[question.id] = "100";
     } else if (question.type === "DATE") {
       responses[question.id] = "2026-07-28";
+    } else if (question.type === "TIME") {
+      responses[question.id] = "07:30";
     } else if (question.required) {
       responses[question.id] = "—";
     }

@@ -346,13 +346,22 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
               {
                 to: "/permits",
                 label: "Forms",
-                description: "Safe work and related permits",
+                description: "Issue permits and close out open ones",
               },
               {
-                to: "/inspections/history",
+                to: "/permits/history",
                 label: "Records",
-                description: "Completed permit and checklist history",
+                description: "Open and closed permit history",
               },
+              ...(showOperators
+                ? [
+                    {
+                      to: "/permits/manage",
+                      label: "Manage",
+                      description: "Edit permit form templates",
+                    },
+                  ]
+                : []),
             ],
           },
         ] satisfies NavItem[])

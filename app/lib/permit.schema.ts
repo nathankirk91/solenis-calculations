@@ -4,7 +4,6 @@ import {
   buildAnswersFromResponses,
   filterQuestionsForContext,
   parseCheckboxAnswer,
-  readShiftAnswer,
   summarizeInspectionAnswers,
   type InspectionDefinition,
 } from "~/lib/inspections";
@@ -16,21 +15,8 @@ function emptyToUndefined(value: unknown) {
   return value;
 }
 
-export type InspectionSchemaContext = {
-  /** Melbourne Mon–Sun week; defaults to true when omitted. */
-  isFirstInspectionOfWeek?: boolean;
-};
-
-/**
- * Zod schema for Conform client validation (no transform — transforming on
- * onInput revalidation shrinks `responses` and drops unanswered fields).
- */
-export function createInspectionFormSchema(
-  definition: InspectionDefinition,
-  context: InspectionSchemaContext = {},
-) {
+function buildResponseShape(definition: InspectionDefinition) {
   const responseShape: Record<string, z.ZodType<string | undefined>> = {};
-  const isFirstInspectionOfWeek = context.isFirstInspectionOfWeek ?? true;
 
   for (const question of definition.questions) {
     if (question.type === "TEXT") {
@@ -104,11 +90,23 @@ export function createInspectionFormSchema(
     }
   }
 
+  return responseShape;
+}
+
+const authorizationPersonSchema = z.object({
+  name: z
+    .string({ error: "Enter the name." })
+    .trim()
+    .min(1, "Enter the name.")
+    .max(120, "Keep the name under 120 characters."),
+  signature: z
+    .string({ error: "Signature / initials are required." })
+    .min(1, "Please sign or initial."),
+});
+
+export function createPermitIssueFormSchema(definition: InspectionDefinition) {
   return z
     .object({
-      operatorId: z
-        .string({ error: "Select who is doing this inspection." })
-        .min(1, "Select who is doing this inspection."),
       equipmentRef: z.preprocess(
         emptyToUndefined,
         z
@@ -118,37 +116,23 @@ export function createInspectionFormSchema(
           .max(80, "Keep the reference under 80 characters.")
           .optional(),
       ),
-      notes: z.preprocess(
-        emptyToUndefined,
-        z
-          .string()
-          .trim()
-          .max(2000, "Notes must be under 2000 characters.")
-          .optional(),
-      ),
-      actions: z
-        .array(z.string().trim().max(2000, "Keep each action under 2000 characters."))
+      authorizedPersonnel: z
+        .array(
+          z
+            .string()
+            .trim()
+            .max(120, "Keep each name under 120 characters."),
+        )
         .default([]),
-      signature: z
-        .string({ error: "Signature is required." })
-        .min(1, "Please sign or initial the form."),
-      responses: z.object(responseShape),
+      authorization: z.object({
+        operationsRep: authorizationPersonSchema,
+        maintenanceRep: authorizationPersonSchema,
+        safeWorkCoordinator: authorizationPersonSchema,
+      }),
+      responses: z.object(buildResponseShape(definition)),
     })
     .superRefine((value, ctx) => {
-      if (definition.fixedEquipmentRef) {
-        // Unit is locked on the form; no picker validation needed.
-      } else if (definition.equipmentChoices?.length) {
-        const allowed = new Set(
-          definition.equipmentChoices.map((choice) => choice.value),
-        );
-        if (!value.equipmentRef || !allowed.has(value.equipmentRef)) {
-          ctx.addIssue({
-            code: "custom",
-            message: `Select ${definition.equipmentLabel ?? "a unit"}.`,
-            path: ["equipmentRef"],
-          });
-        }
-      } else if (definition.equipmentLabel && !value.equipmentRef) {
+      if (definition.equipmentLabel && !value.equipmentRef) {
         ctx.addIssue({
           code: "custom",
           message: `${definition.equipmentLabel} is required.`,
@@ -156,10 +140,20 @@ export function createInspectionFormSchema(
         });
       }
 
-      const shift = readShiftAnswer(definition.questions, value.responses);
+      const personnel = value.authorizedPersonnel
+        .map((name) => name.trim())
+        .filter(Boolean);
+      if (personnel.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Add at least one authorized person.",
+          path: ["authorizedPersonnel", 0],
+        });
+      }
+
       const applicableQuestions = filterQuestionsForContext(
         definition.questions,
-        { shift, isFirstInspectionOfWeek },
+        { isFirstInspectionOfWeek: true },
       );
 
       for (const question of applicableQuestions) {
@@ -200,18 +194,11 @@ export function createInspectionFormSchema(
     });
 }
 
-/** Full schema including submit transform (answers + summary). */
-export function createInspectionSchema(
-  definition: InspectionDefinition,
-  context: InspectionSchemaContext = {},
-) {
-  const isFirstInspectionOfWeek = context.isFirstInspectionOfWeek ?? true;
-
-  return createInspectionFormSchema(definition, context).transform((value) => {
-    const shift = readShiftAnswer(definition.questions, value.responses);
+export function createPermitIssueSchema(definition: InspectionDefinition) {
+  return createPermitIssueFormSchema(definition).transform((value) => {
     const applicableQuestions = filterQuestionsForContext(
       definition.questions,
-      { shift, isFirstInspectionOfWeek },
+      { isFirstInspectionOfWeek: true },
     );
     const responses: Record<string, string> = {};
     for (const question of applicableQuestions) {
@@ -222,13 +209,14 @@ export function createInspectionSchema(
       responses,
     );
     const summary = summarizeInspectionAnswers(answers);
+    const authorizedPersonnel = value.authorizedPersonnel
+      .map((name) => name.trim())
+      .filter(Boolean);
 
     return {
-      operatorId: value.operatorId,
-      equipmentRef: definition.fixedEquipmentRef ?? value.equipmentRef ?? null,
-      notes: value.notes ?? null,
-      actions: value.actions.map((item) => item.trim()).filter(Boolean),
-      signature: value.signature,
+      equipmentRef: value.equipmentRef ?? null,
+      authorizedPersonnel,
+      authorization: value.authorization,
       responses,
       answers,
       summary,
@@ -236,6 +224,39 @@ export function createInspectionSchema(
   });
 }
 
-export type InspectionFormValues = z.infer<
-  ReturnType<typeof createInspectionSchema>
+export function createPermitCloseoutSchema() {
+  return z.object({
+    date: z
+      .string({ error: "Enter the close-out date." })
+      .trim()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date."),
+    time: z
+      .string({ error: "Enter the close-out time." })
+      .trim()
+      .regex(/^\d{2}:\d{2}$/, "Enter a valid 24-hour time."),
+    operatorsInitials: z
+      .string({ error: "Operators initials are required." })
+      .min(1, "Operators must initial the close-out."),
+    maintenanceInitials: z
+      .string({ error: "Maintenance initials are required." })
+      .min(1, "Maintenance must initial the close-out."),
+  });
+}
+
+export type PermitIssueFormValues = z.infer<
+  ReturnType<typeof createPermitIssueSchema>
 >;
+export type PermitCloseoutValues = z.infer<
+  ReturnType<typeof createPermitCloseoutSchema>
+>;
+export type PermitAuthorization = {
+  operationsRep: { name: string; signature: string };
+  maintenanceRep: { name: string; signature: string };
+  safeWorkCoordinator: { name: string; signature: string };
+};
+export type PermitCloseout = {
+  date: string;
+  time: string;
+  operatorsInitials: string;
+  maintenanceInitials: string;
+};

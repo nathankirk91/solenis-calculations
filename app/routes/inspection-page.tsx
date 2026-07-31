@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, redirect } from "react-router";
 
 import type { Route } from "./+types/inspection-page";
 
@@ -33,7 +33,13 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const definition = await getInspectionDefinition(params.inspectionId);
+  // Legacy /inspections/safe-work-permit URLs redirect to /permits/...
+  const maybePermit = await getInspectionDefinition(params.inspectionId);
+  if (maybePermit && isPermitInspection(maybePermit)) {
+    throw redirect(maybePermit.href);
+  }
+
+  const definition = maybePermit;
   if (!definition || !definition.isAvailable) {
     throw new Response("Inspection not found", { status: 404 });
   }
@@ -99,6 +105,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   const definition = await getInspectionDefinition(params.inspectionId);
   if (!definition || !definition.isAvailable) {
     throw new Response("Inspection not found", { status: 404 });
+  }
+  if (isPermitInspection(definition)) {
+    throw redirect(definition.href);
   }
 
   const user = await requireUser(request, definition.href);

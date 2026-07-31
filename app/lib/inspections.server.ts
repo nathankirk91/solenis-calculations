@@ -39,6 +39,7 @@ function isKnownQuestionType(value: unknown): value is InspectionQuestionType {
     value === "RADIO" ||
     value === "NUMBER" ||
     value === "DATE" ||
+    value === "TIME" ||
     value === "CHECKBOX"
   );
 }
@@ -54,7 +55,10 @@ function attentionJsonForType(
   type: InspectionQuestionType,
   attentionValues: string[],
 ): string[] | typeof Prisma.DbNull {
-  return type === "TEXT" || type === "NUMBER" || type === "DATE"
+  return type === "TEXT" ||
+    type === "NUMBER" ||
+    type === "DATE" ||
+    type === "TIME"
     ? Prisma.DbNull
     : attentionValues;
 }
@@ -1212,18 +1216,24 @@ export async function updateManagedInspection(args: {
 
   const existing = await prisma.inspection.findUnique({
     where: { id: args.id },
-    select: { slug: true },
+    select: { slug: true, category: true },
   });
   if (!existing) {
     throw new Error("Inspection not found.");
   }
+
+  const category = args.category.trim() || "General";
+  const isPermit = category.toLowerCase() === "permits";
 
   await prisma.inspection.update({
     where: { id: args.id },
     data: {
       title,
       description: args.description.trim(),
-      category: args.category.trim() || "General",
+      category,
+      href: isPermit
+        ? `/permits/${existing.slug}`
+        : `/inspections/${existing.slug}`,
       equipmentLabel: args.equipmentLabel.trim() || null,
       isAvailable: args.isAvailable,
     },
@@ -1308,7 +1318,7 @@ export async function addInspectionQuestion(args: {
     defaultAttentionValues(args.type, options);
 
   const normalizedAttention =
-    args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
+    args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE" || args.type === "TIME"
       ? []
       : attentionValues.filter((value) =>
           args.type === "YES_NO"
@@ -1426,7 +1436,7 @@ export async function updateInspectionQuestion(args: {
     defaultAttentionValues(args.type, options);
 
   const normalizedAttention =
-    args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
+    args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE" || args.type === "TIME"
       ? []
       : attentionValues.filter((value) =>
           args.type === "YES_NO"
@@ -1633,14 +1643,24 @@ export async function listInspectionHistory(
   const bounds = options.date ? melbourneDayBounds(options.date) : null;
 
   const rows = await prisma.inspectionRun.findMany({
-    where: bounds
-      ? {
-          createdAt: {
-            gte: bounds.start,
-            lt: bounds.end,
+    where: {
+      inspection: {
+        NOT: {
+          category: {
+            equals: "Permits",
+            mode: "insensitive",
           },
-        }
-      : undefined,
+        },
+      },
+      ...(bounds
+        ? {
+            createdAt: {
+              gte: bounds.start,
+              lt: bounds.end,
+            },
+          }
+        : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: limit,
     select: {

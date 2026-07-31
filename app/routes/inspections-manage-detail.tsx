@@ -21,6 +21,7 @@ import {
   INSPECTION_QUESTION_TYPES,
   INSPECTION_SHIFT_OPTIONS,
   YES_NO_OPTIONS,
+  isPermitInspection,
   looksLikeAttentionOption,
   questionTypeLabel,
   type InspectionQuestionDef,
@@ -65,15 +66,33 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     if (intent === "update") {
+      const existing = await getManagedInspection(inspectionId);
+      const nextCategory = String(formData.get("category") ?? "");
+      if (existing && isPermitInspection(existing)) {
+        if (nextCategory.trim().toLowerCase() !== "permits") {
+          return data(
+            { error: "Permit forms must keep the Permits category." },
+            { status: 400 },
+          );
+        }
+      } else if (nextCategory.trim().toLowerCase() === "permits") {
+        return data(
+          {
+            error:
+              "Move forms to Permits → Manage instead of changing category here.",
+          },
+          { status: 400 },
+        );
+      }
       await updateManagedInspection({
         id: inspectionId,
         title: String(formData.get("title") ?? ""),
         description: String(formData.get("description") ?? ""),
-        category: String(formData.get("category") ?? ""),
+        category: nextCategory,
         equipmentLabel: String(formData.get("equipmentLabel") ?? ""),
         isAvailable: String(formData.get("isAvailable") ?? "") === "on",
       });
-      return { ok: true as const, message: "Inspection details saved." };
+      return { ok: true as const, message: "Details saved." };
     }
 
     if (intent === "publish-version") {
@@ -282,6 +301,7 @@ function QuestionFields({
           <option value="TEXT">Text box</option>
           <option value="NUMBER">Number</option>
           <option value="DATE">Date</option>
+          <option value="TIME">Time (24-hour)</option>
           <option value="RADIO">Radio options</option>
           <option value="CHECKBOX">Checkboxes (multi-select)</option>
         </select>
@@ -673,6 +693,12 @@ export default function InspectionsManageDetailPage({
   actionData,
 }: Route.ComponentProps) {
   const { user, inspection, pendingCount } = loaderData;
+  const isPermit = isPermitInspection(inspection);
+  const manageHref = isPermit ? "/permits/manage" : "/inspections/manage";
+  const manageLabel = isPermit ? "← All permits" : "← All inspections";
+  const catalogLabel = isPermit
+    ? "Show on Permits page"
+    : "Show on Inspections page";
   const [questionType, setQuestionType] =
     useState<InspectionQuestionType>("YES_NO");
   const [radioOptions, setRadioOptions] = useState("OK\nNeeds attention\nN/A");
@@ -705,10 +731,10 @@ export default function InspectionsManageDetailPage({
               </Badge>
             ) : null}
             <Link
-              to="/inspections/manage"
+              to={manageHref}
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              ← All inspections
+              {manageLabel}
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -791,11 +817,25 @@ export default function InspectionsManageDetailPage({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      name="category"
-                      defaultValue={inspection.category}
-                    />
+                    {isPermit ? (
+                      <>
+                        <Input
+                          id="category"
+                          name="category"
+                          value="Permits"
+                          readOnly
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Permit forms always use the Permits category.
+                        </p>
+                      </>
+                    ) : (
+                      <Input
+                        id="category"
+                        name="category"
+                        defaultValue={inspection.category}
+                      />
+                    )}
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="equipmentLabel">Equipment ID label</Label>
@@ -814,7 +854,7 @@ export default function InspectionsManageDetailPage({
                     defaultChecked={inspection.isAvailable}
                     className="size-4 accent-[var(--brand-navy)]"
                   />
-                  Show on Inspections page
+                  {catalogLabel}
                 </label>
                 <div>
                   <Button type="submit">Save details</Button>

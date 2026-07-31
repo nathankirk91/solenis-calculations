@@ -1,5 +1,3 @@
-import { Link } from "react-router";
-
 import type { Route } from "./+types/inspections";
 
 import { AppHeader } from "~/components/app-header";
@@ -51,11 +49,8 @@ export default function InspectionsPage({ loaderData }: Route.ComponentProps) {
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
             Open forklift checks by unit, or complete daily start-up /
-            shut-down checklists. Work permits live under{" "}
-            <Link to="/permits" className="underline-offset-4 hover:underline">
-              Permits
-            </Link>
-            . Anything marked for attention notifies managers.
+            shut-down checklists. Anything marked for attention notifies
+            managers.
           </p>
         </section>
 

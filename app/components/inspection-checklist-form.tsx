@@ -374,6 +374,18 @@ export function InspectionChecklistForm({
                               aria-invalid={Boolean(fieldErrors)}
                             />
                           </div>
+                        ) : question.type === "TIME" ? (
+                          <div className="mt-3">
+                            <Input
+                              id={fieldId}
+                              name={fieldName}
+                              key={fieldKey}
+                              type="time"
+                              defaultValue={value}
+                              className="max-w-xs"
+                              aria-invalid={Boolean(fieldErrors)}
+                            />
+                          </div>
                         ) : question.type === "CHECKBOX" ? (
                           <fieldset className="mt-3">
                             <legend className="sr-only">{question.label}</legend>
