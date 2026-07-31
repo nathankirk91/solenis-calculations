@@ -232,8 +232,12 @@ export async function createManagedUser(args: {
   };
 }
 
-export async function updateManagedUserRoles(args: {
+export async function updateManagedUser(args: {
   userId: string;
+  name: string;
+  email: string;
+  /** When set (non-empty), replaces the user's password. */
+  password?: string;
   roleIds: string[];
   assignedById?: string | null;
 }): Promise<ManagedUser> {
@@ -243,7 +247,20 @@ export async function updateManagedUserRoles(args: {
   }
   await ensureRolesAndSignOffDefaults();
 
+  const name = args.name.trim();
+  const email = args.email.trim().toLowerCase();
+  const password = args.password?.trim() ?? "";
   const roleIds = uniqueIds(args.roleIds);
+
+  if (!name) {
+    throw new Error("Name is required.");
+  }
+  if (!email || !email.includes("@")) {
+    throw new Error("A valid email is required.");
+  }
+  if (password && password.length < 6) {
+    throw new Error("Password must be at least 6 characters.");
+  }
   if (roleIds.length === 0) {
     throw new Error("Select at least one role.");
   }
@@ -256,6 +273,14 @@ export async function updateManagedUserRoles(args: {
     throw new Error("User not found.");
   }
 
+  const emailTaken = await prisma.user.findFirst({
+    where: { email, id: { not: args.userId } },
+    select: { id: true },
+  });
+  if (emailTaken) {
+    throw new Error("A user with that email already exists.");
+  }
+
   const roles = await prisma.role.findMany({
     where: { id: { in: roleIds }, isActive: true },
     select: { id: true, slug: true, name: true },
@@ -265,6 +290,7 @@ export async function updateManagedUserRoles(args: {
   }
 
   const primaryRole = primarySystemRoleFromSlugs(roles.map((role) => role.slug));
+  const passwordHash = password ? await hashPassword(password) : null;
 
   await prisma.$transaction([
     prisma.userRoleAssignment.deleteMany({ where: { userId: args.userId } }),
@@ -277,7 +303,12 @@ export async function updateManagedUserRoles(args: {
     }),
     prisma.user.update({
       where: { id: args.userId },
-      data: { role: primaryRole },
+      data: {
+        name,
+        email,
+        role: primaryRole,
+        ...(passwordHash ? { passwordHash } : {}),
+      },
     }),
   ]);
 
@@ -303,6 +334,32 @@ export async function updateManagedUserRoles(args: {
     roles: assigned,
     createdAt: updated.createdAt,
   };
+}
+
+/** @deprecated Prefer updateManagedUser. */
+export async function updateManagedUserRoles(args: {
+  userId: string;
+  roleIds: string[];
+  assignedById?: string | null;
+}): Promise<ManagedUser> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+  const existing = await prisma.user.findUnique({
+    where: { id: args.userId },
+    select: { name: true, email: true },
+  });
+  if (!existing) {
+    throw new Error("User not found.");
+  }
+  return updateManagedUser({
+    userId: args.userId,
+    name: existing.name ?? "",
+    email: existing.email,
+    roleIds: args.roleIds,
+    assignedById: args.assignedById,
+  });
 }
 
 /** @deprecated Prefer createManagedUser. */

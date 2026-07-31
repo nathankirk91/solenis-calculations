@@ -20,7 +20,7 @@ import { listRoles } from "~/lib/roles.server";
 import {
   createManagedUser,
   listManagedUsers,
-  updateManagedUserRoles,
+  updateManagedUser,
 } from "~/lib/user.server";
 
 export function meta({}: Route.MetaArgs) {
@@ -62,17 +62,26 @@ export async function action({ request }: Route.ActionArgs) {
       return { ok: true as const, message: "User added." };
     }
 
-    if (intent === "update-roles") {
+    if (intent === "update") {
       const userId = String(formData.get("userId") ?? "");
       if (!userId) {
         return data({ error: "Missing user." }, { status: 400 });
       }
-      await updateManagedUserRoles({
+      const password = String(formData.get("password") ?? "");
+      await updateManagedUser({
         userId,
+        name: String(formData.get("name") ?? ""),
+        email: String(formData.get("email") ?? ""),
+        password: password || undefined,
         roleIds,
         assignedById: admin.id,
       });
-      return { ok: true as const, message: "Roles updated." };
+      return {
+        ok: true as const,
+        message: password
+          ? "User updated (password changed)."
+          : "User updated.",
+      };
     }
   } catch (error) {
     return data(
@@ -212,8 +221,9 @@ export default function UsersPage({
             <CardHeader>
               <CardTitle>Current users</CardTitle>
               <CardDescription>
-                Update role assignments at any time. Users must sign in again
-                for access changes to apply.
+                Edit name, email, roles, or set a new password. Leave password
+                blank to keep the current one. Users must sign in again for
+                access changes to apply.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -232,43 +242,75 @@ export default function UsersPage({
                         key={managed.id}
                         className="rounded-lg border border-border/70 bg-background/50 px-3 py-3"
                       >
-                        <div className="mb-3">
-                          <p className="font-medium">
-                            {managed.name?.trim() || "Unnamed user"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {managed.email}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Access: {managed.role}
-                            {managed.roles.length > 0
-                              ? ` · ${managed.roles.map((role) => role.name).join(", ")}`
-                              : ""}
-                          </p>
-                        </div>
                         <Form method="post" className="grid gap-3">
-                          <input type="hidden" name="intent" value="update-roles" />
+                          <input type="hidden" name="intent" value="update" />
                           <input type="hidden" name="userId" value={managed.id} />
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {roles.map((role) => (
-                              <label
-                                key={role.id}
-                                className="flex items-start gap-2 text-sm"
-                              >
-                                <input
-                                  type="checkbox"
-                                  name="roleIds"
-                                  value={role.id}
-                                  defaultChecked={assigned.has(role.id)}
-                                  className="mt-1"
-                                />
-                                <span>{role.name}</span>
-                              </label>
-                            ))}
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="grid gap-2">
+                              <Label htmlFor={`name-${managed.id}`}>Name</Label>
+                              <Input
+                                id={`name-${managed.id}`}
+                                name="name"
+                                required
+                                defaultValue={managed.name ?? ""}
+                                autoComplete="off"
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor={`email-${managed.id}`}>
+                                Email
+                              </Label>
+                              <Input
+                                id={`email-${managed.id}`}
+                                name="email"
+                                type="email"
+                                required
+                                defaultValue={managed.email}
+                                autoComplete="off"
+                              />
+                            </div>
                           </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor={`password-${managed.id}`}>
+                              New password
+                            </Label>
+                            <Input
+                              id={`password-${managed.id}`}
+                              name="password"
+                              type="password"
+                              minLength={6}
+                              placeholder="Leave blank to keep current password"
+                              autoComplete="new-password"
+                            />
+                          </div>
+                          <fieldset className="grid gap-2">
+                            <legend className="text-sm font-medium">
+                              Roles
+                              <span className="ml-2 font-normal text-muted-foreground">
+                                Access: {managed.role}
+                              </span>
+                            </legend>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {roles.map((role) => (
+                                <label
+                                  key={role.id}
+                                  className="flex items-start gap-2 text-sm"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    name="roleIds"
+                                    value={role.id}
+                                    defaultChecked={assigned.has(role.id)}
+                                    className="mt-1"
+                                  />
+                                  <span>{role.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </fieldset>
                           <div className="flex justify-end">
                             <Button type="submit" variant="outline" size="sm">
-                              Save roles
+                              Save user
                             </Button>
                           </div>
                         </Form>
