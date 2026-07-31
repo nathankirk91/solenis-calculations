@@ -30,8 +30,19 @@ import {
 } from "~/lib/inspections";
 import { cn } from "~/lib/utils";
 
+type SignOffOption = {
+  id: string;
+  name: string | null;
+  email: string;
+};
+
 type Props = {
   definition: InspectionDefinition;
+  signOffOptions: {
+    operationsRep: SignOffOption[];
+    maintenanceRep: SignOffOption[];
+    safeWorkCoordinator: SignOffOption[];
+  };
   lastResult?: SubmissionResult<string[]> | null;
   summary?: InspectionSummary | null;
   status?: InspectionSummary["status"] | null;
@@ -40,6 +51,7 @@ type Props = {
 
 export function PermitIssueForm({
   definition,
+  signOffOptions,
   lastResult,
   summary,
   status,
@@ -64,9 +76,9 @@ export function PermitIssueForm({
       equipmentRef: "",
       authorizedPersonnel: [""],
       authorization: {
-        operationsRep: { name: "", signature: "" },
-        maintenanceRep: { name: "", signature: "" },
-        safeWorkCoordinator: { name: "", signature: "" },
+        operationsRep: { userId: "", signature: "" },
+        maintenanceRep: { userId: "", signature: "" },
+        safeWorkCoordinator: { userId: "", signature: "" },
       },
       responses: defaultResponses,
     },
@@ -390,23 +402,26 @@ export function PermitIssueForm({
                   Authorization to conduct work
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Enter each representative’s name and initials.
+                  Select an eligible user for each sign-off and add initials.
                 </p>
               </div>
               <AuthorizationPersonFields
                 title="Operations rep"
-                nameField={opsFields.name}
+                userIdField={opsFields.userId}
                 signatureField={opsFields.signature}
+                options={signOffOptions.operationsRep}
               />
               <AuthorizationPersonFields
                 title="Maintenance rep"
-                nameField={maintFields.name}
+                userIdField={maintFields.userId}
                 signatureField={maintFields.signature}
+                options={signOffOptions.maintenanceRep}
               />
               <AuthorizationPersonFields
                 title="Safe work coordinator"
-                nameField={coordinatorFields.name}
+                userIdField={coordinatorFields.userId}
                 signatureField={coordinatorFields.signature}
+                options={signOffOptions.safeWorkCoordinator}
               />
             </section>
 
@@ -487,11 +502,12 @@ export function PermitIssueForm({
 
 function AuthorizationPersonFields({
   title,
-  nameField,
+  userIdField,
   signatureField,
+  options,
 }: {
   title: string;
-  nameField: {
+  userIdField: {
     id: string;
     name: string;
     key?: string;
@@ -503,27 +519,42 @@ function AuthorizationPersonFields({
     name: string;
     errors?: string[];
   };
+  options: SignOffOption[];
 }) {
   return (
     <div className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-4">
       <p className="text-sm font-medium text-brand-navy">{title}</p>
       <div className="grid gap-2">
-        <Label htmlFor={nameField.id}>Name</Label>
-        <Input
-          id={nameField.id}
-          name={nameField.name}
-          key={nameField.key ?? nameField.id}
+        <Label htmlFor={userIdField.id}>User</Label>
+        <select
+          id={userIdField.id}
+          name={userIdField.name}
+          key={userIdField.key ?? userIdField.id}
           defaultValue={
-            typeof nameField.initialValue === "string"
-              ? nameField.initialValue
+            typeof userIdField.initialValue === "string"
+              ? userIdField.initialValue
               : ""
           }
-          placeholder="Full name"
-          aria-invalid={Boolean(nameField.errors)}
-        />
-        {nameField.errors ? (
+          aria-invalid={Boolean(userIdField.errors)}
+          className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="">Select user…</option>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name?.trim() || option.email}
+              {option.name?.trim() ? ` (${option.email})` : ""}
+            </option>
+          ))}
+        </select>
+        {options.length === 0 ? (
+          <p className="text-sm text-amber-800">
+            No users are assigned a role allowed for this sign-off. An admin can
+            update users and permit settings.
+          </p>
+        ) : null}
+        {userIdField.errors ? (
           <p className="text-sm text-destructive">
-            {nameField.errors.join(" ")}
+            {userIdField.errors.join(" ")}
           </p>
         ) : null}
       </div>

@@ -10,6 +10,10 @@ import { requireUser } from "~/lib/auth.server";
 import { handlePermitIssueSubmit } from "~/lib/permit-action.server";
 import { getPermitDefinition } from "~/lib/permits.server";
 import { canReviewRuns } from "~/lib/roles";
+import {
+  listUsersEligibleForSlot,
+  PERMIT_SLOT_CODES,
+} from "~/lib/roles.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -28,11 +32,24 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
 
   const user = await requireUser(request, definition.href);
-  const pendingCount = canReviewRuns(user.role)
-    ? await countPendingRuns()
-    : 0;
+  const [pendingCount, operationsRep, maintenanceRep, safeWorkCoordinator] =
+    await Promise.all([
+      canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
+      listUsersEligibleForSlot(PERMIT_SLOT_CODES.operationsRep),
+      listUsersEligibleForSlot(PERMIT_SLOT_CODES.maintenanceRep),
+      listUsersEligibleForSlot(PERMIT_SLOT_CODES.safeWorkCoordinator),
+    ]);
 
-  return { user, pendingCount, definition };
+  return {
+    user,
+    pendingCount,
+    definition,
+    signOffOptions: {
+      operationsRep,
+      maintenanceRep,
+      safeWorkCoordinator,
+    },
+  };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -49,7 +66,7 @@ export default function PermitPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { definition, user, pendingCount } = loaderData;
+  const { definition, user, pendingCount, signOffOptions } = loaderData;
 
   return (
     <div className="app-shell">
@@ -76,6 +93,7 @@ export default function PermitPage({
         <div className="animate-in fade-in slide-in-from-bottom-3 duration-500 delay-100">
           <PermitIssueForm
             definition={definition}
+            signOffOptions={signOffOptions}
             lastResult={actionData?.lastResult}
             summary={actionData?.summary}
             status={actionData?.status}

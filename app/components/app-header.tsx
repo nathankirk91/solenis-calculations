@@ -5,8 +5,9 @@ import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
-  canManageManagers,
   canManageOperators,
+  canManageRoles,
+  canManageUsers,
   canReviewRuns,
 } from "~/lib/roles";
 import type { AuthUser } from "~/lib/user.server";
@@ -266,7 +267,8 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
   const menuId = useId();
   const showApprovals = user ? canReviewRuns(user.role) : false;
   const showOperators = user ? canManageOperators(user.role) : false;
-  const showManagers = user ? canManageManagers(user.role) : false;
+  const showUsers = user ? canManageUsers(user.role) : false;
+  const showRoles = user ? canManageRoles(user.role) : false;
 
   useEffect(() => {
     setOpen(false);
@@ -360,6 +362,11 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
                       label: "Manage",
                       description: "Edit permit form templates",
                     },
+                    {
+                      to: "/permits/settings",
+                      label: "Settings",
+                      description: "Who can sign each authorisation",
+                    },
                   ]
                 : []),
             ],
@@ -397,12 +404,21 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
                     },
                   ]
                 : []),
-              ...(showManagers
+              ...(showUsers
                 ? [
                     {
-                      to: "/managers",
-                      label: "Managers",
-                      description: "Accounts and access",
+                      to: "/users",
+                      label: "Users",
+                      description: "Accounts and assigned roles",
+                    },
+                  ]
+                : []),
+              ...(showRoles
+                ? [
+                    {
+                      to: "/roles",
+                      label: "Roles",
+                      description: "Create and edit access roles",
                     },
                   ]
                 : []),

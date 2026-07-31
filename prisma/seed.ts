@@ -236,6 +236,13 @@ async function main() {
     `Seeded ${INSPECTION_DEFINITIONS.length} inspections with questions`,
   );
   console.log(`Seeded ${DEFAULT_OPERATORS.length} operators`);
+
+  // Role catalog + backfill user_role_assignments from legacy users.role
+  const { ensureRolesAndSignOffDefaults } = await import(
+    "../app/lib/roles.server"
+  );
+  await ensureRolesAndSignOffDefaults();
+  console.log("Ensured default roles and permit sign-off slots");
 }
 
 main()

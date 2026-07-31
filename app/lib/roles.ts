@@ -14,6 +14,15 @@ export function canManageOperators(role: UserRole): boolean {
   return isManagerOrAdmin(role);
 }
 
+/** @deprecated Prefer canManageUsers. */
 export function canManageManagers(role: UserRole): boolean {
+  return role === "ADMIN";
+}
+
+export function canManageUsers(role: UserRole): boolean {
+  return role === "ADMIN";
+}
+
+export function canManageRoles(role: UserRole): boolean {
   return role === "ADMIN";
 }

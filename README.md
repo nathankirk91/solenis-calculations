@@ -163,9 +163,12 @@ Permits live on `/permits`, with their own records and management (separate from
 | Issue / open permits | `/permits` |
 | Permit records | `/permits/history` |
 | Manage permit forms | `/permits/manage` |
+| Permit sign-off settings | `/permits/settings` |
 | Safe Work Permit (Form 42801) | `/permits/safe-work-permit` |
 
-Issuing a permit opens it. Managers close it later from the open list / permit record using the close-out fields.
+Issuing a permit opens it. Close-out happens later from the open list / permit record.
+
+Authorisation sign-offs (Operations, Maintenance, Safe work coordinator) use users who hold roles configured under **Permits → Settings**. Admins manage accounts at `/users` and role definitions at `/roles`. Legacy `/managers` redirects to `/users`.
 
 ## Scripts
 

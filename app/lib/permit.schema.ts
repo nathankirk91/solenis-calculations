@@ -94,11 +94,10 @@ function buildResponseShape(definition: InspectionDefinition) {
 }
 
 const authorizationPersonSchema = z.object({
-  name: z
-    .string({ error: "Enter the name." })
+  userId: z
+    .string({ error: "Select a user." })
     .trim()
-    .min(1, "Enter the name.")
-    .max(120, "Keep the name under 120 characters."),
+    .min(1, "Select a user."),
   signature: z
     .string({ error: "Signature / initials are required." })
     .min(1, "Please sign or initial."),
@@ -249,10 +248,16 @@ export type PermitIssueFormValues = z.infer<
 export type PermitCloseoutValues = z.infer<
   ReturnType<typeof createPermitCloseoutSchema>
 >;
+export type PermitAuthorizationPerson = {
+  userId: string;
+  name: string;
+  signature: string;
+};
+
 export type PermitAuthorization = {
-  operationsRep: { name: string; signature: string };
-  maintenanceRep: { name: string; signature: string };
-  safeWorkCoordinator: { name: string; signature: string };
+  operationsRep: PermitAuthorizationPerson;
+  maintenanceRep: PermitAuthorizationPerson;
+  safeWorkCoordinator: PermitAuthorizationPerson;
 };
 export type PermitCloseout = {
   date: string;

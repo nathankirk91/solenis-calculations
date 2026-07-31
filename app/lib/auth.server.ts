@@ -8,8 +8,8 @@ import {
   sessionStorage,
 } from "~/lib/session.server";
 import {
-  canManageManagers,
   canManageOperators,
+  canManageUsers,
   canReviewRuns,
   type UserRole,
 } from "~/lib/roles";
@@ -45,7 +45,10 @@ export async function getUser(request: Request): Promise<AuthUser | null> {
 
   // Trust the session on each navigation. A DB round-trip here made every
   // in-app click wait on Supabase; role changes take effect on next login.
-  return sessionUser;
+  return {
+    ...sessionUser,
+    roles: Array.isArray(sessionUser.roles) ? sessionUser.roles : [],
+  };
 }
 
 export async function requireUser(
@@ -105,10 +108,10 @@ export async function requireOperatorManager(
 
 export async function requireAdmin(
   request: Request,
-  returnTo = "/managers",
+  returnTo = "/users",
 ): Promise<AuthUser> {
   const user = await requireUser(request, returnTo);
-  if (!canManageManagers(user.role)) {
+  if (!canManageUsers(user.role)) {
     throw redirect("/");
   }
   return user;

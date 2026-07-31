@@ -64,6 +64,7 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   name         String?
+  /// Primary system access role (synced from Admin/Manager/Operator assignments).
   role         UserRole @default(OPERATOR)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -77,8 +78,71 @@ model User {
   createdInspectionActions InspectionAction[] @relation("InspectionActionCreatedBy")
   closedInspectionActions InspectionAction[] @relation("InspectionActionClosedBy")
   pushSubscriptions       PushSubscription[]
+  roleAssignments         UserRoleAssignment[]
+  assignedRolesBy         UserRoleAssignment[] @relation("RoleAssignedBy")
 
   @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @default("")
+  /// Built-in roles (admin/manager/operator + default permit roles) cannot be deleted.
+  isSystem    Boolean  @default(false) @map("is_system")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users              UserRoleAssignment[]
+  permitSignOffSlots PermitSignOffSlotRole[]
+
+  @@index([isActive, sortOrder])
+  @@map("roles")
+}
+
+model UserRoleAssignment {
+  userId       String   @map("user_id")
+  roleId       String   @map("role_id")
+  assignedById String?  @map("assigned_by_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedBy User? @relation("RoleAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_role_assignments")
+}
+
+/// Which app roles may sign each permit authorization slot.
+model PermitSignOffSlot {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  label     String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  allowedRoles PermitSignOffSlotRole[]
+
+  @@index([sortOrder])
+  @@map("permit_sign_off_slots")
+}
+
+model PermitSignOffSlotRole {
+  slotId String @map("slot_id")
+  roleId String @map("role_id")
+
+  slot PermitSignOffSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  role Role              @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([slotId, roleId])
+  @@index([roleId])
+  @@map("permit_sign_off_slot_roles")
 }
 
 model Operator {

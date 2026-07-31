@@ -407,8 +407,13 @@ function parseAnswers(value: unknown): InspectionAnswerRecord[] {
 function parseAuthorization(value: unknown): PermitAuthorization {
   const raw = (value ?? {}) as Partial<PermitAuthorization>;
   const person = (entry: unknown) => {
-    const row = (entry ?? {}) as { name?: string; signature?: string };
+    const row = (entry ?? {}) as {
+      userId?: string;
+      name?: string;
+      signature?: string;
+    };
     return {
+      userId: String(row.userId ?? ""),
       name: String(row.name ?? ""),
       signature: String(row.signature ?? ""),
     };

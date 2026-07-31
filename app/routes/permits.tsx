@@ -68,12 +68,20 @@ export default function PermitsPage({ loaderData }: Route.ComponentProps) {
               All records
             </Link>
             {canManage ? (
-              <Link
-                to="/permits/manage"
-                className="text-brand-navy underline-offset-4 hover:underline"
-              >
-                Manage forms
-              </Link>
+              <>
+                <Link
+                  to="/permits/manage"
+                  className="text-brand-navy underline-offset-4 hover:underline"
+                >
+                  Manage forms
+                </Link>
+                <Link
+                  to="/permits/settings"
+                  className="text-brand-navy underline-offset-4 hover:underline"
+                >
+                  Settings
+                </Link>
+              </>
             ) : null}
           </div>
         </section>
