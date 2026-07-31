@@ -117,7 +117,10 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
     `ALTER TYPE "inspection_question_type" ADD VALUE IF NOT EXISTS 'TIME'`,
     `ALTER TYPE "inspection_question_type" ADD VALUE IF NOT EXISTS 'CHECKBOX'`,
     `DO $$ BEGIN
-      CREATE TYPE "permit_run_status" AS ENUM ('OPEN', 'CLOSED');
+      CREATE TYPE "permit_run_status" AS ENUM ('PENDING_AUTHORIZATION', 'OPEN', 'CLOSED');
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `DO $$ BEGIN
+      ALTER TYPE "permit_run_status" ADD VALUE IF NOT EXISTS 'PENDING_AUTHORIZATION';
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `CREATE TABLE IF NOT EXISTS "inspections" (
       "id" TEXT NOT NULL,

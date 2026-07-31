@@ -463,6 +463,28 @@ export async function updatePermitSignOffSlotRoles(args: {
   ]);
 }
 
+export async function listUsersEligibleForAnyPermitSignOff(): Promise<
+  Array<{ id: string; name: string | null; email: string }>
+> {
+  const [operations, maintenance, coordinator] = await Promise.all([
+    listUsersEligibleForSlot(PERMIT_SLOT_CODES.operationsRep),
+    listUsersEligibleForSlot(PERMIT_SLOT_CODES.maintenanceRep),
+    listUsersEligibleForSlot(PERMIT_SLOT_CODES.safeWorkCoordinator),
+  ]);
+  const byId = new Map<
+    string,
+    { id: string; name: string | null; email: string }
+  >();
+  for (const user of [...operations, ...maintenance, ...coordinator]) {
+    byId.set(user.id, user);
+  }
+  return [...byId.values()].sort((a, b) => {
+    const aLabel = (a.name ?? a.email).toLowerCase();
+    const bLabel = (b.name ?? b.email).toLowerCase();
+    return aLabel.localeCompare(bLabel);
+  });
+}
+
 export async function listUsersEligibleForSlot(
   slotCode: string,
 ): Promise<Array<{ id: string; name: string | null; email: string }>> {

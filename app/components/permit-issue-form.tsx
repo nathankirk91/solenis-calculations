@@ -6,7 +6,6 @@ import {
 import { parseWithZod } from "@conform-to/zod/v4";
 import { Form, useNavigation } from "react-router";
 
-import { SignaturePad } from "~/components/signature-pad";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -30,19 +29,8 @@ import {
 } from "~/lib/inspections";
 import { cn } from "~/lib/utils";
 
-type SignOffOption = {
-  id: string;
-  name: string | null;
-  email: string;
-};
-
 type Props = {
   definition: InspectionDefinition;
-  signOffOptions: {
-    operationsRep: SignOffOption[];
-    maintenanceRep: SignOffOption[];
-    safeWorkCoordinator: SignOffOption[];
-  };
   lastResult?: SubmissionResult<string[]> | null;
   summary?: InspectionSummary | null;
   status?: InspectionSummary["status"] | null;
@@ -51,7 +39,6 @@ type Props = {
 
 export function PermitIssueForm({
   definition,
-  signOffOptions,
   lastResult,
   summary,
   status,
@@ -75,22 +62,12 @@ export function PermitIssueForm({
     defaultValue: {
       equipmentRef: "",
       authorizedPersonnel: [""],
-      authorization: {
-        operationsRep: { userId: "", signature: "" },
-        maintenanceRep: { userId: "", signature: "" },
-        safeWorkCoordinator: { userId: "", signature: "" },
-      },
       responses: defaultResponses,
     },
   });
 
   const responseFields = fields.responses.getFieldset();
   const personnelFields = fields.authorizedPersonnel.getFieldList();
-  const authorizationFields = fields.authorization.getFieldset();
-  const opsFields = authorizationFields.operationsRep.getFieldset();
-  const maintFields = authorizationFields.maintenanceRep.getFieldset();
-  const coordinatorFields =
-    authorizationFields.safeWorkCoordinator.getFieldset();
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -98,8 +75,8 @@ export function PermitIssueForm({
         <CardHeader>
           <CardTitle>Issue permit</CardTitle>
           <CardDescription>
-            Complete the checks and authorisation to open this permit. Close-out
-            happens later from the open permits list.
+            Complete the checks and authorized personnel. The permit then waits
+            for Operations, Maintenance, and Safe work coordinator sign-off.
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
@@ -396,35 +373,6 @@ export function PermitIssueForm({
               </div>
             </section>
 
-            <section className="grid gap-4">
-              <div>
-                <h3 className="font-heading text-lg font-semibold text-brand-navy">
-                  Authorization to conduct work
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Select an eligible user for each sign-off and add initials.
-                </p>
-              </div>
-              <AuthorizationPersonFields
-                title="Operations rep"
-                userIdField={opsFields.userId}
-                signatureField={opsFields.signature}
-                options={signOffOptions.operationsRep}
-              />
-              <AuthorizationPersonFields
-                title="Maintenance rep"
-                userIdField={maintFields.userId}
-                signatureField={maintFields.signature}
-                options={signOffOptions.maintenanceRep}
-              />
-              <AuthorizationPersonFields
-                title="Safe work coordinator"
-                userIdField={coordinatorFields.userId}
-                signatureField={coordinatorFields.signature}
-                options={signOffOptions.safeWorkCoordinator}
-              />
-            </section>
-
             {formError ? (
               <p className="text-sm text-destructive">{formError}</p>
             ) : null}
@@ -438,7 +386,7 @@ export function PermitIssueForm({
               disabled={isSubmitting || definition.questions.length === 0}
               className="w-full sm:w-auto"
             >
-              {isSubmitting ? "Opening…" : "Open permit"}
+              {isSubmitting ? "Submitting…" : "Submit for authorization"}
             </Button>
           </CardFooter>
         </Form>
@@ -448,7 +396,8 @@ export function PermitIssueForm({
         <CardHeader>
           <CardTitle>Status</CardTitle>
           <CardDescription>
-            After submit, the permit stays open until close-out.
+            After submit, the permit is pending authorization until all three
+            sign-offs are complete.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -458,12 +407,14 @@ export function PermitIssueForm({
                 variant="outline"
                 className={cn(
                   status === "PASSED" &&
-                    "border-emerald-600/40 text-emerald-700",
+                    "border-sky-600/40 text-sky-800",
                   status === "NEEDS_ATTENTION" &&
                     "border-amber-600/40 text-amber-800",
                 )}
               >
-                {status === "PASSED" ? "Opened" : "Opened · needs attention"}
+                {status === "PASSED"
+                  ? "Pending authorization"
+                  : "Pending · needs attention"}
               </Badge>
               <dl className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -491,82 +442,11 @@ export function PermitIssueForm({
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Complete the form and authorisation to open the permit.
+              Complete the form to submit for authorization.
             </p>
           )}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function AuthorizationPersonFields({
-  title,
-  userIdField,
-  signatureField,
-  options,
-}: {
-  title: string;
-  userIdField: {
-    id: string;
-    name: string;
-    key?: string;
-    initialValue?: string | string[] | undefined | null;
-    errors?: string[];
-  };
-  signatureField: {
-    id: string;
-    name: string;
-    errors?: string[];
-  };
-  options: SignOffOption[];
-}) {
-  return (
-    <div className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-4">
-      <p className="text-sm font-medium text-brand-navy">{title}</p>
-      <div className="grid gap-2">
-        <Label htmlFor={userIdField.id}>User</Label>
-        <select
-          id={userIdField.id}
-          name={userIdField.name}
-          key={userIdField.key ?? userIdField.id}
-          defaultValue={
-            typeof userIdField.initialValue === "string"
-              ? userIdField.initialValue
-              : ""
-          }
-          aria-invalid={Boolean(userIdField.errors)}
-          className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <option value="">Select user…</option>
-          {options.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name?.trim() || option.email}
-              {option.name?.trim() ? ` (${option.email})` : ""}
-            </option>
-          ))}
-        </select>
-        {options.length === 0 ? (
-          <p className="text-sm text-amber-800">
-            No users are assigned a role allowed for this sign-off. An admin can
-            update users and permit settings.
-          </p>
-        ) : null}
-        {userIdField.errors ? (
-          <p className="text-sm text-destructive">
-            {userIdField.errors.join(" ")}
-          </p>
-        ) : null}
-      </div>
-      <div className="grid gap-2">
-        <Label>Initials</Label>
-        <SignaturePad
-          name={signatureField.name}
-          id={signatureField.id}
-          required
-          error={signatureField.errors?.join(" ")}
-        />
-      </div>
     </div>
   );
 }

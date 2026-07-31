@@ -21,12 +21,31 @@ import {
   type ManagedInspectionDetail,
 } from "~/lib/inspections.server";
 import type {
+  PermitAuthSlotKey,
   PermitAuthorization,
   PermitCloseout,
 } from "~/lib/permit.schema";
+import {
+  emptyPermitAuthorization,
+  isPermitAuthSlotSigned,
+  isPermitFullyAuthorized,
+  PERMIT_AUTH_SLOT_KEYS,
+} from "~/lib/permit.schema";
 import { ensureInspectionSchema } from "~/lib/migrate.server";
+import {
+  PERMIT_SLOT_CODES,
+  userHasRoleForSlot,
+  type PermitSlotCode,
+} from "~/lib/roles.server";
 
-export type PermitRunStatus = "OPEN" | "CLOSED";
+export type PermitRunStatus = "PENDING_AUTHORIZATION" | "OPEN" | "CLOSED";
+
+export const PERMIT_AUTH_SLOT_TO_CODE: Record<PermitAuthSlotKey, PermitSlotCode> =
+  {
+    operationsRep: PERMIT_SLOT_CODES.operationsRep,
+    maintenanceRep: PERMIT_SLOT_CODES.maintenanceRep,
+    safeWorkCoordinator: PERMIT_SLOT_CODES.safeWorkCoordinator,
+  };
 
 export type PermitRunListItem = {
   id: string;
@@ -160,7 +179,7 @@ export async function createPermitRun(args: {
   answers: InspectionAnswerRecord[];
   summary: InspectionSummary;
   authorizedPersonnel: string[];
-  authorization: PermitAuthorization;
+  authorization?: PermitAuthorization;
 }): Promise<{ id: string } | null> {
   await ensureInspectionSchema();
   const prisma = getPrisma();
@@ -191,13 +210,14 @@ export async function createPermitRun(args: {
     data: {
       inspectionId: args.inspectionId,
       submittedById: args.submittedById,
-      status: "OPEN",
+      status: "PENDING_AUTHORIZATION",
       equipmentRef: args.equipmentRef,
       inspectionVersion: version,
       responses: args.answers as unknown as Prisma.InputJsonValue,
       summary: args.summary as unknown as Prisma.InputJsonValue,
       authorizedPersonnel: args.authorizedPersonnel,
-      authorization: args.authorization as unknown as Prisma.InputJsonValue,
+      authorization: (args.authorization ??
+        emptyPermitAuthorization()) as unknown as Prisma.InputJsonValue,
     },
     select: { id: true },
   });
@@ -209,6 +229,15 @@ export async function listOpenPermitRuns(args?: {
   limit?: number;
 }): Promise<PermitRunListItem[]> {
   return listPermitRuns({ status: "OPEN", limit: args?.limit ?? 50 });
+}
+
+export async function listPendingAuthorizationPermitRuns(args?: {
+  limit?: number;
+}): Promise<PermitRunListItem[]> {
+  return listPermitRuns({
+    status: "PENDING_AUTHORIZATION",
+    limit: args?.limit ?? 50,
+  });
 }
 
 export async function listPermitRuns(args?: {
@@ -321,6 +350,94 @@ export async function getPermitRunById(
   }
 }
 
+export async function listUnsignedSlotsForUser(args: {
+  userId: string;
+  authorization: PermitAuthorization;
+}): Promise<PermitAuthSlotKey[]> {
+  const unsigned: PermitAuthSlotKey[] = [];
+  for (const key of PERMIT_AUTH_SLOT_KEYS) {
+    if (isPermitAuthSlotSigned(args.authorization[key])) {
+      continue;
+    }
+    const allowed = await userHasRoleForSlot({
+      userId: args.userId,
+      slotCode: PERMIT_AUTH_SLOT_TO_CODE[key],
+    });
+    if (allowed) {
+      unsigned.push(key);
+    }
+  }
+  return unsigned;
+}
+
+export async function signOffPermitSlot(args: {
+  permitRunId: string;
+  userId: string;
+  userName: string | null;
+  userEmail: string;
+  slotKey: PermitAuthSlotKey;
+  signature: string;
+}): Promise<PermitRunDetail> {
+  await ensureInspectionSchema();
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  const existing = await prisma.permitRun.findUnique({
+    where: { id: args.permitRunId },
+    select: { id: true, status: true, authorization: true },
+  });
+  if (!existing) {
+    throw new Error("Permit not found.");
+  }
+  if (existing.status !== "PENDING_AUTHORIZATION") {
+    throw new Error("This permit is not awaiting authorization.");
+  }
+
+  const authorization = parseAuthorization(existing.authorization);
+  if (isPermitAuthSlotSigned(authorization[args.slotKey])) {
+    throw new Error("This sign-off has already been completed.");
+  }
+
+  const allowed = await userHasRoleForSlot({
+    userId: args.userId,
+    slotCode: PERMIT_AUTH_SLOT_TO_CODE[args.slotKey],
+  });
+  if (!allowed) {
+    throw new Error("You are not allowed to sign this role.");
+  }
+
+  const signature = args.signature.trim();
+  if (!signature) {
+    throw new Error("Signature / initials are required.");
+  }
+
+  authorization[args.slotKey] = {
+    userId: args.userId,
+    name: args.userName?.trim() || args.userEmail,
+    signature,
+  };
+
+  const nextStatus = isPermitFullyAuthorized(authorization)
+    ? "OPEN"
+    : "PENDING_AUTHORIZATION";
+
+  await prisma.permitRun.update({
+    where: { id: args.permitRunId },
+    data: {
+      authorization: authorization as unknown as Prisma.InputJsonValue,
+      status: nextStatus,
+    },
+  });
+
+  const detail = await getPermitRunById(args.permitRunId);
+  if (!detail) {
+    throw new Error("Permit not found after sign-off.");
+  }
+  return detail;
+}
+
 export async function closePermitRun(args: {
   permitRunId: string;
   closedById: string;
@@ -341,6 +458,9 @@ export async function closePermitRun(args: {
   }
   if (existing.status === "CLOSED") {
     throw new Error("This permit is already closed.");
+  }
+  if (existing.status !== "OPEN") {
+    throw new Error("Permit must be fully authorized before close-out.");
   }
 
   await prisma.permitRun.update({

@@ -53,6 +53,7 @@ enum InspectionQuestionType {
 }
 
 enum PermitRunStatus {
+  PENDING_AUTHORIZATION
   OPEN
   CLOSED
 

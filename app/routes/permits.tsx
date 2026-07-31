@@ -10,6 +10,7 @@ import { requireUser } from "~/lib/auth.server";
 import { formatMelbourneDateTime } from "~/lib/datetime";
 import {
   listOpenPermitRuns,
+  listPendingAuthorizationPermitRuns,
   listPermitCards,
 } from "~/lib/permits.server";
 import { canManageOperators, canReviewRuns } from "~/lib/roles";
@@ -27,15 +28,18 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireUser(request, "/permits");
-  const [{ permits }, openPermits, pendingCount] = await Promise.all([
-    listPermitCards(),
-    listOpenPermitRuns({ limit: 20 }),
-    canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
-  ]);
+  const [{ permits }, pendingPermits, openPermits, pendingCount] =
+    await Promise.all([
+      listPermitCards(),
+      listPendingAuthorizationPermitRuns({ limit: 20 }),
+      listOpenPermitRuns({ limit: 20 }),
+      canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
+    ]);
 
   return {
     user,
     permits,
+    pendingPermits,
     openPermits,
     pendingCount,
     canManage: canManageOperators(user.role),
@@ -43,7 +47,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function PermitsPage({ loaderData }: Route.ComponentProps) {
-  const { permits, openPermits, user, pendingCount, canManage } = loaderData;
+  const {
+    permits,
+    pendingPermits,
+    openPermits,
+    user,
+    pendingCount,
+    canManage,
+  } = loaderData;
 
   return (
     <div className="app-shell">
@@ -57,8 +68,8 @@ export default function PermitsPage({ loaderData }: Route.ComponentProps) {
             Permits
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-            Issue a permit before work starts, then close it out when the job is
-            finished.
+            Issue a permit, get authorisation sign-off, then close it out when
+            the job is finished.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Link
@@ -87,6 +98,59 @@ export default function PermitsPage({ loaderData }: Route.ComponentProps) {
         </section>
 
         <section
+          aria-labelledby="pending-permits-heading"
+          className="mb-14 animate-in fade-in slide-in-from-bottom-2 duration-500"
+        >
+          <div className="mb-4">
+            <h2
+              id="pending-permits-heading"
+              className="font-heading text-2xl font-semibold tracking-tight text-brand-navy"
+            >
+              Pending authorization
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Waiting for Operations, Maintenance, and Safe work coordinator
+              sign-off.
+            </p>
+          </div>
+          {pendingPermits.length > 0 ? (
+            <ul className="grid gap-3">
+              {pendingPermits.map((permit) => (
+                <li key={permit.id}>
+                  <Link
+                    to={`/permits/runs/${permit.id}`}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-white/70 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-brand/5"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-brand-navy">
+                        {permit.title}
+                      </p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {formatMelbourneDateTime(permit.createdAt)}
+                        {permit.equipmentRef
+                          ? ` · ${permit.equipmentRef}`
+                          : ""}
+                        {permit.area ? ` · ${permit.area}` : ""}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="border-sky-600/40 text-sky-800"
+                    >
+                      Pending authorization
+                    </Badge>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No permits waiting for authorization.
+            </p>
+          )}
+        </section>
+
+        <section
           aria-labelledby="open-permits-heading"
           className="mb-14 animate-in fade-in slide-in-from-bottom-2 duration-500"
         >
@@ -98,7 +162,7 @@ export default function PermitsPage({ loaderData }: Route.ComponentProps) {
               Open permits
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Permits waiting for close-out.
+              Authorized permits waiting for close-out.
             </p>
           </div>
           {openPermits.length > 0 ? (

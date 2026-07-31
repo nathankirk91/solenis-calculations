@@ -29,10 +29,19 @@ import {
   formatLastAnswerDisplay,
   type InspectionAnswerRecord,
 } from "~/lib/inspections";
-import { createPermitCloseoutSchema } from "~/lib/permit.schema";
+import {
+  createPermitCloseoutSchema,
+  createPermitSignOffSchema,
+  isPermitAuthSlotSigned,
+  PERMIT_AUTH_SLOT_KEYS,
+  PERMIT_AUTH_SLOT_LABELS,
+  type PermitAuthSlotKey,
+} from "~/lib/permit.schema";
 import {
   closePermitRun,
   getPermitRunById,
+  listUnsignedSlotsForUser,
+  signOffPermitSlot,
 } from "~/lib/permits.server";
 import { canReviewRuns } from "~/lib/roles";
 import { cn } from "~/lib/utils";
@@ -42,7 +51,7 @@ export function meta({}: Route.MetaArgs) {
     { title: "Permit record | Springvale Solenis" },
     {
       name: "description",
-      content: "View and close out a work permit.",
+      content: "Review, authorize, or close out a work permit.",
     },
   ];
 }
@@ -56,7 +65,15 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const pendingCount = canReviewRuns(user.role)
     ? await countPendingRuns()
     : 0;
-  return { user, pendingCount, run };
+  const signOffSlots =
+    run.status === "PENDING_AUTHORIZATION"
+      ? await listUnsignedSlotsForUser({
+          userId: user.id,
+          authorization: run.authorization,
+        })
+      : [];
+
+  return { user, pendingCount, run, signOffSlots };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -65,11 +82,67 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (!run) {
     throw new Response("Permit not found", { status: 404 });
   }
+
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "closeout");
+
+  if (intent === "sign-off") {
+    if (run.status !== "PENDING_AUTHORIZATION") {
+      return data(
+        { error: "This permit is not awaiting authorization.", lastResult: null },
+        { status: 400 },
+      );
+    }
+
+    const allowedSlots = await listUnsignedSlotsForUser({
+      userId: user.id,
+      authorization: run.authorization,
+    });
+    const submission = parseWithZod(formData, {
+      schema: createPermitSignOffSchema(allowedSlots),
+    });
+    if (submission.status !== "success") {
+      return data(
+        { lastResult: submission.reply(), error: null },
+        { status: submission.status === "error" ? 400 : 200 },
+      );
+    }
+
+    try {
+      await signOffPermitSlot({
+        permitRunId: run.id,
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        slotKey: submission.value.slotKey as PermitAuthSlotKey,
+        signature: submission.value.signature,
+      });
+    } catch (error) {
+      return data(
+        {
+          lastResult: submission.reply(),
+          error:
+            error instanceof Error
+              ? error.message
+              : "Could not save sign-off.",
+        },
+        { status: 400 },
+      );
+    }
+
+    throw redirect(`/permits/runs/${run.id}`);
+  }
+
   if (run.status === "CLOSED") {
     return data({ error: "This permit is already closed." }, { status: 400 });
   }
+  if (run.status !== "OPEN") {
+    return data(
+      { error: "Permit must be fully authorized before close-out." },
+      { status: 400 },
+    );
+  }
 
-  const formData = await request.formData();
   const submission = parseWithZod(formData, {
     schema: createPermitCloseoutSchema(),
   });
@@ -91,7 +164,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       {
         lastResult: submission.reply(),
         error:
-          error instanceof Error ? error.message : "Could not close the permit.",
+          error instanceof Error
+            ? error.message
+            : "Could not close the permit.",
       },
       { status: 400 },
     );
@@ -104,8 +179,10 @@ export default function PermitRunPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { user, pendingCount, run } = loaderData;
+  const { user, pendingCount, run, signOffSlots } = loaderData;
+  const isPending = run.status === "PENDING_AUTHORIZATION";
   const isOpen = run.status === "OPEN";
+  const isClosed = run.status === "CLOSED";
 
   return (
     <div className="app-shell">
@@ -116,12 +193,16 @@ export default function PermitRunPage({
             <Badge
               variant="outline"
               className={cn(
-                isOpen
-                  ? "border-amber-600/40 text-amber-800"
-                  : "border-emerald-600/40 text-emerald-700",
+                isPending && "border-sky-600/40 text-sky-800",
+                isOpen && "border-amber-600/40 text-amber-800",
+                isClosed && "border-emerald-600/40 text-emerald-700",
               )}
             >
-              {isOpen ? "Open" : "Closed"}
+              {isPending
+                ? "Pending authorization"
+                : isOpen
+                  ? "Open"
+                  : "Closed"}
             </Badge>
             <Link
               to="/permits"
@@ -134,7 +215,7 @@ export default function PermitRunPage({
             {run.inspectionTitle}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Opened {formatMelbourneDateTime(run.createdAt)}
+            Submitted {formatMelbourneDateTime(run.createdAt)}
             {run.submittedByName ? ` · ${run.submittedByName}` : ""}
             {run.equipmentRef ? ` · ${run.equipmentRef}` : ""}
           </p>
@@ -188,24 +269,49 @@ export default function PermitRunPage({
 
               <div className="grid gap-3">
                 <h3 className="font-medium">Authorization</h3>
-                <AuthorizationDisplay
-                  title="Operations rep"
-                  name={run.authorization.operationsRep.name}
-                  signature={run.authorization.operationsRep.signature}
-                />
-                <AuthorizationDisplay
-                  title="Maintenance rep"
-                  name={run.authorization.maintenanceRep.name}
-                  signature={run.authorization.maintenanceRep.signature}
-                />
-                <AuthorizationDisplay
-                  title="Safe work coordinator"
-                  name={run.authorization.safeWorkCoordinator.name}
-                  signature={run.authorization.safeWorkCoordinator.signature}
-                />
+                {PERMIT_AUTH_SLOT_KEYS.map((key) => {
+                  const person = run.authorization[key];
+                  const signed = isPermitAuthSlotSigned(person);
+                  return (
+                    <AuthorizationDisplay
+                      key={key}
+                      title={PERMIT_AUTH_SLOT_LABELS[key]}
+                      name={person.name}
+                      signature={person.signature}
+                      pending={!signed}
+                    />
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
+
+          {isPending && signOffSlots.length > 0 ? (
+            <SignOffForm
+              slots={signOffSlots}
+              lastResult={
+                actionData && "lastResult" in actionData
+                  ? actionData.lastResult
+                  : null
+              }
+              error={
+                actionData && "error" in actionData ? actionData.error : null
+              }
+            />
+          ) : null}
+
+          {isPending && signOffSlots.length === 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Awaiting authorization</CardTitle>
+                <CardDescription>
+                  Operations, Maintenance, and Safe work coordinator must each
+                  sign off before this permit opens. You do not currently have an
+                  unsigned role on this permit.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : null}
 
           {isOpen ? (
             <CloseoutForm
@@ -218,7 +324,9 @@ export default function PermitRunPage({
                 actionData && "error" in actionData ? actionData.error : null
               }
             />
-          ) : run.closeout ? (
+          ) : null}
+
+          {isClosed && run.closeout ? (
             <Card>
               <CardHeader>
                 <CardTitle>Permit close-out</CardTitle>
@@ -271,6 +379,97 @@ export default function PermitRunPage({
   );
 }
 
+function SignOffForm({
+  slots,
+  lastResult,
+  error,
+}: {
+  slots: PermitAuthSlotKey[];
+  lastResult?: SubmissionResult<string[]> | null;
+  error?: string | null;
+}) {
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state !== "idle";
+  const schema = createPermitSignOffSchema(slots);
+  const [form, fields] = useForm({
+    lastResult: lastResult ?? undefined,
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema });
+    },
+    shouldValidate: "onBlur",
+    shouldRevalidate: "onInput",
+    defaultValue: {
+      intent: "sign-off",
+      slotKey: slots[0],
+      signature: "",
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sign off</CardTitle>
+        <CardDescription>
+          Review the permit details above, then sign as one of your eligible
+          roles.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form method="post" className="grid gap-4" {...getFormProps(form)}>
+          <input type="hidden" name="intent" value="sign-off" />
+          {slots.length === 1 ? (
+            <input type="hidden" name="slotKey" value={slots[0]} />
+          ) : (
+            <fieldset className="grid gap-2">
+              <legend className="text-sm font-medium">
+                Sign off as
+              </legend>
+              {slots.map((slot) => (
+                <label
+                  key={slot}
+                  className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-sm"
+                >
+                  <input
+                    type="radio"
+                    name={fields.slotKey.name}
+                    value={slot}
+                    defaultChecked={slot === slots[0]}
+                  />
+                  {PERMIT_AUTH_SLOT_LABELS[slot]}
+                </label>
+              ))}
+              {fields.slotKey.errors ? (
+                <p className="text-sm text-destructive">
+                  {fields.slotKey.errors.join(" ")}
+                </p>
+              ) : null}
+            </fieldset>
+          )}
+
+          <div className="grid gap-2">
+            <Label>Initials</Label>
+            <SignaturePad
+              name={fields.signature.name}
+              id={fields.signature.id}
+              required
+              error={fields.signature.errors?.join(" ")}
+            />
+          </div>
+
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {form.errors ? (
+            <p className="text-sm text-destructive">{form.errors.join(" ")}</p>
+          ) : null}
+
+          <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+            {isSubmitting ? "Signing…" : "Submit sign-off"}
+          </Button>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CloseoutForm({
   lastResult,
   error,
@@ -305,6 +504,7 @@ function CloseoutForm({
       </CardHeader>
       <CardContent>
         <Form method="post" className="grid gap-4" {...getFormProps(form)}>
+          <input type="hidden" name="intent" value="closeout" />
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor={fields.date.id}>Close-out date</Label>
@@ -385,16 +585,27 @@ function AuthorizationDisplay({
   title,
   name,
   signature,
+  pending,
 }: {
   title: string;
   name: string;
   signature: string;
+  pending?: boolean;
 }) {
   return (
     <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-      <p className="text-sm font-medium">{title}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{name || "—"}</p>
-      {signature ? (
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">{title}</p>
+        {pending ? (
+          <Badge variant="outline" className="border-sky-600/40 text-sky-800">
+            Awaiting
+          </Badge>
+        ) : null}
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {pending ? "Not signed yet" : name || "—"}
+      </p>
+      {!pending && signature ? (
         <img
           src={signature}
           alt={`${title} initials`}

@@ -28,7 +28,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const statusParam = url.searchParams.get("status");
   const status =
-    statusParam === "OPEN" || statusParam === "CLOSED" ? statusParam : "ALL";
+    statusParam === "OPEN" ||
+    statusParam === "CLOSED" ||
+    statusParam === "PENDING_AUTHORIZATION"
+      ? statusParam
+      : "ALL";
   const [runs, pendingCount] = await Promise.all([
     listPermitRuns({ status, limit: 100 }),
     canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
@@ -59,7 +63,7 @@ export default function PermitsHistoryPage({
             Permit records
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Open and closed permits.
+            Pending, open, and closed permits.
           </p>
         </div>
 
@@ -73,6 +77,7 @@ export default function PermitsHistoryPage({
               className="flex h-9 rounded-lg border border-input bg-transparent px-3 py-1 text-sm"
             >
               <option value="ALL">All</option>
+              <option value="PENDING_AUTHORIZATION">Pending authorization</option>
               <option value="OPEN">Open</option>
               <option value="CLOSED">Closed</option>
             </select>
@@ -101,12 +106,19 @@ export default function PermitsHistoryPage({
                   <Badge
                     variant="outline"
                     className={cn(
-                      run.status === "OPEN"
-                        ? "border-amber-600/40 text-amber-800"
-                        : "border-emerald-600/40 text-emerald-700",
+                      run.status === "PENDING_AUTHORIZATION" &&
+                        "border-sky-600/40 text-sky-800",
+                      run.status === "OPEN" &&
+                        "border-amber-600/40 text-amber-800",
+                      run.status === "CLOSED" &&
+                        "border-emerald-600/40 text-emerald-700",
                     )}
                   >
-                    {run.status === "OPEN" ? "Open" : "Closed"}
+                    {run.status === "PENDING_AUTHORIZATION"
+                      ? "Pending authorization"
+                      : run.status === "OPEN"
+                        ? "Open"
+                        : "Closed"}
                   </Badge>
                 </Link>
               </li>

@@ -189,6 +189,36 @@ export async function notifyUserPush(
 }
 
 /**
+ * Best-effort push to specific users (deduped). Never throws.
+ */
+export async function notifyUsersPush(
+  userIds: string[],
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number; reason?: string }> {
+  const config = configureWebPush();
+  if (!config) {
+    console.warn("Web push skipped: VAPID keys are not set");
+    return { sent: 0, failed: 0, reason: "VAPID keys are not set" };
+  }
+
+  const uniqueIds = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return { sent: 0, failed: 0, reason: "No recipients" };
+  }
+
+  const prisma = getPrisma();
+  if (!prisma) {
+    return { sent: 0, failed: 0, reason: "Database is not configured" };
+  }
+
+  const subscriptions = await prisma.pushSubscription.findMany({
+    where: { userId: { in: uniqueIds } },
+  });
+
+  return sendPushToSubscriptions(subscriptions, payload);
+}
+
+/**
  * Best-effort push to all manager/admin subscriptions. Never throws.
  */
 export async function notifyManagersPush(

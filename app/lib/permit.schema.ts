@@ -93,15 +93,41 @@ function buildResponseShape(definition: InspectionDefinition) {
   return responseShape;
 }
 
-const authorizationPersonSchema = z.object({
-  userId: z
-    .string({ error: "Select a user." })
-    .trim()
-    .min(1, "Select a user."),
-  signature: z
-    .string({ error: "Signature / initials are required." })
-    .min(1, "Please sign or initial."),
-});
+export const PERMIT_AUTH_SLOT_KEYS = [
+  "operationsRep",
+  "maintenanceRep",
+  "safeWorkCoordinator",
+] as const;
+
+export type PermitAuthSlotKey = (typeof PERMIT_AUTH_SLOT_KEYS)[number];
+
+export const PERMIT_AUTH_SLOT_LABELS: Record<PermitAuthSlotKey, string> = {
+  operationsRep: "Operations rep",
+  maintenanceRep: "Maintenance rep",
+  safeWorkCoordinator: "Safe work coordinator",
+};
+
+export function emptyPermitAuthorization(): PermitAuthorization {
+  return {
+    operationsRep: { userId: "", name: "", signature: "" },
+    maintenanceRep: { userId: "", name: "", signature: "" },
+    safeWorkCoordinator: { userId: "", name: "", signature: "" },
+  };
+}
+
+export function isPermitAuthSlotSigned(
+  person: PermitAuthorizationPerson | null | undefined,
+): boolean {
+  return Boolean(person?.userId?.trim() && person?.signature?.trim());
+}
+
+export function isPermitFullyAuthorized(
+  authorization: PermitAuthorization,
+): boolean {
+  return PERMIT_AUTH_SLOT_KEYS.every((key) =>
+    isPermitAuthSlotSigned(authorization[key]),
+  );
+}
 
 export function createPermitIssueFormSchema(definition: InspectionDefinition) {
   return z
@@ -123,11 +149,6 @@ export function createPermitIssueFormSchema(definition: InspectionDefinition) {
             .max(120, "Keep each name under 120 characters."),
         )
         .default([]),
-      authorization: z.object({
-        operationsRep: authorizationPersonSchema,
-        maintenanceRep: authorizationPersonSchema,
-        safeWorkCoordinator: authorizationPersonSchema,
-      }),
       responses: z.object(buildResponseShape(definition)),
     })
     .superRefine((value, ctx) => {
@@ -215,7 +236,6 @@ export function createPermitIssueSchema(definition: InspectionDefinition) {
     return {
       equipmentRef: value.equipmentRef ?? null,
       authorizedPersonnel,
-      authorization: value.authorization,
       responses,
       answers,
       summary,
@@ -223,8 +243,40 @@ export function createPermitIssueSchema(definition: InspectionDefinition) {
   });
 }
 
+export function createPermitSignOffSchema(
+  allowedSlotKeys: PermitAuthSlotKey[],
+) {
+  if (allowedSlotKeys.length === 0) {
+    return z.object({
+      intent: z.literal("sign-off"),
+      slotKey: z.string(),
+      signature: z.string(),
+    }).superRefine((_value, ctx) => {
+      ctx.addIssue({
+        code: "custom",
+        message: "You are not eligible to sign off on this permit.",
+        path: ["slotKey"],
+      });
+    });
+  }
+
+  const slotKeySchema =
+    allowedSlotKeys.length === 1
+      ? z.literal(allowedSlotKeys[0])
+      : z.enum(allowedSlotKeys as [PermitAuthSlotKey, ...PermitAuthSlotKey[]]);
+
+  return z.object({
+    intent: z.literal("sign-off"),
+    slotKey: slotKeySchema,
+    signature: z
+      .string({ error: "Signature / initials are required." })
+      .min(1, "Please sign or initial."),
+  });
+}
+
 export function createPermitCloseoutSchema() {
   return z.object({
+    intent: z.literal("closeout").optional(),
     date: z
       .string({ error: "Enter the close-out date." })
       .trim()
