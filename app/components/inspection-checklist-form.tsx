@@ -28,6 +28,9 @@ import {
   findShiftQuestion,
   formatLastAnswerDisplay,
   groupQuestionsBySection,
+  isPermitInspection,
+  parseCheckboxAnswer,
+  serializeCheckboxAnswer,
   type InspectionDefinition,
   type InspectionQuestionType,
   type InspectionSummary,
@@ -127,6 +130,8 @@ export function InspectionChecklistForm({
 
   const responseFields = fields.responses.getFieldset();
   const actionFields = fields.actions.getFieldList();
+  const isPermit = isPermitInspection(definition);
+  const formNoun = isPermit ? "permit" : "inspection";
 
   function updateSearchParam(key: string, value: string) {
     const next = new URLSearchParams(searchParams);
@@ -154,7 +159,7 @@ export function InspectionChecklistForm({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
       <Card>
         <CardHeader>
-          <CardTitle>Checklist</CardTitle>
+          <CardTitle>{isPermit ? "Permit form" : "Checklist"}</CardTitle>
           <CardDescription>
             Answer each question, then sign and submit to record this
             inspection.
@@ -279,7 +284,8 @@ export function InspectionChecklistForm({
                     const choices =
                       question.type === "YES_NO"
                         ? [...YES_NO_OPTIONS]
-                        : question.type === "RADIO"
+                        : question.type === "RADIO" ||
+                            question.type === "CHECKBOX"
                           ? question.options
                           : [];
                     const value = isShiftField
@@ -289,6 +295,10 @@ export function InspectionChecklistForm({
                         : typeof field?.initialValue === "string"
                           ? field.initialValue
                           : "";
+                    const checkboxSelected =
+                      question.type === "CHECKBOX"
+                        ? new Set(parseCheckboxAnswer(value))
+                        : null;
                     const lastValue = lastAnswers[question.id] ?? "";
                     const showConfiguredLastValue =
                       question.showLastValue &&
@@ -364,6 +374,56 @@ export function InspectionChecklistForm({
                               aria-invalid={Boolean(fieldErrors)}
                             />
                           </div>
+                        ) : question.type === "CHECKBOX" ? (
+                          <fieldset className="mt-3">
+                            <legend className="sr-only">{question.label}</legend>
+                            <input type="hidden" name={fieldName} value={value} />
+                            <div className="flex flex-wrap gap-2">
+                              {choices.map((option) => {
+                                const optionId = `${fieldId}-${option}`;
+                                const checked =
+                                  checkboxSelected?.has(option) ?? false;
+                                const flagsAttention =
+                                  question.attentionValues.includes(option);
+                                return (
+                                  <label
+                                    key={option}
+                                    htmlFor={optionId}
+                                    className={cn(
+                                      "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[:checked]:border-brand/50 has-[:checked]:bg-brand/10",
+                                      flagsAttention &&
+                                        "has-[:checked]:border-amber-500/50 has-[:checked]:bg-amber-50",
+                                    )}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      id={optionId}
+                                      checked={checked}
+                                      onChange={(event) => {
+                                        const next = new Set(
+                                          checkboxSelected ?? [],
+                                        );
+                                        if (event.target.checked) {
+                                          next.add(option);
+                                        } else {
+                                          next.delete(option);
+                                        }
+                                        form.update({
+                                          name: fieldName,
+                                          value: serializeCheckboxAnswer([
+                                            ...next,
+                                          ]),
+                                          validated: false,
+                                        });
+                                      }}
+                                      className="size-4 accent-[var(--brand-navy)]"
+                                    />
+                                    {option}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </fieldset>
                         ) : (
                           <fieldset className="mt-3">
                             <legend className="sr-only">{question.label}</legend>
@@ -584,7 +644,11 @@ export function InspectionChecklistForm({
               disabled={isSubmitting || definition.questions.length === 0}
               className="w-full sm:w-auto"
             >
-              {isSubmitting ? "Saving…" : "Submit inspection"}
+              {isSubmitting
+                ? "Saving…"
+                : definition.questions.length === 0
+                  ? `No questions configured`
+                  : `Submit ${formNoun}`}
             </Button>
           </CardFooter>
         </Form>

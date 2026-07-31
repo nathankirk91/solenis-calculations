@@ -147,9 +147,11 @@ export default function InspectionsManagePage({
             Manage inspections
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Create checklists and add questions (yes/no, text, or radio
-            options). Operators see available inspections on the Inspections
-            page.
+            Create checklists and permits, then add questions (yes/no, text,
+            radio, checkboxes, number, or date). Use category{" "}
+            <span className="font-medium text-foreground">Permits</span> for
+            forms that appear on the Permits page; other categories appear under
+            Inspections.
           </p>
           {migrateNote ? (
             <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
@@ -159,8 +161,8 @@ export default function InspectionsManagePage({
           {actionData && "seeded" in actionData && actionData.seeded != null ? (
             <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
               Loaded {actionData.seeded} default inspections (forklift template +
-              unit forms, start-up, shut-down). Edit shared forklift questions on
-              the master template.
+              unit forms, start-up, shut-down, safe work permit). Edit shared
+              forklift questions on the master template.
             </p>
           ) : null}
           {actionData && "error" in actionData && actionData.error ? (
@@ -196,7 +198,7 @@ export default function InspectionsManagePage({
                     name="description"
                     rows={2}
                     className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    placeholder="Short explanation shown on the Inspections page"
+                    placeholder="Short explanation shown on the catalog page"
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -205,7 +207,7 @@ export default function InspectionsManagePage({
                     <Input
                       id="category"
                       name="category"
-                      placeholder="e.g. Equipment"
+                      placeholder="e.g. Equipment, Shift, or Permits"
                       autoComplete="off"
                     />
                   </div>

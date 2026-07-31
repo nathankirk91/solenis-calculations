@@ -19,6 +19,13 @@ function passResponses(definition) {
         (option) => !question.attentionValues.includes(option),
       );
       responses[question.id] = ok ?? question.options[0];
+    } else if (question.type === "CHECKBOX") {
+      const ok = question.options.find(
+        (option) => !question.attentionValues.includes(option),
+      );
+      if (question.required) {
+        responses[question.id] = ok ?? question.options[0] ?? "";
+      }
     } else if (question.type === "NUMBER") {
       responses[question.id] = "100";
     } else if (question.type === "DATE") {
@@ -293,13 +300,21 @@ function passResponses(definition) {
     DAILY_SHUTDOWN,
     FORKLIFT_DAILY_CHECK_TEMPLATE,
     FORKLIFT_INSPECTIONS_HREF,
+    SAFE_WORK_PERMIT,
     buildHomeInspectionCatalog,
+    buildPermitCatalog,
     isForkliftUnitInspection,
+    isPermitInspection,
+    parseCheckboxAnswer,
+    serializeCheckboxAnswer,
+    isAnswerFlagged,
   } = await import("./inspections.ts");
 
   assert.equal(isForkliftUnitInspection(FORKLIFT_UNIT_FORMS[0]), true);
   assert.equal(isForkliftUnitInspection(FORKLIFT_DAILY_CHECK_TEMPLATE), false);
   assert.equal(isForkliftUnitInspection(DAILY_STARTUP), false);
+  assert.equal(isPermitInspection(SAFE_WORK_PERMIT), true);
+  assert.equal(isPermitInspection(DAILY_STARTUP), false);
 
   const catalog = buildHomeInspectionCatalog([
     ...FORKLIFT_UNIT_FORMS.map((row) => ({
@@ -330,6 +345,15 @@ function passResponses(definition) {
       isAvailable: true,
     },
     {
+      id: SAFE_WORK_PERMIT.id,
+      slug: SAFE_WORK_PERMIT.slug,
+      title: SAFE_WORK_PERMIT.title,
+      description: SAFE_WORK_PERMIT.description,
+      category: SAFE_WORK_PERMIT.category,
+      href: SAFE_WORK_PERMIT.href,
+      isAvailable: true,
+    },
+    {
       id: FORKLIFT_DAILY_CHECK_TEMPLATE.id,
       slug: FORKLIFT_DAILY_CHECK_TEMPLATE.slug,
       title: FORKLIFT_DAILY_CHECK_TEMPLATE.title,
@@ -347,6 +371,56 @@ function passResponses(definition) {
     catalog.slice(1).map((row) => row.id),
     [DAILY_STARTUP.id, DAILY_SHUTDOWN.id],
   );
+
+  const permits = buildPermitCatalog([
+    {
+      id: SAFE_WORK_PERMIT.id,
+      slug: SAFE_WORK_PERMIT.slug,
+      title: SAFE_WORK_PERMIT.title,
+      description: SAFE_WORK_PERMIT.description,
+      category: SAFE_WORK_PERMIT.category,
+      href: SAFE_WORK_PERMIT.href,
+      isAvailable: true,
+    },
+    {
+      id: DAILY_STARTUP.id,
+      slug: DAILY_STARTUP.slug,
+      title: DAILY_STARTUP.title,
+      description: DAILY_STARTUP.description,
+      category: DAILY_STARTUP.category,
+      href: DAILY_STARTUP.href,
+      isAvailable: true,
+    },
+  ]);
+  assert.deepEqual(
+    permits.map((row) => row.id),
+    [SAFE_WORK_PERMIT.id],
+  );
+
+  const ppe = SAFE_WORK_PERMIT.questions.find(
+    (question) => question.id === "safe-work-permit__required-ppe",
+  );
+  assert.ok(ppe);
+  assert.equal(ppe.type, "CHECKBOX");
+  assert.ok(ppe.options.length >= 2);
+
+  const joined = serializeCheckboxAnswer(["Goggles", "Face shield"]);
+  assert.deepEqual(parseCheckboxAnswer(joined), ["Goggles", "Face shield"]);
+  assert.equal(
+    isAnswerFlagged(
+      { type: "CHECKBOX", attentionValues: ["SCBA"] },
+      serializeCheckboxAnswer(["Goggles", "SCBA"]),
+    ),
+    true,
+  );
+
+  const permitAnswers = buildAnswersFromResponses(
+    SAFE_WORK_PERMIT,
+    passResponses(SAFE_WORK_PERMIT),
+  );
+  const permitSummary = summarizeInspectionAnswers(permitAnswers);
+  assert.equal(permitSummary.status, "PASSED");
+  assert.ok(permitSummary.answeredCount > 0);
 }
 
 console.log("inspections tests passed");

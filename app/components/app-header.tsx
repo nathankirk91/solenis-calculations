@@ -69,6 +69,7 @@ function pathMatches(
   const exactOnly =
     targetPath === "/" ||
     targetPath === "/inspections" ||
+    targetPath === "/permits" ||
     targetPath === "/history";
 
   const pathOk = exactOnly
@@ -335,6 +336,23 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
                     },
                   ]
                 : []),
+            ],
+          },
+          {
+            type: "group",
+            id: "permits",
+            label: "Permits",
+            children: [
+              {
+                to: "/permits",
+                label: "Forms",
+                description: "Safe work and related permits",
+              },
+              {
+                to: "/inspections/history",
+                label: "Records",
+                description: "Completed permit and checklist history",
+              },
             ],
           },
         ] satisfies NavItem[])

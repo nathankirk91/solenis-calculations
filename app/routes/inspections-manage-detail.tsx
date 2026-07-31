@@ -233,7 +233,7 @@ function QuestionFields({
   const attentionChoices =
     questionType === "YES_NO"
       ? [...YES_NO_OPTIONS]
-      : questionType === "RADIO"
+      : questionType === "RADIO" || questionType === "CHECKBOX"
         ? radioOptionList
         : [];
 
@@ -283,10 +283,11 @@ function QuestionFields({
           <option value="NUMBER">Number</option>
           <option value="DATE">Date</option>
           <option value="RADIO">Radio options</option>
+          <option value="CHECKBOX">Checkboxes (multi-select)</option>
         </select>
       </div>
 
-      {questionType === "RADIO" ? (
+      {questionType === "RADIO" || questionType === "CHECKBOX" ? (
         <div className="grid gap-2">
           <Label>Options (one per line, or comma-separated)</Label>
           <textarea
@@ -532,7 +533,7 @@ function QuestionEditor({
               Section: {question.sectionTitle}
             </p>
           ) : null}
-          {question.type === "RADIO" ? (
+          {question.type === "RADIO" || question.type === "CHECKBOX" ? (
             <p className="mt-1 text-sm text-muted-foreground">
               Options: {question.options.join(", ")}
             </p>

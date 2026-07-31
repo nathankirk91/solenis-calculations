@@ -21,6 +21,7 @@ export default [
     "routes/polymer-an04-adipic-deta.tsx",
   ),
   route("inspections", "routes/inspections.tsx"),
+  route("permits", "routes/permits.tsx"),
   route("inspections/history", "routes/inspections-history.tsx"),
   route("inspections/manage", "routes/inspections-manage.tsx"),
   route(

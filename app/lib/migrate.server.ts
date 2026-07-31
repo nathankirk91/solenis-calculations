@@ -114,6 +114,7 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `ALTER TYPE "inspection_question_type" ADD VALUE IF NOT EXISTS 'NUMBER'`,
     `ALTER TYPE "inspection_question_type" ADD VALUE IF NOT EXISTS 'DATE'`,
+    `ALTER TYPE "inspection_question_type" ADD VALUE IF NOT EXISTS 'CHECKBOX'`,
     `CREATE TABLE IF NOT EXISTS "inspections" (
       "id" TEXT NOT NULL,
       "slug" TEXT NOT NULL,

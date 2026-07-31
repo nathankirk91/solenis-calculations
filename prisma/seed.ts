@@ -3,7 +3,10 @@ import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient, Prisma } from "../generated/prisma/client";
-import { INSPECTION_DEFINITIONS } from "../app/lib/inspections";
+import {
+  INSPECTION_DEFINITIONS,
+  questionTypeStoresOptions,
+} from "../app/lib/inspections";
 import { POLYMER_ADIPIC_DETA_PRODUCTS } from "../app/lib/polymer-adipic-deta";
 
 const connectionString = process.env.DATABASE_URL;
@@ -121,7 +124,7 @@ async function main() {
           sectionTitle: question.sectionTitle ?? null,
           type: question.type,
           options:
-            question.type === "RADIO" ? question.options : Prisma.DbNull,
+            questionTypeStoresOptions(question.type) ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
           showLastValue: question.showLastValue,
@@ -145,7 +148,7 @@ async function main() {
           sectionTitle: question.sectionTitle ?? null,
           type: question.type,
           options:
-            question.type === "RADIO" ? question.options : Prisma.DbNull,
+            questionTypeStoresOptions(question.type) ? question.options : Prisma.DbNull,
           attentionValues: question.attentionValues,
           required: question.required,
           showLastValue: question.showLastValue,

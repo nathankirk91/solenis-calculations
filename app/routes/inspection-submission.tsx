@@ -16,7 +16,11 @@ import { Label } from "~/components/ui/label";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
 import { formatMelbourneDateTime } from "~/lib/datetime";
-import type { InspectionAnswerRecord } from "~/lib/inspections";
+import {
+  formatLastAnswerDisplay,
+  type InspectionAnswerRecord,
+  type InspectionQuestionType,
+} from "~/lib/inspections";
 import {
   closeInspectionAction,
   getInspectionRunById,
@@ -272,7 +276,11 @@ export default function InspectionSubmissionPage({
                         <span className="text-muted-foreground">
                           {row.label}
                         </span>
-                        <AnswerBadge answer={row.answer} flagged={row.flagged} />
+                        <AnswerBadge
+                          answer={row.answer}
+                          flagged={row.flagged}
+                          type={row.type}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -433,10 +441,15 @@ function Stat({
 function AnswerBadge({
   answer,
   flagged,
+  type,
 }: {
   answer: string;
   flagged: boolean;
+  type: InspectionQuestionType;
 }) {
+  const display = answer
+    ? formatLastAnswerDisplay(answer, type)
+    : "—";
   return (
     <Badge
       variant="outline"
@@ -447,7 +460,7 @@ function AnswerBadge({
           : "border-emerald-600/40 text-emerald-700",
       )}
     >
-      {answer || "—"}
+      {display}
     </Badge>
   );
 }

@@ -46,6 +46,7 @@ enum InspectionQuestionType {
   RADIO
   NUMBER
   DATE
+  CHECKBOX
 
   @@map("inspection_question_type")
 }

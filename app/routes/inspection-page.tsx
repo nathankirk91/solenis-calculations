@@ -11,6 +11,7 @@ import { handleInspectionSubmit } from "~/lib/inspection-action.server";
 import {
   FORKLIFT_INSPECTIONS_HREF,
   isForkliftUnitInspection,
+  isPermitInspection,
 } from "~/lib/inspections";
 import {
   getInspectionDefinition,
@@ -26,7 +27,7 @@ export function meta({}: Route.MetaArgs) {
     { title: "Inspection | Springvale Solenis" },
     {
       name: "description",
-      content: "Plant inspection checklist for Solenis Springvale.",
+      content: "Plant inspection checklist or work permit for Solenis Springvale.",
     },
   ];
 }
@@ -121,6 +122,17 @@ export default function InspectionPage({
     openActions,
   } = loaderData;
   const backToForklifts = isForkliftUnitInspection(definition);
+  const isPermit = isPermitInspection(definition);
+  const backHref = backToForklifts
+    ? FORKLIFT_INSPECTIONS_HREF
+    : isPermit
+      ? "/permits"
+      : "/inspections";
+  const backLabel = backToForklifts
+    ? "← Forklift inspections"
+    : isPermit
+      ? "← Permits"
+      : "← Inspections";
 
   return (
     <div className="app-shell">
@@ -130,10 +142,10 @@ export default function InspectionPage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{definition.category}</Badge>
             <Link
-              to={backToForklifts ? FORKLIFT_INSPECTIONS_HREF : "/inspections"}
+              to={backHref}
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              {backToForklifts ? "← Forklift inspections" : "← Inspections"}
+              {backLabel}
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">

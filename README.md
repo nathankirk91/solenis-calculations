@@ -141,15 +141,26 @@ Question types:
 |---|---|---|
 | Yes / No | Yes or No | Usually **No** (configurable) |
 | Text box | Free text | Not auto-flagged |
+| Number | Numeric value | Not auto-flagged |
+| Date | Date picker | Not auto-flagged |
 | Radio | Custom options | Manager picks which options flag attention |
+| Checkboxes | Multi-select options | Manager picks which options flag attention |
 
 Default seeded inspections:
 
 | Inspection | Route |
 |---|---|
-| Forklift — Daily Safety Check (Form 78) | `/inspections/forklift-daily-check` |
+| Forklift — Daily Safety Check (Form 78) | `/inspections/forklifts` |
 | Daily Start-up | `/inspections/daily-startup` |
 | Daily Shut-down | `/inspections/daily-shutdown` |
+
+## Permits
+
+Permits live on `/permits` (separate catalog from equipment / shift checklists). They reuse the same inspection form engine and history. Seed category **Permits**.
+
+| Permit | Route |
+|---|---|
+| Safe Work Permit (Form 42801) | `/inspections/safe-work-permit` |
 
 Management:
 

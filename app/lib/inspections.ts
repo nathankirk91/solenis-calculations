@@ -4,12 +4,25 @@ export const INSPECTION_QUESTION_TYPES = [
   "RADIO",
   "NUMBER",
   "DATE",
+  "CHECKBOX",
 ] as const;
 
 export type InspectionQuestionType = (typeof INSPECTION_QUESTION_TYPES)[number];
 
 /** Common shift labels used on forklift (and similar) forms. */
 export const INSPECTION_SHIFT_OPTIONS = ["Day", "Afternoon"] as const;
+
+/** Hazard-control answers on Safe Work Permit (Form 42801). */
+export const IN_PLACE_OPTIONS = ["In place", "Not required"] as const;
+
+/** Electrical hazard answers on Safe Work Permit (Form 42801). */
+export const YES_NA_OPTIONS = ["Yes", "N/A"] as const;
+
+/** Category for work permits (separate from equipment / shift checklists). */
+export const PERMIT_CATEGORY = "Permits";
+
+/** Joiner for multi-select CHECKBOX answers stored as a single string. */
+export const CHECKBOX_ANSWER_SEPARATOR = "|";
 
 export type InspectionQuestionDef = {
   id: string;
@@ -305,6 +318,69 @@ function dateQuestion(
     sortOrder,
     helpText: opts?.helpText,
   };
+}
+
+function checkboxQuestion(
+  inspectionId: string,
+  id: string,
+  label: string,
+  sectionTitle: string,
+  options: string[],
+  sortOrder: number,
+  opts?: {
+    required?: boolean;
+    helpText?: string;
+    attentionValues?: string[];
+    showLastValue?: boolean;
+    applicableEquipmentRefs?: string[];
+    applicableShifts?: string[];
+    firstOfWeekOnly?: boolean;
+  },
+): InspectionQuestionDef {
+  return {
+    id: `${inspectionId}__${id}`,
+    label,
+    sectionTitle,
+    type: "CHECKBOX",
+    options,
+    attentionValues: opts?.attentionValues ?? [],
+    required: opts?.required ?? false,
+    showLastValue: opts?.showLastValue ?? false,
+    applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
+    applicableShifts: opts?.applicableShifts ?? [],
+    firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
+    sortOrder,
+    helpText: opts?.helpText,
+  };
+}
+
+export function parseCheckboxAnswer(answer: string): string[] {
+  if (!answer.trim()) {
+    return [];
+  }
+  return answer
+    .split(CHECKBOX_ANSWER_SEPARATOR)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function serializeCheckboxAnswer(values: string[]): string {
+  return values
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join(CHECKBOX_ANSWER_SEPARATOR);
+}
+
+export function questionTypeStoresOptions(
+  type: InspectionQuestionType,
+): boolean {
+  return type === "RADIO" || type === "CHECKBOX";
+}
+
+export function isPermitInspection(item: {
+  category?: string | null;
+}): boolean {
+  return (item.category ?? "").trim().toLowerCase() === "permits";
 }
 
 /** ADAPT-A-LIFT unit numbers on Form 78 (6 forklifts, checked each shift). */
@@ -671,6 +747,433 @@ export const FORKLIFT_UNIT_FORMS: InspectionDefinition[] = FORKLIFT_UNITS.map(
   (unit, index) => forkliftUnitForm(unit, 2 + index),
 );
 
+/** Form 42801 — Safe Work Permit (hazard control + PPE + authorisation). */
+export const SAFE_WORK_PERMIT: InspectionDefinition = {
+  id: "safe-work-permit",
+  slug: "safe-work-permit",
+  title: "Safe Work Permit",
+  shortName: "Safe Work",
+  description:
+    "Form 42801 safe work permit: classify the job, confirm hazard controls and PPE, and record authorisation before work starts.",
+  category: PERMIT_CATEGORY,
+  href: "/inspections/safe-work-permit",
+  sortOrder: 20,
+  equipmentLabel: "Equipment number",
+  instructionNotes:
+    "Form 42801 (09/14). Top copy is the field copy; bottom copy is the control room copy. Complete hazard control steps and authorisation before work begins. Fill permit close-out when the job is finished.",
+  isAvailable: true,
+  questions: [
+    dateQuestion(
+      "safe-work-permit",
+      "date",
+      "Date",
+      "Permit details",
+      1,
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "permit-duration",
+      "Permit duration",
+      "Permit details",
+      2,
+      { helpText: "How long this permit remains valid." },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "start-time",
+      "Start time",
+      "Permit details",
+      3,
+      { helpText: "e.g. 7:30" },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "start-ampm",
+      "Start AM / PM",
+      "Permit details",
+      ["AM", "PM"],
+      4,
+      { attentionValues: [] },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "end-time",
+      "End time",
+      "Permit details",
+      5,
+      { helpText: "e.g. 3:30" },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "end-ampm",
+      "End AM / PM",
+      "Permit details",
+      ["AM", "PM"],
+      6,
+      { attentionValues: [] },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "area",
+      "Area",
+      "Permit details",
+      7,
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "work-to-be-performed",
+      "Work to be performed",
+      "Work details",
+      8,
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "last-contained",
+      "Equipment or piping last contained",
+      "Work details",
+      9,
+      {
+        required: false,
+        helpText: "What the equipment or piping last contained, if known.",
+      },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "personnel-1",
+      "Authorized personnel 1",
+      "Authorized personnel",
+      10,
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "personnel-2",
+      "Authorized personnel 2",
+      "Authorized personnel",
+      11,
+      { required: false },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "personnel-3",
+      "Authorized personnel 3",
+      "Authorized personnel",
+      12,
+      { required: false },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "personnel-4",
+      "Authorized personnel 4",
+      "Authorized personnel",
+      13,
+      { required: false },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "work-classification",
+      "Work classification",
+      "Work classification",
+      ["Routine work", "Non-routine work"],
+      14,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-cleared",
+      "1. Has line and/or equipment been cleared of material and any residual pressure?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      15,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-decontaminated",
+      "2. Has line and/or equipment been decontaminated (steamed, washed, neutralized etc.)?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      16,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-locked-out",
+      "3. Has system been locked out to prevent release of any energy source (run-lock-try)?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      17,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-multiple-energy",
+      "4. Are multiple energy sources involved with lockout (if Yes complete lockout procedure form)?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      18,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-lock-box",
+      "5. Is a LOCK-BOX being used for this work?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      19,
+      { attentionValues: [] },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "lock-box-no",
+      "Lock-box number",
+      "Hazard control steps",
+      20,
+      {
+        required: false,
+        helpText: "Required when a lock-box is in place.",
+      },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-check-valves",
+      "6. Are check valves in system that prevent proper bleeding off of residual energy?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      21,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-safety-shower",
+      "7. Are nearest safety shower / eyewash stations identified and operational?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      22,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-confined-space",
+      "8. Is a CONFINED SPACE ENTRY PERMIT required for this work? (If Yes, complete Confined Space Permit)",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      23,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-hot-work",
+      "9. Is a HOT WORK PERMIT required for this work? (If Yes, complete Hot Work Permit)",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      24,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-line-break",
+      "10. Is a LINE BREAK PERMIT required for this work? (If Yes, complete Line Break Permit)",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      25,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-non-routine-plan",
+      "11. Has Non-Routine work plan been developed for performing this work?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      26,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-ladder-scaffold",
+      "12. Will work require use of a ladder, scaffolding, or man lift?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      27,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-fall-protection",
+      "13. Will work require fall protection (> 6 foot / 1.83 meters elevation)?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      28,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "hazard-roof-access",
+      "14. Will work be performed on an unprotected roof or structure (complete roof access permit)?",
+      "Hazard control steps",
+      [...IN_PLACE_OPTIONS],
+      29,
+      { attentionValues: [] },
+    ),
+    checkboxQuestion(
+      "safe-work-permit",
+      "required-ppe",
+      "Required PPE above standard PPE (hard hat, safety shoes, safety glasses)",
+      "Required PPE",
+      [
+        "Face shield",
+        "Leather gloves",
+        "Cartridge respirator",
+        "Rain jacket",
+        "Goggles",
+        "Chemical gloves",
+        "Air-line respirator (w/escape pack)",
+        "Rain pants/bibs",
+        "Welding/cutting shield",
+        "Chemical boots/covers",
+        "SCBA",
+        "Chemical suit",
+        "Chemical face shield",
+        "Full body harness",
+        "Double lanyard",
+        "Other",
+      ],
+      30,
+      {
+        required: false,
+        helpText: "Select all additional PPE required for this job.",
+      },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "ppe-other",
+      "Other PPE (specify)",
+      "Required PPE",
+      31,
+      {
+        required: false,
+        helpText: "Complete when Other is selected above.",
+      },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "elec-qualified",
+      "1. Will work be performed by qualified electrical personnel?",
+      "Electrical hazard control",
+      [...YES_NA_OPTIONS],
+      32,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "elec-live",
+      "2. Will work be performed on or near live electrical circuits or components?",
+      "Electrical hazard control",
+      [...YES_NA_OPTIONS],
+      33,
+      {
+        attentionValues: [],
+        helpText: "If Yes, ensure a work plan is in place with required PPE.",
+      },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "elec-deenergized-isolation",
+      "3. If work will be performed on a de-energized circuit, have proper isolation and lock out procedures been followed including testing of equipment to verify it has been de-energized?",
+      "Electrical hazard control",
+      [...YES_NA_OPTIONS],
+      34,
+      { attentionValues: [] },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "elec-high-voltage",
+      "4. Will work be performed on de-energized electrical circuit or equipment which operates at greater than 1,000 volts?",
+      "Electrical hazard control",
+      [...YES_NA_OPTIONS],
+      35,
+      {
+        attentionValues: [],
+        helpText: "If Yes, ensure a work plan is in place with required PPE.",
+      },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "special-precautions",
+      "Special precautions",
+      "Special precautions",
+      36,
+      { required: false },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "ops-rep",
+      "Operations rep",
+      "Authorization to conduct work",
+      37,
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "maint-rep",
+      "Maintenance rep",
+      "Authorization to conduct work",
+      38,
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "safe-work-coordinator",
+      "Safe work coordinator",
+      "Authorization to conduct work",
+      39,
+    ),
+    dateQuestion(
+      "safe-work-permit",
+      "closeout-date",
+      "Close-out date",
+      "Permit close-out",
+      40,
+      {
+        required: false,
+        helpText: "Complete when the job is finished.",
+      },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "closeout-time",
+      "Close-out time",
+      "Permit close-out",
+      41,
+      {
+        required: false,
+        helpText: "e.g. 4:15",
+      },
+    ),
+    radioQuestion(
+      "safe-work-permit",
+      "closeout-ampm",
+      "Close-out AM / PM",
+      "Permit close-out",
+      ["AM", "PM"],
+      42,
+      { required: false, attentionValues: [] },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "closeout-ops-initials",
+      "Operators initials",
+      "Permit close-out",
+      43,
+      { required: false },
+    ),
+    textQuestion(
+      "safe-work-permit",
+      "closeout-maint-initials",
+      "Maintenance initials",
+      "Permit close-out",
+      44,
+      { required: false },
+    ),
+  ],
+};
 
 export const DAILY_STARTUP: InspectionDefinition = {
   id: "daily-startup",
@@ -821,6 +1324,7 @@ export const INSPECTION_DEFINITIONS: InspectionDefinition[] = [
   ...FORKLIFT_UNIT_FORMS,
   DAILY_STARTUP,
   DAILY_SHUTDOWN,
+  SAFE_WORK_PERMIT,
 ];
 
 export function getFallbackInspectionByIdOrSlug(
@@ -891,13 +1395,23 @@ export function questionTypeLabel(type: InspectionQuestionType): string {
       return "Number";
     case "DATE":
       return "Date";
+    case "CHECKBOX":
+      return "Checkboxes";
   }
 }
 
 export function isAnswerFlagged(
-  question: Pick<InspectionQuestionDef, "attentionValues">,
+  question: Pick<InspectionQuestionDef, "attentionValues" | "type">,
   answer: string,
 ): boolean {
+  if (!answer.trim() || question.attentionValues.length === 0) {
+    return false;
+  }
+  if (question.type === "CHECKBOX") {
+    return parseCheckboxAnswer(answer).some((value) =>
+      question.attentionValues.includes(value),
+    );
+  }
   return question.attentionValues.includes(answer);
 }
 
@@ -984,6 +1498,9 @@ export function formatLastAnswerDisplay(
         });
       }
     }
+  }
+  if (type === "CHECKBOX") {
+    return parseCheckboxAnswer(trimmed).join(", ");
   }
   return trimmed;
 }
@@ -1187,12 +1704,16 @@ export function isForkliftUnitInspection(item: {
 
 /**
  * Home / checklist catalog: collapse individual forklift units into one
- * "Forklift inspections" entry that opens the unit picker.
+ * "Forklift inspections" entry that opens the unit picker. Permit forms are
+ * listed on /permits instead.
  */
 export function buildHomeInspectionCatalog(
   inspections: InspectionCard[],
 ): InspectionCard[] {
-  const available = inspections.filter((inspection) => inspection.isAvailable);
+  const available = inspections.filter(
+    (inspection) =>
+      inspection.isAvailable && !isPermitInspection(inspection),
+  );
   const forkliftUnits = available.filter((inspection) =>
     isForkliftUnitInspection(inspection),
   );
@@ -1206,3 +1727,18 @@ export function buildHomeInspectionCatalog(
 
   return [FORKLIFT_INSPECTIONS_CARD, ...others];
 }
+
+/** Operator hub catalog for work permits (Safe Work, Hot Work, etc.). */
+export function buildPermitCatalog(
+  inspections: InspectionCard[],
+): InspectionCard[] {
+  return inspections.filter(
+    (inspection) =>
+      inspection.isAvailable && isPermitInspection(inspection),
+  );
+}
+
+/** Fallback permit cards when Supabase is not configured yet. */
+export const FALLBACK_PERMITS: InspectionCard[] = FALLBACK_INSPECTIONS.filter(
+  (inspection) => isPermitInspection(inspection),
+);

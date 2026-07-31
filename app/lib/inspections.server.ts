@@ -19,6 +19,7 @@ import {
   groupQuestionsBySection,
   parseStringArray,
   questionOptionsForType,
+  questionTypeStoresOptions,
   slugifyInspectionTitle,
   summarizeInspectionAnswers,
   type InspectionAnswerRecord,
@@ -30,6 +31,33 @@ import {
   type InspectionSummary,
   type LastInspectionAnswers,
 } from "~/lib/inspections";
+
+function isKnownQuestionType(value: unknown): value is InspectionQuestionType {
+  return (
+    value === "YES_NO" ||
+    value === "TEXT" ||
+    value === "RADIO" ||
+    value === "NUMBER" ||
+    value === "DATE" ||
+    value === "CHECKBOX"
+  );
+}
+
+function optionsJsonForType(
+  type: InspectionQuestionType,
+  options: string[],
+): string[] | typeof Prisma.DbNull {
+  return questionTypeStoresOptions(type) ? options : Prisma.DbNull;
+}
+
+function attentionJsonForType(
+  type: InspectionQuestionType,
+  attentionValues: string[],
+): string[] | typeof Prisma.DbNull {
+  return type === "TEXT" || type === "NUMBER" || type === "DATE"
+    ? Prisma.DbNull
+    : attentionValues;
+}
 
 export type { InspectionHistorySort };
 
@@ -667,14 +695,9 @@ function parseVersionSnapshot(value: unknown): InspectionVersionSnapshot {
   const questions = Array.isArray(snapshot.questions)
     ? snapshot.questions.map((question) => {
         const row = question as Partial<InspectionQuestionDef>;
-        const type: InspectionQuestionType =
-          row.type === "YES_NO" ||
-          row.type === "TEXT" ||
-          row.type === "RADIO" ||
-          row.type === "NUMBER" ||
-          row.type === "DATE"
-            ? row.type
-            : "TEXT";
+        const type: InspectionQuestionType = isKnownQuestionType(row.type)
+          ? row.type
+          : "TEXT";
         const options = Array.isArray(row.options)
           ? row.options.map(String)
           : [];
@@ -1049,7 +1072,7 @@ export async function seedDefaultInspections(): Promise<number> {
           sectionTitle: question.sectionTitle ?? null,
           type: question.type,
           options:
-            question.type === "RADIO" ? question.options : Prisma.DbNull,
+            optionsJsonForType(question.type, question.options),
           attentionValues: question.attentionValues,
           required: question.required,
           showLastValue: question.showLastValue,
@@ -1073,7 +1096,7 @@ export async function seedDefaultInspections(): Promise<number> {
           sectionTitle: question.sectionTitle ?? null,
           type: question.type,
           options:
-            question.type === "RADIO" ? question.options : Prisma.DbNull,
+            optionsJsonForType(question.type, question.options),
           attentionValues: question.attentionValues,
           required: question.required,
           showLastValue: question.showLastValue,
@@ -1272,8 +1295,12 @@ export async function addInspectionQuestion(args: {
   }
 
   const options = questionOptionsForType(args.type, args.options ?? []);
-  if (args.type === "RADIO" && options.length < 2) {
-    throw new Error("Radio questions need at least two options.");
+  if (questionTypeStoresOptions(args.type) && options.length < 2) {
+    throw new Error(
+      args.type === "CHECKBOX"
+        ? "Checkbox questions need at least two options."
+        : "Radio questions need at least two options.",
+    );
   }
 
   const attentionValues =
@@ -1301,11 +1328,8 @@ export async function addInspectionQuestion(args: {
       helpText: args.helpText?.trim() || null,
       sectionTitle: args.sectionTitle?.trim() || null,
       type: args.type,
-      options: args.type === "RADIO" ? options : Prisma.DbNull,
-      attentionValues:
-        args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
-          ? Prisma.DbNull
-          : normalizedAttention,
+      options: optionsJsonForType(args.type, options),
+      attentionValues: attentionJsonForType(args.type, normalizedAttention),
       required: args.required ?? true,
       showLastValue: args.showLastValue ?? false,
       applicableEquipmentRefs:
@@ -1389,8 +1413,12 @@ export async function updateInspectionQuestion(args: {
   await assertQuestionSourceInspection(existing.inspectionId);
 
   const options = questionOptionsForType(args.type, args.options ?? []);
-  if (args.type === "RADIO" && options.length < 2) {
-    throw new Error("Radio questions need at least two options.");
+  if (questionTypeStoresOptions(args.type) && options.length < 2) {
+    throw new Error(
+      args.type === "CHECKBOX"
+        ? "Checkbox questions need at least two options."
+        : "Radio questions need at least two options.",
+    );
   }
 
   const attentionValues =
@@ -1413,11 +1441,8 @@ export async function updateInspectionQuestion(args: {
       helpText: args.helpText?.trim() || null,
       sectionTitle: args.sectionTitle?.trim() || null,
       type: args.type,
-      options: args.type === "RADIO" ? options : Prisma.DbNull,
-      attentionValues:
-        args.type === "TEXT" || args.type === "NUMBER" || args.type === "DATE"
-          ? Prisma.DbNull
-          : normalizedAttention,
+      options: optionsJsonForType(args.type, options),
+      attentionValues: attentionJsonForType(args.type, normalizedAttention),
       required: args.required ?? true,
       showLastValue: args.showLastValue ?? false,
       applicableEquipmentRefs:
@@ -1558,14 +1583,7 @@ function parseAnswers(value: unknown): InspectionAnswerRecord[] {
         questionId: String(row.questionId ?? ""),
         label: String(row.label ?? ""),
         sectionTitle: row.sectionTitle ? String(row.sectionTitle) : null,
-        type:
-          row.type === "YES_NO" ||
-          row.type === "TEXT" ||
-          row.type === "RADIO" ||
-          row.type === "NUMBER" ||
-          row.type === "DATE"
-            ? row.type
-            : "TEXT",
+        type: isKnownQuestionType(row.type) ? row.type : "TEXT",
         answer: String(row.answer ?? ""),
         flagged: Boolean(row.flagged),
       };
@@ -2197,7 +2215,7 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
           sectionTitle: question.sectionTitle ?? null,
           type: question.type,
           options:
-            question.type === "RADIO" ? question.options : Prisma.DbNull,
+            optionsJsonForType(question.type, question.options),
           attentionValues: question.attentionValues,
           required: question.required,
           showLastValue: question.showLastValue,
@@ -2222,7 +2240,7 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
           sectionTitle: question.sectionTitle ?? null,
           type: question.type,
           options:
-            question.type === "RADIO" ? question.options : Prisma.DbNull,
+            optionsJsonForType(question.type, question.options),
           attentionValues: question.attentionValues,
           required: question.required,
           showLastValue: question.showLastValue,

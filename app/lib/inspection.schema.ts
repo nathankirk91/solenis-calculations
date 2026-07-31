@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   buildAnswersFromResponses,
   filterQuestionsForContext,
+  parseCheckboxAnswer,
   readShiftAnswer,
   summarizeInspectionAnswers,
   type InspectionDefinition,
@@ -59,6 +60,21 @@ export function createInspectionFormSchema(
           .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date.")
           .optional(),
       );
+    } else if (question.type === "CHECKBOX") {
+      responseShape[question.id] = z.preprocess((value) => {
+        if (value == null || value === "") {
+          return undefined;
+        }
+        if (Array.isArray(value)) {
+          const joined = value
+            .map((item) => String(item).trim())
+            .filter(Boolean)
+            .join("|");
+          return joined || undefined;
+        }
+        const trimmed = String(value).trim();
+        return trimmed || undefined;
+      }, z.string().optional());
     } else if (question.type === "YES_NO") {
       responseShape[question.id] = z.preprocess(
         emptyToUndefined,
@@ -147,9 +163,28 @@ export function createInspectionFormSchema(
               question.type === "NUMBER" ||
               question.type === "DATE"
                 ? "Enter an answer."
-                : "Select an answer.",
+                : question.type === "CHECKBOX"
+                  ? "Select at least one option."
+                  : "Select an answer.",
             path: ["responses", question.id],
           });
+        }
+        if (
+          question.type === "CHECKBOX" &&
+          answer != null &&
+          String(answer).trim() !== ""
+        ) {
+          const allowed = new Set(question.options);
+          const invalid = parseCheckboxAnswer(String(answer)).filter(
+            (item) => !allowed.has(item),
+          );
+          if (invalid.length > 0) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Select valid options only.",
+              path: ["responses", question.id],
+            });
+          }
         }
       }
     });
