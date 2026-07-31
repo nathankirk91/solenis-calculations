@@ -16,3 +16,9 @@ node_modules
 *.local
 
 /generated/prisma
+
+# Test artifacts
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache

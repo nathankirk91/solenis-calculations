@@ -10,7 +10,11 @@
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "test:calc": "node --experimental-strip-types app/lib/polymer-adipic-deta.test.mjs && node --experimental-strip-types app/lib/pending-run-loads.test.mjs && node --experimental-strip-types app/lib/datetime.test.mjs && node --experimental-strip-types app/lib/inspections.test.mjs && node --experimental-strip-types app/lib/inspection-history.test.mjs",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "node ./scripts/run-unit-tests.mjs",
+    "test:integration": "node ./scripts/run-integration-tests.mjs",
+    "test:e2e": "playwright test",
+    "test:calc": "npm run test:unit",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -48,6 +52,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@react-router/dev": "^8",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22",
