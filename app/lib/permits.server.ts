@@ -64,8 +64,41 @@ export async function listPermitCards(): Promise<{
   permits: InspectionCard[];
   source: "prisma" | "fallback";
 }> {
+  await repairStalePermitHrefs();
   const { inspections, source } = await listInspectionCards();
   return { permits: buildPermitCatalog(inspections), source };
+}
+
+/** Fix permit rows still pointing at /inspections/* after the permits split. */
+async function repairStalePermitHrefs(): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return;
+  }
+  try {
+    await ensureInspectionSchema();
+    const { INSPECTION_DEFINITIONS } = await import("~/lib/inspections");
+    for (const definition of INSPECTION_DEFINITIONS) {
+      if (!isPermitInspection(definition)) {
+        continue;
+      }
+      await prisma.inspection.updateMany({
+        where: {
+          id: definition.id,
+          OR: [
+            { href: { not: definition.href } },
+            { category: { not: PERMIT_CATEGORY } },
+          ],
+        },
+        data: {
+          href: definition.href,
+          category: PERMIT_CATEGORY,
+        },
+      });
+    }
+  } catch {
+    // Best-effort repair; catalog still overlays static hrefs.
+  }
 }
 
 export async function listManagedPermits(): Promise<ManagedInspection[]> {

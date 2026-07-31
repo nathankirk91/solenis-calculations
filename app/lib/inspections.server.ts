@@ -316,15 +316,18 @@ export async function listInspectionCards(): Promise<{
     }
 
     return {
-      inspections: rows.map((row) => ({
-        id: row.id,
-        slug: row.slug,
-        title: row.title,
-        description: row.description,
-        category: row.category,
-        href: row.href,
-        isAvailable: row.isAvailable,
-      })),
+      inspections: rows.map((row) => {
+        const fallback = getFallbackInspectionByIdOrSlug(row.id);
+        return {
+          id: row.id,
+          slug: row.slug,
+          title: row.title,
+          description: row.description,
+          category: fallback?.category ?? row.category,
+          href: fallback?.href ?? row.href,
+          isAvailable: row.isAvailable,
+        };
+      }),
       source: "prisma",
     };
   } catch {
@@ -456,6 +459,8 @@ function mergeStaticDefinitionMeta(
   return {
     ...definition,
     shortName: fallback?.shortName ?? definition.shortName,
+    href: fallback?.href ?? definition.href,
+    category: fallback?.category ?? definition.category,
     equipmentLabel:
       definition.equipmentLabel ??
       fallback?.equipmentLabel ??

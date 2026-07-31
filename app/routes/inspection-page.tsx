@@ -22,6 +22,17 @@ import {
 import { listActiveOperators } from "~/lib/operators.server";
 import { canReviewRuns } from "~/lib/roles";
 
+/** Prefer /permits/:slug so stale DB hrefs cannot cause a redirect loop. */
+function permitIssueHref(definition: {
+  slug: string;
+  href?: string | null;
+}): string {
+  if (definition.href?.startsWith("/permits/")) {
+    return definition.href;
+  }
+  return `/permits/${definition.slug}`;
+}
+
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Inspection | Springvale Solenis" },
@@ -36,7 +47,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Legacy /inspections/safe-work-permit URLs redirect to /permits/...
   const maybePermit = await getInspectionDefinition(params.inspectionId);
   if (maybePermit && isPermitInspection(maybePermit)) {
-    throw redirect(maybePermit.href);
+    throw redirect(permitIssueHref(maybePermit));
   }
 
   const definition = maybePermit;
@@ -107,7 +118,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     throw new Response("Inspection not found", { status: 404 });
   }
   if (isPermitInspection(definition)) {
-    throw redirect(definition.href);
+    throw redirect(permitIssueHref(definition));
   }
 
   const user = await requireUser(request, definition.href);
