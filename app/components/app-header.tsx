@@ -346,9 +346,14 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
             label: "Permits",
             children: [
               {
+                to: "/permits/dashboard",
+                label: "Dashboard",
+                description: "Pending and open permits",
+              },
+              {
                 to: "/permits",
                 label: "Forms",
-                description: "Issue permits and close out open ones",
+                description: "Issue a new permit",
               },
               {
                 to: "/permits/history",

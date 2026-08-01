@@ -1,42 +1,51 @@
 import { Link } from "react-router";
 
-import type { Route } from "./+types/permits";
+import type { Route } from "./+types/permits-dashboard";
 
 import { AppHeader } from "~/components/app-header";
-import { CatalogLinkCard } from "~/components/catalog-link-card";
+import { PermitDashboard } from "~/components/permit-dashboard";
 import { Badge } from "~/components/ui/badge";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
-import { listPermitCards } from "~/lib/permits.server";
+import {
+  listOpenPermitRuns,
+  listPendingAuthorizationPermitRuns,
+} from "~/lib/permits.server";
 import { canManageOperators, canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Issue permit | Springvale Solenis" },
+    { title: "Permit dashboard | Springvale Solenis" },
     {
       name: "description",
-      content: "Choose a permit form to issue at Solenis Springvale.",
+      content:
+        "Active permits awaiting authorization or close-out at Solenis Springvale.",
     },
   ];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireUser(request, "/permits");
-  const [{ permits }, pendingCount] = await Promise.all([
-    listPermitCards(),
+  const user = await requireUser(request, "/permits/dashboard");
+  const [pendingPermits, openPermits, pendingCount] = await Promise.all([
+    listPendingAuthorizationPermitRuns({ limit: 50 }),
+    listOpenPermitRuns({ limit: 50 }),
     canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
   ]);
 
   return {
     user,
-    permits,
+    pendingPermits,
+    openPermits,
     pendingCount,
     canManage: canManageOperators(user.role),
   };
 }
 
-export default function PermitsPage({ loaderData }: Route.ComponentProps) {
-  const { permits, user, pendingCount, canManage } = loaderData;
+export default function PermitsDashboardPage({
+  loaderData,
+}: Route.ComponentProps) {
+  const { pendingPermits, openPermits, user, pendingCount, canManage } =
+    loaderData;
 
   return (
     <div className="app-shell">
@@ -46,26 +55,20 @@ export default function PermitsPage({ loaderData }: Route.ComponentProps) {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Permits</Badge>
             <Link
-              to="/permits/dashboard"
+              to="/permits"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              Dashboard
+              Issue a permit
             </Link>
           </div>
           <h1 className="font-heading text-4xl font-semibold tracking-tight text-brand-navy sm:text-5xl">
-            Issue a permit
+            Dashboard
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-            Choose a form to start. After submit it goes for authorization
-            sign-off.
+            Active permits that need authorization or close-out. Closed permits
+            are in Records.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
-            <Link
-              to="/permits/dashboard"
-              className="text-brand-navy underline-offset-4 hover:underline"
-            >
-              Dashboard
-            </Link>
             <Link
               to="/permits/history"
               className="text-brand-navy underline-offset-4 hover:underline"
@@ -91,34 +94,12 @@ export default function PermitsPage({ loaderData }: Route.ComponentProps) {
           </div>
         </section>
 
-        <section aria-labelledby="permits-heading">
-          <h2
-            id="permits-heading"
-            className="mb-4 font-heading text-2xl font-semibold tracking-tight text-brand-navy"
-          >
-            Forms
-          </h2>
-          {permits.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {permits.map((permit, index) => (
-                <div
-                  key={permit.id}
-                  className="animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500"
-                  style={{ animationDelay: `${80 + index * 60}ms` }}
-                >
-                  <CatalogLinkCard item={permit} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">
-              No permit forms are available yet.
-              {canManage
-                ? " Add one under Permits → Manage."
-                : " Ask a manager to add a permit form."}
-            </p>
-          )}
-        </section>
+        <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+          <PermitDashboard
+            pendingPermits={pendingPermits}
+            openPermits={openPermits}
+          />
+        </div>
       </main>
     </div>
   );

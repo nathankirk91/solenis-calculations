@@ -160,7 +160,8 @@ Permits live on `/permits`, with their own records and management (separate from
 
 | Page | Route |
 |---|---|
-| Issue / open permits | `/permits` |
+| Permit dashboard (pending + open) | `/permits/dashboard` |
+| Issue a permit | `/permits` |
 | Permit records | `/permits/history` |
 | Manage permit forms | `/permits/manage` |
 | Permit sign-off settings | `/permits/settings` |

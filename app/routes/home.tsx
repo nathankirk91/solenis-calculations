@@ -5,6 +5,7 @@ import type { Route } from "./+types/home";
 import { AppHeader } from "~/components/app-header";
 import { CatalogLinkCard } from "~/components/catalog-link-card";
 import { ForkliftDayDashboardCard } from "~/components/forklift-day-dashboard";
+import { PermitDashboard } from "~/components/permit-dashboard";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -21,6 +22,10 @@ import {
 } from "~/lib/datetime";
 import { getPrisma } from "~/lib/db.server";
 import { listForkliftChecksForDay } from "~/lib/inspections.server";
+import {
+  listOpenPermitRuns,
+  listPendingAuthorizationPermitRuns,
+} from "~/lib/permits.server";
 import { canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
@@ -29,7 +34,7 @@ export function meta({}: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Quick view of today's forklift checks and plant calculation shortcuts.",
+        "Quick view of today's forklift checks, active permits, and plant calculation shortcuts.",
     },
   ];
 }
@@ -40,11 +45,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   const date =
     parseYmd(url.searchParams.get("date")) ?? melbourneDateYmd();
   const prisma = getPrisma();
-  const pendingCount = canReviewRuns(user.role)
-    ? await countPendingRuns()
-    : 0;
-
-  const forkliftDay = await listForkliftChecksForDay(date);
+  const [pendingCount, forkliftDay, pendingPermits, openPermits] =
+    await Promise.all([
+      canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
+      listForkliftChecksForDay(date),
+      listPendingAuthorizationPermitRuns({ limit: 10 }),
+      listOpenPermitRuns({ limit: 10 }),
+    ]);
 
   if (!prisma) {
     return {
@@ -52,6 +59,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       calculations: FALLBACK_CALCULATIONS,
       pendingCount,
       forkliftDay,
+      pendingPermits,
+      openPermits,
       date,
       source: "fallback" as const,
     };
@@ -88,6 +97,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       calculations,
       pendingCount,
       forkliftDay,
+      pendingPermits,
+      openPermits,
       date,
       source: "prisma" as const,
     };
@@ -97,6 +108,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       calculations: FALLBACK_CALCULATIONS,
       pendingCount,
       forkliftDay,
+      pendingPermits,
+      openPermits,
       date,
       source: "fallback" as const,
     };
@@ -104,7 +117,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { calculations, user, pendingCount, forkliftDay, date } = loaderData;
+  const {
+    calculations,
+    user,
+    pendingCount,
+    forkliftDay,
+    pendingPermits,
+    openPermits,
+    date,
+  } = loaderData;
   const dayLabel = formatMelbourneYmd(date) ?? date;
   const recordsHref = `/inspections/history?date=${encodeURIComponent(date)}`;
 
@@ -120,8 +141,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             Springvale
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-            Quick view of forklift checks for {dayLabel}, plus shortcuts into
-            plant calculations.
+            Quick view of forklift checks for {dayLabel}, active permits, and
+            shortcuts into plant calculations.
           </p>
         </section>
 
@@ -171,6 +192,28 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               <Link to="/inspections">All checklists</Link>
             </Button>
           </div>
+        </section>
+
+        <section
+          aria-labelledby="permits-dashboard-heading"
+          className="mb-14 animate-in fade-in slide-in-from-bottom-2 duration-500"
+        >
+          <div className="mb-4">
+            <h2
+              id="permits-dashboard-heading"
+              className="font-heading text-2xl font-semibold tracking-tight text-brand-navy"
+            >
+              Permits
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pending authorization and open permits.
+            </p>
+          </div>
+          <PermitDashboard
+            pendingPermits={pendingPermits}
+            openPermits={openPermits}
+            compact
+          />
         </section>
 
         <section

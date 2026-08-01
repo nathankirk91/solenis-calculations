@@ -24,6 +24,7 @@ export default [
   ),
   route("inspections", "routes/inspections.tsx"),
   route("permits", "routes/permits.tsx"),
+  route("permits/dashboard", "routes/permits-dashboard.tsx"),
   route("permits/history", "routes/permits-history.tsx"),
   route("permits/manage", "routes/permits-manage.tsx"),
   route(
