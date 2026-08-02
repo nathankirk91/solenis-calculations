@@ -70,16 +70,18 @@ const DEFAULT_ROLES: Array<{
   {
     id: "role-operations-rep",
     slug: "operations-rep",
-    name: "Operations rep",
-    description: "Can sign Operations authorisation on permits.",
+    name: "Operations representative / Account manager",
+    description:
+      "Knows the equipment; can sign Operations authorisation on Safe Work Permits.",
     isSystem: true,
     sortOrder: 10,
   },
   {
     id: "role-maintenance-rep",
     slug: "maintenance-rep",
-    name: "Maintenance rep",
-    description: "Can sign Maintenance authorisation on permits.",
+    name: "Maintenance representative / Account technician",
+    description:
+      "Person performing the work or lead for a group; can sign Maintenance authorisation.",
     isSystem: true,
     sortOrder: 11,
   },
@@ -87,7 +89,8 @@ const DEFAULT_ROLES: Array<{
     id: "role-safe-work-coordinator",
     slug: "safe-work-coordinator",
     name: "Safe work coordinator",
-    description: "Can sign Safe work coordinator authorisation on permits.",
+    description:
+      "Knows the equipment and SWP process; can sign Safe work coordinator authorisation.",
     isSystem: true,
     sortOrder: 12,
   },
@@ -103,14 +106,14 @@ const DEFAULT_SLOTS: Array<{
   {
     id: "slot-operations-rep",
     code: PERMIT_SLOT_CODES.operationsRep,
-    label: "Operations rep",
+    label: "Operations representative / Account manager",
     sortOrder: 1,
     defaultRoleSlug: "operations-rep",
   },
   {
     id: "slot-maintenance-rep",
     code: PERMIT_SLOT_CODES.maintenanceRep,
-    label: "Maintenance rep",
+    label: "Maintenance representative / Account technician",
     sortOrder: 2,
     defaultRoleSlug: "maintenance-rep",
   },

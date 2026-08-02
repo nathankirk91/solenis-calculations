@@ -102,10 +102,12 @@ export const PERMIT_AUTH_SLOT_KEYS = [
 export type PermitAuthSlotKey = (typeof PERMIT_AUTH_SLOT_KEYS)[number];
 
 export const PERMIT_AUTH_SLOT_LABELS: Record<PermitAuthSlotKey, string> = {
-  operationsRep: "Operations rep",
-  maintenanceRep: "Maintenance rep",
+  operationsRep: "Operations representative / Account manager",
+  maintenanceRep: "Maintenance representative / Account technician",
   safeWorkCoordinator: "Safe work coordinator",
 };
+
+export const MAX_PERMIT_DURATION_HOURS = 12;
 
 export function emptyPermitAuthorization(): PermitAuthorization {
   return {
@@ -127,6 +129,69 @@ export function isPermitFullyAuthorized(
   return PERMIT_AUTH_SLOT_KEYS.every((key) =>
     isPermitAuthSlotSigned(authorization[key]),
   );
+}
+
+export function distinctPermitSignerIds(
+  authorization: PermitAuthorization,
+): string[] {
+  return [
+    ...new Set(
+      PERMIT_AUTH_SLOT_KEYS.map((key) => authorization[key].userId.trim()).filter(
+        Boolean,
+      ),
+    ),
+  ];
+}
+
+/** True when completing this slot would open the permit with fewer than two people. */
+export function needsFewerThanTwoSignersReason(args: {
+  authorization: PermitAuthorization;
+  slotKey: PermitAuthSlotKey;
+  userId: string;
+}): boolean {
+  const next: PermitAuthorization = {
+    ...args.authorization,
+    [args.slotKey]: {
+      ...args.authorization[args.slotKey],
+      userId: args.userId,
+      name: args.authorization[args.slotKey].name || "pending",
+      signature: args.authorization[args.slotKey].signature || "pending",
+    },
+  };
+  if (!isPermitFullyAuthorized(next)) {
+    return false;
+  }
+  return distinctPermitSignerIds(next).length < 2;
+}
+
+function parseTimeToMinutes(value: string): number | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+  return hours * 60 + minutes;
+}
+
+/** Duration in minutes from start→end, allowing overnight wrap within 24h. */
+export function permitDurationMinutes(
+  startTime: string,
+  endTime: string,
+): number | null {
+  const start = parseTimeToMinutes(startTime);
+  const end = parseTimeToMinutes(endTime);
+  if (start == null || end == null) {
+    return null;
+  }
+  let duration = end - start;
+  if (duration <= 0) {
+    duration += 24 * 60;
+  }
+  return duration;
 }
 
 export function createPermitIssueFormSchema(definition: InspectionDefinition) {
@@ -166,7 +231,7 @@ export function createPermitIssueFormSchema(definition: InspectionDefinition) {
       if (personnel.length === 0) {
         ctx.addIssue({
           code: "custom",
-          message: "Add at least one authorized person.",
+          message: "Add at least one authorized person (technician, contractor, or visitor).",
           path: ["authorizedPersonnel", 0],
         });
       }
@@ -211,6 +276,33 @@ export function createPermitIssueFormSchema(definition: InspectionDefinition) {
           }
         }
       }
+
+      const startId = applicableQuestions.find((q) =>
+        q.id.endsWith("__start-time"),
+      )?.id;
+      const endId = applicableQuestions.find((q) =>
+        q.id.endsWith("__end-time"),
+      )?.id;
+      if (startId && endId) {
+        const start = String(value.responses[startId] ?? "");
+        const end = String(value.responses[endId] ?? "");
+        if (start && end) {
+          const minutes = permitDurationMinutes(start, end);
+          if (minutes == null) {
+            ctx.addIssue({
+              code: "custom",
+              message: "Enter valid start and end times.",
+              path: ["responses", endId],
+            });
+          } else if (minutes > MAX_PERMIT_DURATION_HOURS * 60) {
+            ctx.addIssue({
+              code: "custom",
+              message: `Permit duration cannot exceed ${MAX_PERMIT_DURATION_HOURS} hours.`,
+              path: ["responses", endId],
+            });
+          }
+        }
+      }
     });
 }
 
@@ -245,12 +337,15 @@ export function createPermitIssueSchema(definition: InspectionDefinition) {
 
 export function createPermitSignOffSchema(
   allowedSlotKeys: PermitAuthSlotKey[],
+  options?: { requireFewerThanTwoReason?: boolean },
 ) {
   if (allowedSlotKeys.length === 0) {
     return z.object({
       intent: z.literal("sign-off"),
       slotKey: z.string(),
       signature: z.string(),
+      siteVerified: z.string().optional(),
+      fewerThanTwoSignersReason: z.string().optional(),
     }).superRefine((_value, ctx) => {
       ctx.addIssue({
         code: "custom",
@@ -265,13 +360,40 @@ export function createPermitSignOffSchema(
       ? z.literal(allowedSlotKeys[0])
       : z.enum(allowedSlotKeys as [PermitAuthSlotKey, ...PermitAuthSlotKey[]]);
 
-  return z.object({
-    intent: z.literal("sign-off"),
-    slotKey: slotKeySchema,
-    signature: z
-      .string({ error: "Signature / initials are required." })
-      .min(1, "Please sign or initial."),
-  });
+  return z
+    .object({
+      intent: z.literal("sign-off"),
+      slotKey: slotKeySchema,
+      signature: z
+        .string({ error: "Signature / initials are required." })
+        .min(1, "Please sign or initial."),
+      siteVerified: z
+        .string({ error: "Confirm you inspected the job site." })
+        .refine((value) => value === "on", {
+          message: "Confirm you visually inspected the job site before signing.",
+        }),
+      fewerThanTwoSignersReason: z.preprocess(
+        emptyToUndefined,
+        z
+          .string()
+          .trim()
+          .max(500, "Keep the reason under 500 characters.")
+          .optional(),
+      ),
+    })
+    .superRefine((value, ctx) => {
+      if (
+        options?.requireFewerThanTwoReason &&
+        !value.fewerThanTwoSignersReason?.trim()
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Document why fewer than two separate people are available to sign.",
+          path: ["fewerThanTwoSignersReason"],
+        });
+      }
+    });
 }
 
 export function createPermitCloseoutSchema() {
@@ -287,10 +409,10 @@ export function createPermitCloseoutSchema() {
       .regex(/^\d{2}:\d{2}$/, "Enter a valid 24-hour time."),
     operatorsInitials: z
       .string({ error: "Operators initials are required." })
-      .min(1, "Operators must initial the close-out."),
+      .min(1, "Operators involved must initial the close-out."),
     maintenanceInitials: z
       .string({ error: "Maintenance initials are required." })
-      .min(1, "Maintenance must initial the close-out."),
+      .min(1, "Maintenance personnel involved must initial the close-out."),
   });
 }
 
@@ -304,12 +426,16 @@ export type PermitAuthorizationPerson = {
   userId: string;
   name: string;
   signature: string;
+  /** ISO timestamp when signer confirmed site verification. */
+  siteVerifiedAt?: string;
 };
 
 export type PermitAuthorization = {
   operationsRep: PermitAuthorizationPerson;
   maintenanceRep: PermitAuthorizationPerson;
   safeWorkCoordinator: PermitAuthorizationPerson;
+  /** Required by procedure when fewer than two distinct people signed. */
+  fewerThanTwoSignersReason?: string;
 };
 export type PermitCloseout = {
   date: string;

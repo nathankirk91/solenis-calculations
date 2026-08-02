@@ -787,13 +787,13 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
   title: "Safe Work Permit",
   shortName: "Safe Work",
   description:
-    "Form 42801 safe work permit: classify the job, confirm hazard controls and PPE, and record authorisation before work starts.",
+    "Form 42801 safe work permit for non-routine work: confirm hazard controls and PPE, then obtain Operations, Maintenance, and Safe Work Coordinator authorisation before work starts.",
   category: PERMIT_CATEGORY,
   href: "/permits/safe-work-permit",
   sortOrder: 20,
   equipmentLabel: "Equipment number",
   instructionNotes:
-    "Form 42801 (09/14). Top copy is the field copy; bottom copy is the control room copy. Complete hazard control steps and authorisation before work begins. Close the permit out later when the job is finished.",
+    "Form 42801 (09/14). Safe Work Permits authorise technicians, contractors, and visitors for non-routine work in process areas. SWP does not replace Hot Work, Confined Space Entry, or Line Break permits — complete those separately when required. Maximum duration is 12 hours if conditions and personnel do not change. Approvers must visually inspect the job site before signing. A minimum of two separate people must sign unless no other employees are available (document the reason). Close out with date, time, and operator/maintenance initials when work is finished. Retain closed permits for at least one year.",
   isAvailable: true,
   questions: [
     dateQuestion(
@@ -809,7 +809,10 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "Permit duration",
       "Permit details",
       2,
-      { helpText: "How long this permit remains valid." },
+      {
+        helpText:
+          "Maximum 12 hours. Conditions and authorised personnel must not change during this period.",
+      },
     ),
     timeQuestion(
       "safe-work-permit",
@@ -817,7 +820,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "Start time",
       "Permit details",
       3,
-      { helpText: "24-hour clock (e.g. 07:30)." },
+      { helpText: "24-hour clock (e.g. 07:30). Permit must be approved before work begins." },
     ),
     timeQuestion(
       "safe-work-permit",
@@ -825,7 +828,10 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "End time",
       "Permit details",
       4,
-      { helpText: "24-hour clock (e.g. 15:30)." },
+      {
+        helpText:
+          "24-hour clock (e.g. 15:30). Must be within 12 hours of start time.",
+      },
     ),
     textQuestion(
       "safe-work-permit",
@@ -983,7 +989,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
     radioQuestion(
       "safe-work-permit",
       "hazard-fall-protection",
-      "13. Will work require fall protection (> 6 foot / 1.83 meters elevation)?",
+      "13. Will work require fall protection (> 4 ft / 1.2 meters elevation)?",
       "Hazard control steps",
       [...IN_PLACE_OPTIONS],
       22,

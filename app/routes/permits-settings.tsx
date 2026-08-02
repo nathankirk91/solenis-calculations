@@ -27,7 +27,7 @@ export function meta({}: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Choose which roles may sign Operations, Maintenance, and Safe work authorisations.",
+        "Choose which roles may sign Operations representative, Maintenance representative, and Safe work coordinator authorisations.",
     },
   ];
 }

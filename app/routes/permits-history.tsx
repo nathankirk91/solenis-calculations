@@ -63,7 +63,8 @@ export default function PermitsHistoryPage({
             Permit records
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Pending, open, and closed permits.
+            Pending, open, and closed permits. Closed Safe Work Permits are
+            retained for at least one year.
           </p>
         </div>
 

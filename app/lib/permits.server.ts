@@ -26,6 +26,7 @@ import type {
   PermitCloseout,
 } from "~/lib/permit.schema";
 import {
+  distinctPermitSignerIds,
   emptyPermitAuthorization,
   isPermitAuthSlotSigned,
   isPermitFullyAuthorized,
@@ -377,6 +378,8 @@ export async function signOffPermitSlot(args: {
   userEmail: string;
   slotKey: PermitAuthSlotKey;
   signature: string;
+  siteVerified: boolean;
+  fewerThanTwoSignersReason?: string;
 }): Promise<PermitRunDetail> {
   await ensureInspectionSchema();
   const prisma = getPrisma();
@@ -393,6 +396,12 @@ export async function signOffPermitSlot(args: {
   }
   if (existing.status !== "PENDING_AUTHORIZATION") {
     throw new Error("This permit is not awaiting authorization.");
+  }
+
+  if (!args.siteVerified) {
+    throw new Error(
+      "Approvers must visually inspect the job site before signing.",
+    );
   }
 
   const authorization = parseAuthorization(existing.authorization);
@@ -417,7 +426,23 @@ export async function signOffPermitSlot(args: {
     userId: args.userId,
     name: args.userName?.trim() || args.userEmail,
     signature,
+    siteVerifiedAt: new Date().toISOString(),
   };
+
+  if (isPermitFullyAuthorized(authorization)) {
+    const distinct = distinctPermitSignerIds(authorization);
+    if (distinct.length < 2) {
+      const reason = args.fewerThanTwoSignersReason?.trim() ?? "";
+      if (!reason) {
+        throw new Error(
+          "A minimum of two separate people must sign, unless no other employees are available — document the reason.",
+        );
+      }
+      authorization.fewerThanTwoSignersReason = reason;
+    } else {
+      delete authorization.fewerThanTwoSignersReason;
+    }
+  }
 
   const nextStatus = isPermitFullyAuthorized(authorization)
     ? "OPEN"
@@ -525,24 +550,35 @@ function parseAnswers(value: unknown): InspectionAnswerRecord[] {
 }
 
 function parseAuthorization(value: unknown): PermitAuthorization {
-  const raw = (value ?? {}) as Partial<PermitAuthorization>;
+  const raw = (value ?? {}) as Partial<PermitAuthorization> & {
+    fewerThanTwoSignersReason?: string;
+  };
   const person = (entry: unknown) => {
     const row = (entry ?? {}) as {
       userId?: string;
       name?: string;
       signature?: string;
+      siteVerifiedAt?: string;
     };
     return {
       userId: String(row.userId ?? ""),
       name: String(row.name ?? ""),
       signature: String(row.signature ?? ""),
+      ...(row.siteVerifiedAt
+        ? { siteVerifiedAt: String(row.siteVerifiedAt) }
+        : {}),
     };
   };
-  return {
+  const authorization: PermitAuthorization = {
     operationsRep: person(raw.operationsRep),
     maintenanceRep: person(raw.maintenanceRep),
     safeWorkCoordinator: person(raw.safeWorkCoordinator),
   };
+  const reason = String(raw.fewerThanTwoSignersReason ?? "").trim();
+  if (reason) {
+    authorization.fewerThanTwoSignersReason = reason;
+  }
+  return authorization;
 }
 
 function parseCloseout(value: unknown): PermitCloseout | null {

@@ -33,6 +33,7 @@ import {
   createPermitCloseoutSchema,
   createPermitSignOffSchema,
   isPermitAuthSlotSigned,
+  needsFewerThanTwoSignersReason,
   PERMIT_AUTH_SLOT_KEYS,
   PERMIT_AUTH_SLOT_LABELS,
   type PermitAuthSlotKey,
@@ -72,8 +73,21 @@ export async function loader({ request, params }: Route.LoaderArgs) {
           authorization: run.authorization,
         })
       : [];
+  const requireFewerThanTwoReason = signOffSlots.some((slot) =>
+    needsFewerThanTwoSignersReason({
+      authorization: run.authorization,
+      slotKey: slot,
+      userId: user.id,
+    }),
+  );
 
-  return { user, pendingCount, run, signOffSlots };
+  return {
+    user,
+    pendingCount,
+    run,
+    signOffSlots,
+    requireFewerThanTwoReason,
+  };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -98,8 +112,18 @@ export async function action({ request, params }: Route.ActionArgs) {
       userId: user.id,
       authorization: run.authorization,
     });
+    const selectedSlot = String(formData.get("slotKey") ?? "") as PermitAuthSlotKey;
+    const requireFewerThanTwoReason = needsFewerThanTwoSignersReason({
+      authorization: run.authorization,
+      slotKey: allowedSlots.includes(selectedSlot)
+        ? selectedSlot
+        : (allowedSlots[0] ?? "operationsRep"),
+      userId: user.id,
+    });
     const submission = parseWithZod(formData, {
-      schema: createPermitSignOffSchema(allowedSlots),
+      schema: createPermitSignOffSchema(allowedSlots, {
+        requireFewerThanTwoReason,
+      }),
     });
     if (submission.status !== "success") {
       return data(
@@ -116,6 +140,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         userEmail: user.email,
         slotKey: submission.value.slotKey as PermitAuthSlotKey,
         signature: submission.value.signature,
+        siteVerified: submission.value.siteVerified === "on",
+        fewerThanTwoSignersReason: submission.value.fewerThanTwoSignersReason,
       });
     } catch (error) {
       return data(
@@ -179,7 +205,13 @@ export default function PermitRunPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { user, pendingCount, run, signOffSlots } = loaderData;
+  const {
+    user,
+    pendingCount,
+    run,
+    signOffSlots,
+    requireFewerThanTwoReason,
+  } = loaderData;
   const isPending = run.status === "PENDING_AUTHORIZATION";
   const isOpen = run.status === "OPEN";
   const isClosed = run.status === "CLOSED";
@@ -260,6 +292,10 @@ export default function PermitRunPage({
 
               <div className="rounded-lg border border-border/70 bg-background/50 p-4">
                 <h3 className="font-medium">Authorized personnel</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Technicians, contractors, and visitors authorised to perform
+                  the work.
+                </p>
                 <ul className="mt-2 grid gap-1 text-sm text-muted-foreground">
                   {run.authorizedPersonnel.map((name) => (
                     <li key={name}>• {name}</li>
@@ -269,6 +305,10 @@ export default function PermitRunPage({
 
               <div className="grid gap-3">
                 <h3 className="font-medium">Authorization</h3>
+                <p className="text-sm text-muted-foreground">
+                  Minimum of two separate people must sign unless no other
+                  employees are available.
+                </p>
                 {PERMIT_AUTH_SLOT_KEYS.map((key) => {
                   const person = run.authorization[key];
                   const signed = isPermitAuthSlotSigned(person);
@@ -278,10 +318,21 @@ export default function PermitRunPage({
                       title={PERMIT_AUTH_SLOT_LABELS[key]}
                       name={person.name}
                       signature={person.signature}
+                      siteVerifiedAt={person.siteVerifiedAt}
                       pending={!signed}
                     />
                   );
                 })}
+                {run.authorization.fewerThanTwoSignersReason ? (
+                  <div className="rounded-lg border border-amber-600/30 bg-amber-50/60 p-4">
+                    <p className="text-sm font-medium text-amber-950">
+                      Fewer than two separate signatures
+                    </p>
+                    <p className="mt-1 text-sm text-amber-900/80">
+                      {run.authorization.fewerThanTwoSignersReason}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -289,6 +340,7 @@ export default function PermitRunPage({
           {isPending && signOffSlots.length > 0 ? (
             <SignOffForm
               slots={signOffSlots}
+              requireFewerThanTwoReason={requireFewerThanTwoReason}
               lastResult={
                 actionData && "lastResult" in actionData
                   ? actionData.lastResult
@@ -305,9 +357,11 @@ export default function PermitRunPage({
               <CardHeader>
                 <CardTitle>Awaiting authorization</CardTitle>
                 <CardDescription>
-                  Operations, Maintenance, and Safe work coordinator must each
-                  sign off before this permit opens. You do not currently have an
-                  unsigned role on this permit.
+                  Operations representative / Account manager, Maintenance
+                  representative / Account technician, and Safe work coordinator
+                  must each sign off before this permit opens. Approvers must
+                  visually inspect the job site first. You do not currently have
+                  an unsigned role on this permit.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -333,6 +387,7 @@ export default function PermitRunPage({
                 <CardDescription>
                   Closed {run.closedAt ? formatMelbourneDateTime(run.closedAt) : ""}
                   {run.closedByName ? ` · ${run.closedByName}` : ""}
+                  . Retain closed permits for at least one year.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4">
@@ -381,16 +436,20 @@ export default function PermitRunPage({
 
 function SignOffForm({
   slots,
+  requireFewerThanTwoReason,
   lastResult,
   error,
 }: {
   slots: PermitAuthSlotKey[];
+  requireFewerThanTwoReason: boolean;
   lastResult?: SubmissionResult<string[]> | null;
   error?: string | null;
 }) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const schema = createPermitSignOffSchema(slots);
+  const schema = createPermitSignOffSchema(slots, {
+    requireFewerThanTwoReason,
+  });
   const [form, fields] = useForm({
     lastResult: lastResult ?? undefined,
     onValidate({ formData }) {
@@ -402,6 +461,8 @@ function SignOffForm({
       intent: "sign-off",
       slotKey: slots[0],
       signature: "",
+      siteVerified: "",
+      fewerThanTwoSignersReason: "",
     },
   });
 
@@ -410,8 +471,8 @@ function SignOffForm({
       <CardHeader>
         <CardTitle>Sign off</CardTitle>
         <CardDescription>
-          Review the permit details above, then sign as one of your eligible
-          roles.
+          Visually inspect the job site, then sign as one of your eligible
+          roles. Permits must be approved before work begins.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -445,6 +506,65 @@ function SignOffForm({
               ) : null}
             </fieldset>
           )}
+
+          <label className="flex items-start gap-3 rounded-lg border border-border/80 bg-muted/20 px-3 py-3 text-sm">
+            <input
+              type="checkbox"
+              id={fields.siteVerified.id}
+              name={fields.siteVerified.name}
+              value="on"
+              defaultChecked={fields.siteVerified.initialValue === "on"}
+              className="mt-1 size-4 shrink-0 rounded border border-input"
+              aria-invalid={Boolean(fields.siteVerified.errors)}
+            />
+            <span className="grid gap-1">
+              <span className="font-medium leading-snug">
+                I conducted a visual inspection of the job site before approving
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Required by the Safe Work Permitting Process before work begins.
+              </span>
+              {fields.siteVerified.errors ? (
+                <span className="text-sm text-destructive" role="alert">
+                  {fields.siteVerified.errors.join(" ")}
+                </span>
+              ) : null}
+            </span>
+          </label>
+
+          {requireFewerThanTwoReason ? (
+            <div className="grid gap-2">
+              <Label htmlFor={fields.fewerThanTwoSignersReason.id}>
+                Reason fewer than two separate signatures
+              </Label>
+              <textarea
+                id={fields.fewerThanTwoSignersReason.id}
+                name={fields.fewerThanTwoSignersReason.name}
+                key={fields.fewerThanTwoSignersReason.key}
+                rows={3}
+                defaultValue={
+                  typeof fields.fewerThanTwoSignersReason.initialValue ===
+                  "string"
+                    ? fields.fewerThanTwoSignersReason.initialValue
+                    : ""
+                }
+                placeholder="Document why no other employee is available to provide a second signature…"
+                className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                aria-invalid={Boolean(
+                  fields.fewerThanTwoSignersReason.errors,
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                Procedure requires a minimum of two separate signatures unless
+                no other employees are available.
+              </p>
+              {fields.fewerThanTwoSignersReason.errors ? (
+                <p className="text-sm text-destructive">
+                  {fields.fewerThanTwoSignersReason.errors.join(" ")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="grid gap-2">
             <Label>Initials</Label>
@@ -499,7 +619,8 @@ function CloseoutForm({
       <CardHeader>
         <CardTitle>Close out this permit</CardTitle>
         <CardDescription>
-          Complete when the job is finished. This marks the permit closed.
+          When Safe Work activities are complete, record the date, time, and
+          initials of the operator and maintenance personnel involved.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -585,11 +706,13 @@ function AuthorizationDisplay({
   title,
   name,
   signature,
+  siteVerifiedAt,
   pending,
 }: {
   title: string;
   name: string;
   signature: string;
+  siteVerifiedAt?: string;
   pending?: boolean;
 }) {
   return (
@@ -605,6 +728,12 @@ function AuthorizationDisplay({
       <p className="mt-1 text-sm text-muted-foreground">
         {pending ? "Not signed yet" : name || "—"}
       </p>
+      {!pending && siteVerifiedAt ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Site inspected{" "}
+          {formatMelbourneDateTime(siteVerifiedAt) ?? siteVerifiedAt}
+        </p>
+      ) : null}
       {!pending && signature ? (
         <img
           src={signature}

@@ -167,7 +167,7 @@ Permits live on `/permits`, with their own records and management (separate from
 | Permit sign-off settings | `/permits/settings` |
 | Safe Work Permit (Form 42801) | `/permits/safe-work-permit` |
 
-Issuing a permit submits it as **pending authorization**. Eligible Operations, Maintenance, and Safe work coordinator users get a push notification (one per person even with multiple roles). After all three sign-offs, the permit becomes **open** for work and can later be closed out.
+Issuing a permit submits it as **pending authorization**. Eligible Operations representative / Account manager, Maintenance representative / Account technician, and Safe work coordinator users get a push notification (one per person even with multiple roles). Approvers must confirm a job-site visual inspection before signing. A minimum of two separate people must sign (document an exception if fewer). Maximum permit duration is **12 hours**. After all three sign-offs, the permit becomes **open** for work and can later be closed out (date, time, operator and maintenance initials). Retain closed permits for at least one year.
 
 ## Scripts
 
