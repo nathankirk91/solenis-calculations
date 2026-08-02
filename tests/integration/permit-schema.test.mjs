@@ -9,7 +9,7 @@ const { createPermitIssueSchema } = await import(
   "../../app/lib/permit.schema.ts"
 );
 
-function fillRequired(definition) {
+function fillRequired(definition, overrides = {}) {
   /** @type {Record<string, string>} */
   const responses = {};
   for (const question of definition.questions) {
@@ -32,12 +32,14 @@ function fillRequired(definition) {
     } else if (question.type === "DATE") {
       responses[question.id] = "2026-07-28";
     } else if (question.type === "TIME") {
-      responses[question.id] = "08:00";
+      responses[question.id] = question.id.endsWith("__end-time")
+        ? "16:00"
+        : "08:00";
     } else {
       responses[question.id] = "ok";
     }
   }
-  return responses;
+  return { ...responses, ...overrides };
 }
 
 {
@@ -52,6 +54,12 @@ function fillRequired(definition) {
   assert.deepEqual(parsed.data.authorizedPersonnel, ["Alex Operator"]);
   assert.equal(parsed.data.summary.status, "PASSED");
   assert.ok(parsed.data.answers.length > 0);
+  assert.equal(
+    parsed.data.answers.some((row) =>
+      row.questionId.endsWith("__permit-duration"),
+    ),
+    false,
+  );
 }
 
 {
@@ -83,6 +91,24 @@ function fillRequired(definition) {
     parsed.error.issues.some(
       (issue) =>
         Array.isArray(issue.path) && issue.path[0] === "authorizedPersonnel",
+    ),
+  );
+}
+
+{
+  const schema = createPermitIssueSchema(SAFE_WORK_PERMIT);
+  const parsed = schema.safeParse({
+    equipmentRef: "P-100",
+    authorizedPersonnel: ["Alex Operator"],
+    responses: fillRequired(SAFE_WORK_PERMIT, {
+      "safe-work-permit__start-time": "07:00",
+      "safe-work-permit__end-time": "20:00",
+    }),
+  });
+  assert.equal(parsed.success, false);
+  assert.ok(
+    parsed.error.issues.some((issue) =>
+      String(issue.message).includes("12 hours"),
     ),
   );
 }

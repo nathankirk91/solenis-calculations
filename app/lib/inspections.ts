@@ -787,13 +787,13 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
   title: "Safe Work Permit",
   shortName: "Safe Work",
   description:
-    "Form 42801 safe work permit for non-routine work: confirm hazard controls and PPE, then obtain Operations, Maintenance, and Safe Work Coordinator authorisation before work starts.",
+    "Form 42801 safe work permit for non-routine work: confirm hazard controls and PPE, then obtain authorisation from two different people before work starts.",
   category: PERMIT_CATEGORY,
   href: "/permits/safe-work-permit",
   sortOrder: 20,
   equipmentLabel: "Equipment number",
   instructionNotes:
-    "Form 42801 (09/14). Safe Work Permits authorise technicians, contractors, and visitors for non-routine work in process areas. SWP does not replace Hot Work, Confined Space Entry, or Line Break permits — complete those separately when required. Maximum duration is 12 hours if conditions and personnel do not change. Approvers must visually inspect the job site before signing. A minimum of two separate people must sign unless no other employees are available (document the reason). Close out with date, time, and operator/maintenance initials when work is finished. Retain closed permits for at least one year.",
+    "Form 42801 (09/14). Safe Work Permits authorise technicians, contractors, and visitors for non-routine work in process areas. SWP does not replace Hot Work, Confined Space Entry, or Line Break permits — complete those separately when required. Duration is calculated from start and end time and cannot exceed 12 hours if conditions and personnel do not change. Approvers must visually inspect the job site before signing. Two different people must sign before the permit opens; the same person cannot sign more than one role. A third signature can still be added after the permit is open. Close out with date, time, and operator/maintenance initials when work is finished. Retain closed permits for at least one year.",
   isAvailable: true,
   questions: [
     dateQuestion(
@@ -803,31 +803,23 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "Permit details",
       1,
     ),
-    textQuestion(
-      "safe-work-permit",
-      "permit-duration",
-      "Permit duration",
-      "Permit details",
-      2,
-      {
-        helpText:
-          "Maximum 12 hours. Conditions and authorised personnel must not change during this period.",
-      },
-    ),
     timeQuestion(
       "safe-work-permit",
       "start-time",
       "Start time",
       "Permit details",
-      3,
-      { helpText: "24-hour clock (e.g. 07:30). Permit must be approved before work begins." },
+      2,
+      {
+        helpText:
+          "24-hour clock (e.g. 07:30). Permit must be approved before work begins. Duration is calculated from start and end time (max 12 hours).",
+      },
     ),
     timeQuestion(
       "safe-work-permit",
       "end-time",
       "End time",
       "Permit details",
-      4,
+      3,
       {
         helpText:
           "24-hour clock (e.g. 15:30). Must be within 12 hours of start time.",
@@ -838,21 +830,21 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "area",
       "Area",
       "Permit details",
-      5,
+      4,
     ),
     textQuestion(
       "safe-work-permit",
       "work-to-be-performed",
       "Work to be performed",
       "Work details",
-      6,
+      5,
     ),
     textQuestion(
       "safe-work-permit",
       "last-contained",
       "Equipment or piping last contained",
       "Work details",
-      7,
+      6,
       {
         required: false,
         helpText: "What the equipment or piping last contained, if known.",

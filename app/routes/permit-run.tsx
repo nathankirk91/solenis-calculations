@@ -32,10 +32,11 @@ import {
 import {
   createPermitCloseoutSchema,
   createPermitSignOffSchema,
+  formatPermitDurationLabel,
   isPermitAuthSlotSigned,
-  needsFewerThanTwoSignersReason,
   PERMIT_AUTH_SLOT_KEYS,
   PERMIT_AUTH_SLOT_LABELS,
+  permitDurationMinutes,
   type PermitAuthSlotKey,
 } from "~/lib/permit.schema";
 import {
@@ -66,27 +67,26 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const pendingCount = canReviewRuns(user.role)
     ? await countPendingRuns()
     : 0;
-  const signOffSlots =
-    run.status === "PENDING_AUTHORIZATION"
-      ? await listUnsignedSlotsForUser({
-          userId: user.id,
-          authorization: run.authorization,
-        })
-      : [];
-  const requireFewerThanTwoReason = signOffSlots.some((slot) =>
-    needsFewerThanTwoSignersReason({
-      authorization: run.authorization,
-      slotKey: slot,
-      userId: user.id,
-    }),
-  );
+  const canAcceptSignOff =
+    run.status === "PENDING_AUTHORIZATION" || run.status === "OPEN";
+  const signOffSlots = canAcceptSignOff
+    ? await listUnsignedSlotsForUser({
+        userId: user.id,
+        authorization: run.authorization,
+      })
+    : [];
+  const remainingUnsignedSlots = canAcceptSignOff
+    ? PERMIT_AUTH_SLOT_KEYS.filter(
+        (key) => !isPermitAuthSlotSigned(run.authorization[key]),
+      )
+    : [];
 
   return {
     user,
     pendingCount,
     run,
     signOffSlots,
-    requireFewerThanTwoReason,
+    remainingUnsignedSlots,
   };
 }
 
@@ -101,9 +101,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = String(formData.get("intent") ?? "closeout");
 
   if (intent === "sign-off") {
-    if (run.status !== "PENDING_AUTHORIZATION") {
+    if (run.status !== "PENDING_AUTHORIZATION" && run.status !== "OPEN") {
       return data(
-        { error: "This permit is not awaiting authorization.", lastResult: null },
+        {
+          error: "This permit cannot accept sign-off.",
+          lastResult: null,
+        },
         { status: 400 },
       );
     }
@@ -112,18 +115,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       userId: user.id,
       authorization: run.authorization,
     });
-    const selectedSlot = String(formData.get("slotKey") ?? "") as PermitAuthSlotKey;
-    const requireFewerThanTwoReason = needsFewerThanTwoSignersReason({
-      authorization: run.authorization,
-      slotKey: allowedSlots.includes(selectedSlot)
-        ? selectedSlot
-        : (allowedSlots[0] ?? "operationsRep"),
-      userId: user.id,
-    });
     const submission = parseWithZod(formData, {
-      schema: createPermitSignOffSchema(allowedSlots, {
-        requireFewerThanTwoReason,
-      }),
+      schema: createPermitSignOffSchema(allowedSlots),
     });
     if (submission.status !== "success") {
       return data(
@@ -141,7 +134,6 @@ export async function action({ request, params }: Route.ActionArgs) {
         slotKey: submission.value.slotKey as PermitAuthSlotKey,
         signature: submission.value.signature,
         siteVerified: submission.value.siteVerified === "on",
-        fewerThanTwoSignersReason: submission.value.fewerThanTwoSignersReason,
       });
     } catch (error) {
       return data(
@@ -164,7 +156,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
   if (run.status !== "OPEN") {
     return data(
-      { error: "Permit must be fully authorized before close-out." },
+      {
+        error:
+          "Permit needs two different authorized signatures before close-out.",
+      },
       { status: 400 },
     );
   }
@@ -210,11 +205,12 @@ export default function PermitRunPage({
     pendingCount,
     run,
     signOffSlots,
-    requireFewerThanTwoReason,
+    remainingUnsignedSlots,
   } = loaderData;
   const isPending = run.status === "PENDING_AUTHORIZATION";
   const isOpen = run.status === "OPEN";
   const isClosed = run.status === "CLOSED";
+  const calculatedDuration = durationLabelFromAnswers(run.answers);
 
   return (
     <div className="app-shell">
@@ -250,6 +246,7 @@ export default function PermitRunPage({
             Submitted {formatMelbourneDateTime(run.createdAt)}
             {run.submittedByName ? ` · ${run.submittedByName}` : ""}
             {run.equipmentRef ? ` · ${run.equipmentRef}` : ""}
+            {calculatedDuration ? ` · Duration ${calculatedDuration}` : ""}
           </p>
         </div>
 
@@ -270,7 +267,11 @@ export default function PermitRunPage({
                     <h3 className="font-medium">Answers</h3>
                   )}
                   <ul className="mt-3 grid gap-2">
-                    {group.rows.map((row) => (
+                    {group.rows
+                      .filter(
+                        (row) => !row.questionId.endsWith("__permit-duration"),
+                      )
+                      .map((row) => (
                       <li
                         key={row.questionId}
                         className="flex flex-wrap items-start justify-between gap-2 text-sm"
@@ -290,6 +291,15 @@ export default function PermitRunPage({
                 </div>
               ))}
 
+              {calculatedDuration ? (
+                <div className="rounded-lg border border-border/70 bg-background/50 p-4">
+                  <h3 className="font-medium">Calculated duration</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {calculatedDuration} (from start and end time; max 12 hours)
+                  </p>
+                </div>
+              ) : null}
+
               <div className="rounded-lg border border-border/70 bg-background/50 p-4">
                 <h3 className="font-medium">Authorized personnel</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -306,8 +316,9 @@ export default function PermitRunPage({
               <div className="grid gap-3">
                 <h3 className="font-medium">Authorization</h3>
                 <p className="text-sm text-muted-foreground">
-                  Minimum of two separate people must sign unless no other
-                  employees are available.
+                  Two different people must sign before the permit opens. The
+                  same person cannot sign more than one role. A third signature
+                  can still be added after the permit is open.
                 </p>
                 {PERMIT_AUTH_SLOT_KEYS.map((key) => {
                   const person = run.authorization[key];
@@ -337,10 +348,9 @@ export default function PermitRunPage({
             </CardContent>
           </Card>
 
-          {isPending && signOffSlots.length > 0 ? (
+          {signOffSlots.length > 0 ? (
             <SignOffForm
               slots={signOffSlots}
-              requireFewerThanTwoReason={requireFewerThanTwoReason}
               lastResult={
                 actionData && "lastResult" in actionData
                   ? actionData.lastResult
@@ -357,11 +367,33 @@ export default function PermitRunPage({
               <CardHeader>
                 <CardTitle>Awaiting authorization</CardTitle>
                 <CardDescription>
-                  Operations representative / Account manager, Maintenance
-                  representative / Account technician, and Safe work coordinator
-                  must each sign off before this permit opens. Approvers must
-                  visually inspect the job site first. You do not currently have
-                  an unsigned role on this permit.
+                  Two different people must sign before this permit opens.
+                  Approvers must visually inspect the job site first. You do not
+                  currently have an unsigned role on this permit
+                  {remainingUnsignedSlots.length > 0
+                    ? ` (still waiting: ${remainingUnsignedSlots
+                        .map((key) => PERMIT_AUTH_SLOT_LABELS[key])
+                        .join(", ")})`
+                    : ""}
+                  .
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : null}
+
+          {isOpen &&
+          signOffSlots.length === 0 &&
+          remainingUnsignedSlots.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Additional signatures</CardTitle>
+                <CardDescription>
+                  This permit is open with two authorized signatures. A third
+                  signature can still be added for:{" "}
+                  {remainingUnsignedSlots
+                    .map((key) => PERMIT_AUTH_SLOT_LABELS[key])
+                    .join(", ")}
+                  .
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -436,20 +468,16 @@ export default function PermitRunPage({
 
 function SignOffForm({
   slots,
-  requireFewerThanTwoReason,
   lastResult,
   error,
 }: {
   slots: PermitAuthSlotKey[];
-  requireFewerThanTwoReason: boolean;
   lastResult?: SubmissionResult<string[]> | null;
   error?: string | null;
 }) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
-  const schema = createPermitSignOffSchema(slots, {
-    requireFewerThanTwoReason,
-  });
+  const schema = createPermitSignOffSchema(slots);
   const [form, fields] = useForm({
     lastResult: lastResult ?? undefined,
     onValidate({ formData }) {
@@ -462,7 +490,6 @@ function SignOffForm({
       slotKey: slots[0],
       signature: "",
       siteVerified: "",
-      fewerThanTwoSignersReason: "",
     },
   });
 
@@ -471,8 +498,8 @@ function SignOffForm({
       <CardHeader>
         <CardTitle>Sign off</CardTitle>
         <CardDescription>
-          Visually inspect the job site, then sign as one of your eligible
-          roles. Permits must be approved before work begins.
+          Visually inspect the job site, then sign as one eligible role. The
+          same person cannot sign more than one role on this permit.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -531,40 +558,6 @@ function SignOffForm({
               ) : null}
             </span>
           </label>
-
-          {requireFewerThanTwoReason ? (
-            <div className="grid gap-2">
-              <Label htmlFor={fields.fewerThanTwoSignersReason.id}>
-                Reason fewer than two separate signatures
-              </Label>
-              <textarea
-                id={fields.fewerThanTwoSignersReason.id}
-                name={fields.fewerThanTwoSignersReason.name}
-                key={fields.fewerThanTwoSignersReason.key}
-                rows={3}
-                defaultValue={
-                  typeof fields.fewerThanTwoSignersReason.initialValue ===
-                  "string"
-                    ? fields.fewerThanTwoSignersReason.initialValue
-                    : ""
-                }
-                placeholder="Document why no other employee is available to provide a second signature…"
-                className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                aria-invalid={Boolean(
-                  fields.fewerThanTwoSignersReason.errors,
-                )}
-              />
-              <p className="text-xs text-muted-foreground">
-                Procedure requires a minimum of two separate signatures unless
-                no other employees are available.
-              </p>
-              {fields.fewerThanTwoSignersReason.errors ? (
-                <p className="text-sm text-destructive">
-                  {fields.fewerThanTwoSignersReason.errors.join(" ")}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
 
           <div className="grid gap-2">
             <Label>Initials</Label>
@@ -760,4 +753,23 @@ function groupAnswersBySection(rows: InspectionAnswerRecord[]) {
     }
   }
   return groups;
+}
+
+function durationLabelFromAnswers(
+  answers: InspectionAnswerRecord[],
+): string | null {
+  const start = answers.find((row) =>
+    row.questionId.endsWith("__start-time"),
+  )?.answer;
+  const end = answers.find((row) =>
+    row.questionId.endsWith("__end-time"),
+  )?.answer;
+  if (!start || !end) {
+    return null;
+  }
+  const minutes = permitDurationMinutes(start, end);
+  if (minutes == null) {
+    return null;
+  }
+  return formatPermitDurationLabel(minutes);
 }

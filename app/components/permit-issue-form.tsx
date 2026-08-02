@@ -76,9 +76,9 @@ export function PermitIssueForm({
           <CardTitle>Issue permit</CardTitle>
           <CardDescription>
             Complete the checks and authorized personnel (technicians,
-            contractors, or visitors). The permit then waits for Operations
-            representative, Maintenance representative, and Safe work
-            coordinator sign-off. Maximum duration is 12 hours.
+            contractors, or visitors). Duration is calculated from start and end
+            time (max 12 hours). The permit opens after two different people
+            sign off.
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
@@ -399,8 +399,8 @@ export function PermitIssueForm({
         <CardHeader>
           <CardTitle>Status</CardTitle>
           <CardDescription>
-            After submit, the permit is pending authorization until all three
-            roles sign off (minimum two separate people). Approvers must
+            After submit, the permit is pending until two different people sign
+            off. A third role can still sign after it opens. Approvers must
             visually inspect the job site first.
           </CardDescription>
         </CardHeader>

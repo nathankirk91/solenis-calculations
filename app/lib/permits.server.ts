@@ -26,11 +26,11 @@ import type {
   PermitCloseout,
 } from "~/lib/permit.schema";
 import {
-  distinctPermitSignerIds,
   emptyPermitAuthorization,
   isPermitAuthSlotSigned,
-  isPermitFullyAuthorized,
+  isPermitReadyToOpen,
   PERMIT_AUTH_SLOT_KEYS,
+  userHasAlreadySignedPermit,
 } from "~/lib/permit.schema";
 import { ensureInspectionSchema } from "~/lib/migrate.server";
 import {
@@ -355,6 +355,11 @@ export async function listUnsignedSlotsForUser(args: {
   userId: string;
   authorization: PermitAuthorization;
 }): Promise<PermitAuthSlotKey[]> {
+  // One person may sign only one role on a given permit.
+  if (userHasAlreadySignedPermit(args.authorization, args.userId)) {
+    return [];
+  }
+
   const unsigned: PermitAuthSlotKey[] = [];
   for (const key of PERMIT_AUTH_SLOT_KEYS) {
     if (isPermitAuthSlotSigned(args.authorization[key])) {
@@ -379,7 +384,6 @@ export async function signOffPermitSlot(args: {
   slotKey: PermitAuthSlotKey;
   signature: string;
   siteVerified: boolean;
-  fewerThanTwoSignersReason?: string;
 }): Promise<PermitRunDetail> {
   await ensureInspectionSchema();
   const prisma = getPrisma();
@@ -394,8 +398,14 @@ export async function signOffPermitSlot(args: {
   if (!existing) {
     throw new Error("Permit not found.");
   }
-  if (existing.status !== "PENDING_AUTHORIZATION") {
-    throw new Error("This permit is not awaiting authorization.");
+  if (existing.status === "CLOSED") {
+    throw new Error("This permit is closed.");
+  }
+  if (
+    existing.status !== "PENDING_AUTHORIZATION" &&
+    existing.status !== "OPEN"
+  ) {
+    throw new Error("This permit cannot accept sign-off.");
   }
 
   if (!args.siteVerified) {
@@ -407,6 +417,12 @@ export async function signOffPermitSlot(args: {
   const authorization = parseAuthorization(existing.authorization);
   if (isPermitAuthSlotSigned(authorization[args.slotKey])) {
     throw new Error("This sign-off has already been completed.");
+  }
+
+  if (userHasAlreadySignedPermit(authorization, args.userId)) {
+    throw new Error(
+      "You have already signed this permit and cannot sign another role.",
+    );
   }
 
   const allowed = await userHasRoleForSlot({
@@ -429,24 +445,11 @@ export async function signOffPermitSlot(args: {
     siteVerifiedAt: new Date().toISOString(),
   };
 
-  if (isPermitFullyAuthorized(authorization)) {
-    const distinct = distinctPermitSignerIds(authorization);
-    if (distinct.length < 2) {
-      const reason = args.fewerThanTwoSignersReason?.trim() ?? "";
-      if (!reason) {
-        throw new Error(
-          "A minimum of two separate people must sign, unless no other employees are available — document the reason.",
-        );
-      }
-      authorization.fewerThanTwoSignersReason = reason;
-    } else {
-      delete authorization.fewerThanTwoSignersReason;
-    }
-  }
-
-  const nextStatus = isPermitFullyAuthorized(authorization)
-    ? "OPEN"
-    : "PENDING_AUTHORIZATION";
+  // Two different people open the permit; a third signature can still be added later.
+  const nextStatus =
+    existing.status === "OPEN" || isPermitReadyToOpen(authorization)
+      ? "OPEN"
+      : "PENDING_AUTHORIZATION";
 
   await prisma.permitRun.update({
     where: { id: args.permitRunId },
