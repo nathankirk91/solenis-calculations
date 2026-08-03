@@ -349,6 +349,14 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS "permit_runs_inspection_id_idx" ON "permit_runs"("inspection_id")`,
     `CREATE INDEX IF NOT EXISTS "permit_runs_status_created_at_idx" ON "permit_runs"("status", "created_at" DESC)`,
     `CREATE INDEX IF NOT EXISTS "permit_runs_created_at_idx" ON "permit_runs"("created_at" DESC)`,
+    `ALTER TABLE "permit_runs" ADD COLUMN IF NOT EXISTS "permit_number" TEXT`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "permit_runs_permit_number_key" ON "permit_runs"("permit_number")`,
+    `CREATE TABLE IF NOT EXISTS "permit_number_sequences" (
+      "year_month" TEXT NOT NULL,
+      "last_value" INTEGER NOT NULL DEFAULT 0,
+      "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "permit_number_sequences_pkey" PRIMARY KEY ("year_month")
+    )`,
     `DO $$ BEGIN
       ALTER TABLE "permit_runs"
         ADD CONSTRAINT "permit_runs_inspection_id_fkey"

@@ -105,14 +105,26 @@ const { SAFE_WORK_PERMIT } = await import("../../app/lib/inspections.ts");
   const schema = createPermitIssueSchema(SAFE_WORK_PERMIT);
   const ok = schema.safeParse({
     equipmentRef: "P-100",
-    authorizedPersonnel: ["Alex Operator"],
+    authorizedPersonnel: [
+      {
+        name: "Alex Operator",
+        signature:
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      },
+    ],
     responses: fillRequired(),
   });
   assert.equal(ok.success, true);
 
   const tooLong = schema.safeParse({
     equipmentRef: "P-100",
-    authorizedPersonnel: ["Alex Operator"],
+    authorizedPersonnel: [
+      {
+        name: "Alex Operator",
+        signature:
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      },
+    ],
     responses: fillRequired({
       "safe-work-permit__start-time": "06:00",
       "safe-work-permit__end-time": "19:00",

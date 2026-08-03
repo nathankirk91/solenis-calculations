@@ -109,6 +109,45 @@ export const PERMIT_AUTH_SLOT_LABELS: Record<PermitAuthSlotKey, string> = {
 
 export const MAX_PERMIT_DURATION_HOURS = 12;
 
+export type AuthorizedPerson = {
+  name: string;
+  /** Initials / signature data URL. Required for the first person. */
+  signature: string;
+};
+
+export function formatPermitNumber(
+  yearMonth: string,
+  sequence: number,
+): string {
+  return `${yearMonth}${String(sequence).padStart(3, "0")}`;
+}
+
+export function parseAuthorizedPersonnel(value: unknown): AuthorizedPerson[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => {
+      if (typeof item === "string") {
+        const name = item.trim();
+        return name ? { name, signature: "" } : null;
+      }
+      if (item && typeof item === "object") {
+        const row = item as { name?: unknown; signature?: unknown };
+        const name = String(row.name ?? "").trim();
+        if (!name) {
+          return null;
+        }
+        return {
+          name,
+          signature: String(row.signature ?? "").trim(),
+        };
+      }
+      return null;
+    })
+    .filter((person): person is AuthorizedPerson => person != null);
+}
+
 export function emptyPermitAuthorization(): PermitAuthorization {
   return {
     operationsRep: { userId: "", name: "", signature: "" },
@@ -221,10 +260,20 @@ export function createPermitIssueFormSchema(definition: InspectionDefinition) {
       ),
       authorizedPersonnel: z
         .array(
-          z
-            .string()
-            .trim()
-            .max(120, "Keep each name under 120 characters."),
+          z.object({
+            name: z.preprocess(
+              emptyToUndefined,
+              z
+                .string()
+                .trim()
+                .max(120, "Keep each name under 120 characters.")
+                .optional(),
+            ),
+            signature: z.preprocess(
+              emptyToUndefined,
+              z.string().optional(),
+            ),
+          }),
         )
         .default([]),
       responses: z.object(buildResponseShape(definition)),
@@ -238,16 +287,39 @@ export function createPermitIssueFormSchema(definition: InspectionDefinition) {
         });
       }
 
-      const personnel = value.authorizedPersonnel
-        .map((name) => name.trim())
-        .filter(Boolean);
-      if (personnel.length === 0) {
+      const first = value.authorizedPersonnel[0];
+      const firstName = first?.name?.trim() ?? "";
+      const firstSignature = first?.signature?.trim() ?? "";
+      if (!firstName) {
         ctx.addIssue({
           code: "custom",
-          message: "Add at least one authorized person (technician, contractor, or visitor).",
-          path: ["authorizedPersonnel", 0],
+          message:
+            "Add at least one authorized person (technician, contractor, or visitor).",
+          path: ["authorizedPersonnel", 0, "name"],
         });
       }
+      if (!firstSignature) {
+        ctx.addIssue({
+          code: "custom",
+          message: "The first authorized person must sign off.",
+          path: ["authorizedPersonnel", 0, "signature"],
+        });
+      }
+
+      value.authorizedPersonnel.forEach((person, index) => {
+        if (index === 0) {
+          return;
+        }
+        const name = person.name?.trim() ?? "";
+        const signature = person.signature?.trim() ?? "";
+        if (!name && signature) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Enter a name for this signature.",
+            path: ["authorizedPersonnel", index, "name"],
+          });
+        }
+      });
 
       const applicableQuestions = filterQuestionsForContext(
         definition.questions,
@@ -334,9 +406,12 @@ export function createPermitIssueSchema(definition: InspectionDefinition) {
       responses,
     );
     const summary = summarizeInspectionAnswers(answers);
-    const authorizedPersonnel = value.authorizedPersonnel
-      .map((name) => name.trim())
-      .filter(Boolean);
+    const authorizedPersonnel: AuthorizedPerson[] = value.authorizedPersonnel
+      .map((person) => ({
+        name: person.name?.trim() ?? "",
+        signature: person.signature?.trim() ?? "",
+      }))
+      .filter((person) => person.name);
 
     return {
       equipmentRef: value.equipmentRef ?? null,

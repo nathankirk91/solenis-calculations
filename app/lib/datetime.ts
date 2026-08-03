@@ -59,6 +59,12 @@ export function melbourneDateYmd(date: Date = new Date()): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** YYMM prefix for shared permit numbers (Melbourne calendar), e.g. "2608". */
+export function melbournePermitYearMonth(date: Date = new Date()): string {
+  const ymd = melbourneDateYmd(date);
+  return `${ymd.slice(2, 4)}${ymd.slice(5, 7)}`;
+}
+
 /** Display label for a YYYY-MM-DD Melbourne civil date, e.g. "30 July 2026". */
 export function formatMelbourneYmd(ymd: string): string | null {
   const bounds = melbourneDayBounds(ymd);

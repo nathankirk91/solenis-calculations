@@ -45,6 +45,7 @@ export async function handlePermitIssueSubmit(args: {
     submission.value;
 
   let runId: string | null = null;
+  let permitNumber: string | null = null;
   try {
     await ensureInspectionSchema();
     const run = await createPermitRun({
@@ -56,6 +57,7 @@ export async function handlePermitIssueSubmit(args: {
       authorizedPersonnel,
     });
     runId = run?.id ?? null;
+    permitNumber = run?.permitNumber ?? null;
   } catch {
     return data(
       {
@@ -88,7 +90,7 @@ export async function handlePermitIssueSubmit(args: {
     signers.map((signer) => signer.id),
     {
       title: "Permit pending authorization",
-      message: `${definition.shortName} needs your sign-off`,
+      message: `${definition.shortName}${permitNumber ? ` #${permitNumber}` : ""} needs your sign-off`,
       url,
       tag: `permit-auth-${runId}`,
     },

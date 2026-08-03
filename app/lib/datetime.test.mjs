@@ -7,6 +7,7 @@ const {
   formatMelbourneYmd,
   melbourneDateYmd,
   melbourneDayBounds,
+  melbournePermitYearMonth,
   parseYmd,
   startOfMelbourneWeek,
 } = await import("./datetime.ts");
@@ -75,5 +76,10 @@ assert.equal(
     "3 Aug 2026, 12:00 am",
   );
 }
+
+assert.equal(
+  melbournePermitYearMonth(new Date("2026-08-02T14:00:00.000Z")),
+  "2608",
+);
 
 console.log("datetime tests passed");

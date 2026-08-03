@@ -323,8 +323,17 @@ model InspectionAction {
   @@map("inspection_actions")
 }
 
+model PermitNumberSequence {
+  yearMonth String   @id @map("year_month")
+  lastValue Int      @default(0) @map("last_value")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("permit_number_sequences")
+}
+
 model PermitRun {
   id                  String          @id @default(cuid())
+  permitNumber        String?         @unique @map("permit_number")
   inspectionId        String          @map("inspection_id")
   inspection          Inspection      @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   submittedById       String?         @map("submitted_by_id")

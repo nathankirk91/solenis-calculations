@@ -5,9 +5,17 @@ import assert from "node:assert/strict";
  * transforms applicable answers into a summary.
  */
 const { SAFE_WORK_PERMIT } = await import("../../app/lib/inspections.ts");
-const { createPermitIssueSchema } = await import(
-  "../../app/lib/permit.schema.ts"
+const {
+  createPermitIssueSchema,
+  formatPermitNumber,
+  parseAuthorizedPersonnel,
+} = await import("../../app/lib/permit.schema.ts");
+const { melbournePermitYearMonth } = await import(
+  "../../app/lib/datetime.ts"
 );
+
+const SAMPLE_SIGNATURE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 function fillRequired(definition, overrides = {}) {
   /** @type {Record<string, string>} */
@@ -43,15 +51,44 @@ function fillRequired(definition, overrides = {}) {
 }
 
 {
+  assert.equal(formatPermitNumber("2608", 2), "2608002");
+  assert.equal(formatPermitNumber("2608", 12), "2608012");
+  assert.equal(
+    melbournePermitYearMonth(new Date("2026-08-02T14:00:00.000Z")),
+    "2608",
+  );
+}
+
+{
+  assert.deepEqual(parseAuthorizedPersonnel(["Alex"]), [
+    { name: "Alex", signature: "" },
+  ]);
+  assert.deepEqual(
+    parseAuthorizedPersonnel([
+      { name: "Alex", signature: SAMPLE_SIGNATURE },
+      { name: "Sam", signature: "" },
+    ]),
+    [
+      { name: "Alex", signature: SAMPLE_SIGNATURE },
+      { name: "Sam", signature: "" },
+    ],
+  );
+}
+
+{
   const schema = createPermitIssueSchema(SAFE_WORK_PERMIT);
   const parsed = schema.safeParse({
     equipmentRef: "P-100",
-    authorizedPersonnel: ["Alex Operator"],
+    authorizedPersonnel: [
+      { name: "Alex Operator", signature: SAMPLE_SIGNATURE },
+    ],
     responses: fillRequired(SAFE_WORK_PERMIT),
   });
   assert.equal(parsed.success, true);
   assert.equal(parsed.data.equipmentRef, "P-100");
-  assert.deepEqual(parsed.data.authorizedPersonnel, ["Alex Operator"]);
+  assert.deepEqual(parsed.data.authorizedPersonnel, [
+    { name: "Alex Operator", signature: SAMPLE_SIGNATURE },
+  ]);
   assert.equal(parsed.data.summary.status, "PASSED");
   assert.ok(parsed.data.answers.length > 0);
   assert.equal(
@@ -73,7 +110,9 @@ function fillRequired(definition, overrides = {}) {
 
   const parsed = schema.safeParse({
     equipmentRef: "P-100",
-    authorizedPersonnel: ["Alex Operator"],
+    authorizedPersonnel: [
+      { name: "Alex Operator", signature: SAMPLE_SIGNATURE },
+    ],
     responses,
   });
   assert.equal(parsed.success, false);
@@ -83,7 +122,7 @@ function fillRequired(definition, overrides = {}) {
   const schema = createPermitIssueSchema(SAFE_WORK_PERMIT);
   const parsed = schema.safeParse({
     equipmentRef: "P-100",
-    authorizedPersonnel: ["  ", ""],
+    authorizedPersonnel: [{ name: "  ", signature: "" }],
     responses: fillRequired(SAFE_WORK_PERMIT),
   });
   assert.equal(parsed.success, false);
@@ -97,9 +136,41 @@ function fillRequired(definition, overrides = {}) {
 
 {
   const schema = createPermitIssueSchema(SAFE_WORK_PERMIT);
+  const missingSignature = schema.safeParse({
+    equipmentRef: "P-100",
+    authorizedPersonnel: [{ name: "Alex Operator", signature: "" }],
+    responses: fillRequired(SAFE_WORK_PERMIT),
+  });
+  assert.equal(missingSignature.success, false);
+  assert.ok(
+    missingSignature.error.issues.some(
+      (issue) =>
+        Array.isArray(issue.path) &&
+        issue.path[0] === "authorizedPersonnel" &&
+        issue.path[2] === "signature",
+    ),
+  );
+
+  const optionalSecond = schema.safeParse({
+    equipmentRef: "P-100",
+    authorizedPersonnel: [
+      { name: "Alex Operator", signature: SAMPLE_SIGNATURE },
+      { name: "Sam Helper", signature: "" },
+    ],
+    responses: fillRequired(SAFE_WORK_PERMIT),
+  });
+  assert.equal(optionalSecond.success, true);
+  assert.equal(optionalSecond.data.authorizedPersonnel.length, 2);
+  assert.equal(optionalSecond.data.authorizedPersonnel[1].signature, "");
+}
+
+{
+  const schema = createPermitIssueSchema(SAFE_WORK_PERMIT);
   const parsed = schema.safeParse({
     equipmentRef: "P-100",
-    authorizedPersonnel: ["Alex Operator"],
+    authorizedPersonnel: [
+      { name: "Alex Operator", signature: SAMPLE_SIGNATURE },
+    ],
     responses: fillRequired(SAFE_WORK_PERMIT, {
       "safe-work-permit__start-time": "07:00",
       "safe-work-permit__end-time": "20:00",

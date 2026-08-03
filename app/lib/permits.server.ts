@@ -1,11 +1,11 @@
 import { Prisma } from "../../generated/prisma/client";
+import { melbournePermitYearMonth } from "~/lib/datetime";
 import { getPrisma } from "~/lib/db.server";
 import {
   PERMIT_CATEGORY,
   buildAnswersFromResponses,
   buildPermitCatalog,
   isPermitInspection,
-  parseStringArray,
   summarizeInspectionAnswers,
   type InspectionAnswerRecord,
   type InspectionCard,
@@ -21,14 +21,17 @@ import {
   type ManagedInspectionDetail,
 } from "~/lib/inspections.server";
 import type {
+  AuthorizedPerson,
   PermitAuthSlotKey,
   PermitAuthorization,
   PermitCloseout,
 } from "~/lib/permit.schema";
 import {
   emptyPermitAuthorization,
+  formatPermitNumber,
   isPermitAuthSlotSigned,
   isPermitReadyToOpen,
+  parseAuthorizedPersonnel,
   PERMIT_AUTH_SLOT_KEYS,
   userHasAlreadySignedPermit,
 } from "~/lib/permit.schema";
@@ -50,6 +53,7 @@ export const PERMIT_AUTH_SLOT_TO_CODE: Record<PermitAuthSlotKey, PermitSlotCode>
 
 export type PermitRunListItem = {
   id: string;
+  permitNumber: string | null;
   status: PermitRunStatus;
   title: string;
   inspectionId: string;
@@ -63,6 +67,7 @@ export type PermitRunListItem = {
 
 export type PermitRunDetail = {
   id: string;
+  permitNumber: string | null;
   status: PermitRunStatus;
   inspectionId: string;
   inspectionTitle: string;
@@ -71,7 +76,7 @@ export type PermitRunDetail = {
   inspectionVersion: number | null;
   answers: InspectionAnswerRecord[];
   summary: InspectionSummary;
-  authorizedPersonnel: string[];
+  authorizedPersonnel: AuthorizedPerson[];
   authorization: PermitAuthorization;
   closeout: PermitCloseout | null;
   createdAt: Date;
@@ -179,9 +184,9 @@ export async function createPermitRun(args: {
   equipmentRef: string | null;
   answers: InspectionAnswerRecord[];
   summary: InspectionSummary;
-  authorizedPersonnel: string[];
+  authorizedPersonnel: AuthorizedPerson[];
   authorization?: PermitAuthorization;
-}): Promise<{ id: string } | null> {
+}): Promise<{ id: string; permitNumber: string } | null> {
   await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
@@ -207,8 +212,11 @@ export async function createPermitRun(args: {
       ? (inspection.template?.version ?? inspection.version)
       : inspection.version;
 
+  const permitNumber = await allocateNextPermitNumber();
+
   const row = await prisma.permitRun.create({
     data: {
+      permitNumber,
       inspectionId: args.inspectionId,
       submittedById: args.submittedById,
       status: "PENDING_AUTHORIZATION",
@@ -216,14 +224,43 @@ export async function createPermitRun(args: {
       inspectionVersion: version,
       responses: args.answers as unknown as Prisma.InputJsonValue,
       summary: args.summary as unknown as Prisma.InputJsonValue,
-      authorizedPersonnel: args.authorizedPersonnel,
+      authorizedPersonnel:
+        args.authorizedPersonnel as unknown as Prisma.InputJsonValue,
       authorization: (args.authorization ??
         emptyPermitAuthorization()) as unknown as Prisma.InputJsonValue,
     },
-    select: { id: true },
+    select: { id: true, permitNumber: true },
   });
 
-  return row;
+  return {
+    id: row.id,
+    permitNumber: row.permitNumber ?? permitNumber,
+  };
+}
+
+/** Shared YYMMXXX sequence for all permit types (Safe Work, Hot Work, Line Break). */
+export async function allocateNextPermitNumber(
+  date: Date = new Date(),
+): Promise<string> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  const yearMonth = melbournePermitYearMonth(date);
+  const rows = await prisma.$queryRaw<Array<{ last_value: number }>>`
+    INSERT INTO "permit_number_sequences" ("year_month", "last_value", "updated_at")
+    VALUES (${yearMonth}, 1, CURRENT_TIMESTAMP)
+    ON CONFLICT ("year_month") DO UPDATE
+      SET "last_value" = "permit_number_sequences"."last_value" + 1,
+          "updated_at" = CURRENT_TIMESTAMP
+    RETURNING "last_value"
+  `;
+  const sequence = rows[0]?.last_value;
+  if (!sequence || sequence < 1) {
+    throw new Error("Could not allocate a permit number.");
+  }
+  return formatPermitNumber(yearMonth, sequence);
 }
 
 export async function listOpenPermitRuns(args?: {
@@ -259,6 +296,7 @@ export async function listPermitRuns(args?: {
       take: args?.limit ?? 100,
       select: {
         id: true,
+        permitNumber: true,
         status: true,
         equipmentRef: true,
         createdAt: true,
@@ -278,6 +316,7 @@ export async function listPermitRuns(args?: {
       const summary = parseSummary(row.summary);
       return {
         id: row.id,
+        permitNumber: row.permitNumber,
         status: row.status,
         title: row.inspection.title,
         inspectionId: row.inspection.id,
@@ -308,6 +347,7 @@ export async function getPermitRunById(
       where: { id },
       select: {
         id: true,
+        permitNumber: true,
         status: true,
         inspectionId: true,
         equipmentRef: true,
@@ -330,6 +370,7 @@ export async function getPermitRunById(
 
     return {
       id: row.id,
+      permitNumber: row.permitNumber,
       status: row.status,
       inspectionId: row.inspectionId,
       inspectionTitle: row.inspection.title,
@@ -338,7 +379,7 @@ export async function getPermitRunById(
       inspectionVersion: row.inspectionVersion,
       answers: parseAnswers(row.responses),
       summary: parseSummary(row.summary),
-      authorizedPersonnel: parseStringArray(row.authorizedPersonnel),
+      authorizedPersonnel: parseAuthorizedPersonnel(row.authorizedPersonnel),
       authorization: parseAuthorization(row.authorization),
       closeout: parseCloseout(row.closeout),
       createdAt: row.createdAt,

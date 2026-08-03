@@ -97,7 +97,14 @@ export default function PermitsHistoryPage({
                   className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-white/70 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-brand/5"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-brand-navy">{run.title}</p>
+                    <p className="font-medium text-brand-navy">
+                      {run.permitNumber ? (
+                        <span className="mr-2 tabular-nums text-muted-foreground">
+                          #{run.permitNumber}
+                        </span>
+                      ) : null}
+                      {run.title}
+                    </p>
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       {formatMelbourneDateTime(run.createdAt)}
                       {run.equipmentRef ? ` · ${run.equipmentRef}` : ""}

@@ -6,6 +6,7 @@ import {
 import { parseWithZod } from "@conform-to/zod/v4";
 import { Form, useNavigation } from "react-router";
 
+import { SignaturePad } from "~/components/signature-pad";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -61,7 +62,7 @@ export function PermitIssueForm({
     shouldRevalidate: "onInput",
     defaultValue: {
       equipmentRef: "",
-      authorizedPersonnel: [""],
+      authorizedPersonnel: [{ name: "", signature: "" }],
       responses: defaultResponses,
     },
   });
@@ -319,7 +320,8 @@ export function PermitIssueForm({
                   </h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Technicians, contractors, and visitors authorised to perform
-                    the work.
+                    the work. The first person must sign; additional signatures
+                    are optional.
                   </p>
                 </div>
                 <Button
@@ -327,52 +329,80 @@ export function PermitIssueForm({
                   size="sm"
                   {...form.insert.getButtonProps({
                     name: fields.authorizedPersonnel.name,
-                    defaultValue: "",
+                    defaultValue: { name: "", signature: "" },
                   })}
                 >
                   Add person
                 </Button>
               </div>
-              <div className="grid gap-3">
-                {personnelFields.map((field, index) => (
-                  <div key={field.key} className="grid gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor={field.id}>
-                        {index === 0
-                          ? "Authorized person"
-                          : `Authorized person ${index + 1}`}
-                      </Label>
-                      {personnelFields.length > 1 ? (
-                        <button
-                          className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
-                          {...form.remove.getButtonProps({
-                            name: fields.authorizedPersonnel.name,
-                            index,
-                          })}
-                        >
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
-                    <Input
-                      id={field.id}
-                      name={field.name}
+              <div className="grid gap-4">
+                {personnelFields.map((field, index) => {
+                  const person = field.getFieldset();
+                  return (
+                    <div
                       key={field.key}
-                      defaultValue={
-                        typeof field.initialValue === "string"
-                          ? field.initialValue
-                          : ""
-                      }
-                      placeholder="Full name"
-                      aria-invalid={Boolean(field.errors)}
-                    />
-                    {field.errors ? (
-                      <p className="text-sm text-destructive">
-                        {field.errors.join(" ")}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
+                      className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <Label htmlFor={person.name.id}>
+                          {index === 0
+                            ? "Authorized person"
+                            : `Authorized person ${index + 1}`}
+                          {index === 0 ? (
+                            <span className="ml-1 text-destructive">*</span>
+                          ) : null}
+                        </Label>
+                        {personnelFields.length > 1 ? (
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
+                            {...form.remove.getButtonProps({
+                              name: fields.authorizedPersonnel.name,
+                              index,
+                            })}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+                      <Input
+                        id={person.name.id}
+                        name={person.name.name}
+                        key={person.name.key}
+                        defaultValue={
+                          typeof person.name.initialValue === "string"
+                            ? person.name.initialValue
+                            : ""
+                        }
+                        placeholder="Full name"
+                        aria-invalid={Boolean(person.name.errors)}
+                      />
+                      {person.name.errors ? (
+                        <p className="text-sm text-destructive">
+                          {person.name.errors.join(" ")}
+                        </p>
+                      ) : null}
+                      <div className="grid gap-2">
+                        <Label>
+                          Sign-off
+                          {index === 0 ? (
+                            <span className="ml-1 text-destructive">*</span>
+                          ) : (
+                            <span className="ml-1 font-normal text-muted-foreground">
+                              (optional)
+                            </span>
+                          )}
+                        </Label>
+                        <SignaturePad
+                          name={person.signature.name}
+                          id={person.signature.id}
+                          required={index === 0}
+                          error={person.signature.errors?.join(" ")}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
 

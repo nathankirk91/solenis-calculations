@@ -243,6 +243,14 @@ export default function PermitRunPage({
             {run.inspectionTitle}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
+            {run.permitNumber ? (
+              <>
+                <span className="font-medium text-foreground">
+                  #{run.permitNumber}
+                </span>
+                {" · "}
+              </>
+            ) : null}
             Submitted {formatMelbourneDateTime(run.createdAt)}
             {run.submittedByName ? ` · ${run.submittedByName}` : ""}
             {run.equipmentRef ? ` · ${run.equipmentRef}` : ""}
@@ -304,11 +312,35 @@ export default function PermitRunPage({
                 <h3 className="font-medium">Authorized personnel</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Technicians, contractors, and visitors authorised to perform
-                  the work.
+                  the work. The first person must sign; additional signatures
+                  are optional.
                 </p>
-                <ul className="mt-2 grid gap-1 text-sm text-muted-foreground">
-                  {run.authorizedPersonnel.map((name) => (
-                    <li key={name}>• {name}</li>
+                <ul className="mt-3 grid gap-3">
+                  {run.authorizedPersonnel.map((person, index) => (
+                    <li
+                      key={`${person.name}-${index}`}
+                      className="rounded-md border border-border/60 bg-background/70 p-3"
+                    >
+                      <p className="text-sm font-medium text-foreground">
+                        {person.name}
+                        {index === 0 ? (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            (required sign-off)
+                          </span>
+                        ) : null}
+                      </p>
+                      {person.signature ? (
+                        <img
+                          src={person.signature}
+                          alt={`${person.name} sign-off`}
+                          className="mt-2 h-16 w-auto rounded border border-border/50 bg-white object-contain"
+                        />
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          No signature provided
+                        </p>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </div>
