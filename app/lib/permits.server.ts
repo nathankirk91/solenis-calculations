@@ -13,6 +13,7 @@ import {
   type InspectionDefinition,
   type InspectionSummary,
 } from "~/lib/inspections";
+import { workDescriptionFromAnswers } from "~/lib/permit-display";
 import {
   createManagedInspection,
   getInspectionDefinition,
@@ -60,6 +61,7 @@ export type PermitRunListItem = {
   permitNumber: string | null;
   status: PermitRunStatus;
   title: string;
+  workDescription: string | null;
   inspectionId: string;
   equipmentRef: string | null;
   area: string | null;
@@ -417,6 +419,7 @@ export async function listPermitRuns(args?: {
         permitNumber: row.permitNumber,
         status: row.status,
         title: row.inspection.title,
+        workDescription: workDescriptionFromAnswers(answers),
         inspectionId: row.inspection.id,
         equipmentRef: row.equipmentRef,
         area: areaAnswer?.answer?.trim() || null,

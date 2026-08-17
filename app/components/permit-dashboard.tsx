@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { formatMelbourneDateTime } from "~/lib/datetime";
+import { PermitRecordCard } from "~/components/permit-record-card";
 import type { PermitRunListItem } from "~/lib/permits.server";
 import { cn } from "~/lib/utils";
 
@@ -165,37 +165,17 @@ function PermitList({
       {items.length > 0 ? (
         <ul className="grid gap-3">
           {items.map((permit) => (
-            <li key={permit.id}>
-              <Link
-                to={`/permits/runs/${permit.id}`}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-white/70 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-brand/5"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium text-brand-navy">
-                    {permit.permitNumber ? (
-                      <span className="mr-2 tabular-nums text-muted-foreground">
-                        #{permit.permitNumber}
-                      </span>
-                    ) : null}
-                    {permit.title}
-                  </p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    {formatMelbourneDateTime(permit.createdAt)}
-                    {permit.equipmentRef ? ` · ${permit.equipmentRef}` : ""}
-                    {permit.area ? ` · ${permit.area}` : ""}
-                  </p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    status === "pending" && "border-sky-600/40 text-sky-800",
-                    status === "open" && "border-amber-600/40 text-amber-800",
-                  )}
-                >
-                  {status === "pending" ? "Pending authorization" : "Open"}
-                </Badge>
-              </Link>
-            </li>
+            <PermitRecordCard
+              key={permit.id}
+              run={permit}
+              statusBadge={{
+                label: status === "pending" ? "Pending authorization" : "Open",
+                className: cn(
+                  status === "pending" && "border-sky-600/40 text-sky-800",
+                  status === "open" && "border-amber-600/40 text-amber-800",
+                ),
+              }}
+            />
           ))}
         </ul>
       ) : (

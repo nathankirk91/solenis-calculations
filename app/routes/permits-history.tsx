@@ -3,16 +3,14 @@ import { Form, Link } from "react-router";
 import type { Route } from "./+types/permits-history";
 
 import { AppHeader } from "~/components/app-header";
-import { DownloadPdfLink } from "~/components/download-pdf-link";
+import { PermitRecordCard } from "~/components/permit-record-card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
-import { formatMelbourneDateTime } from "~/lib/datetime";
 import { listPermitRuns } from "~/lib/permits.server";
 import { canReviewRuns } from "~/lib/roles";
-import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -92,49 +90,7 @@ export default function PermitsHistoryPage({
         {runs.length > 0 ? (
           <ul className="grid gap-3">
             {runs.map((run) => (
-              <li
-                key={run.id}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-border/70 bg-white/70 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-brand/5"
-              >
-                <Link
-                  to={`/permits/runs/${run.id}`}
-                  className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium text-brand-navy">
-                      {run.permitNumber ? (
-                        <span className="mr-2 tabular-nums text-muted-foreground">
-                          #{run.permitNumber}
-                        </span>
-                      ) : null}
-                      {run.title}
-                    </p>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      {formatMelbourneDateTime(run.createdAt)}
-                      {run.equipmentRef ? ` · ${run.equipmentRef}` : ""}
-                      {run.area ? ` · ${run.area}` : ""}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      run.status === "PENDING_AUTHORIZATION" &&
-                        "border-sky-600/40 text-sky-800",
-                      run.status === "OPEN" &&
-                        "border-amber-600/40 text-amber-800",
-                      run.status === "CLOSED" &&
-                        "border-emerald-600/40 text-emerald-700",
-                    )}
-                  >
-                    {run.status === "PENDING_AUTHORIZATION"
-                      ? "Pending authorization"
-                      : run.status === "OPEN"
-                        ? "Open"
-                        : "Closed"}
-                  </Badge>
-                </Link>
-                <DownloadPdfLink href={`/permits/runs/${run.id}/pdf`} />
-              </li>
+              <PermitRecordCard key={run.id} run={run} />
             ))}
           </ul>
         ) : (
