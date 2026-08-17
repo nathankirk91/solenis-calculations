@@ -15,5 +15,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const document = buildInspectionDocument(run);
   const bytes = await renderRecordPdf(document);
-  return pdfFileResponse(bytes, document.filename);
+  const inline = new URL(request.url).searchParams.get("inline") === "1";
+  return pdfFileResponse(bytes, document.filename, { inline });
 }

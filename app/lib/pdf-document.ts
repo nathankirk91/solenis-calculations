@@ -20,20 +20,24 @@ const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN_X = 48;
 const MARGIN_TOP = 52;
-const MARGIN_BOTTOM = 48;
+const MARGIN_BOTTOM = 56;
+const FOOTER_RESERVE = 28;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_X * 2;
+const MIN_Y = MARGIN_BOTTOM + FOOTER_RESERVE;
 
 const NAVY = rgb(7 / 255, 38 / 255, 53 / 255);
 const TEAL = rgb(0, 204 / 255, 153 / 255);
 const MUTED = rgb(0.38, 0.42, 0.45);
-const RULE = rgb(0.82, 0.85, 0.87);
 const FLAGGED = rgb(0.55, 0.31, 0.04);
 const WHITE = rgb(1, 1, 1);
 const BODY = rgb(0.08, 0.12, 0.16);
 
 const HEADER_HEIGHT = 36;
-const SIGNATURE_MAX_WIDTH = 200;
-const SIGNATURE_MAX_HEIGHT = 56;
+const SIGNATURE_MAX_WIDTH = 180;
+const SIGNATURE_MAX_HEIGHT = 52;
+const ROW_GAP = 8;
+const SECTION_GAP = 14;
+const LINE_HEIGHT = 12;
 
 function toWinAnsi(value: string): string {
   return value
@@ -108,6 +112,7 @@ class PdfLayout {
   private page: PDFPage;
   private y: number;
   private pageNumber = 1;
+  private footerDrawn = false;
   private readonly document: RecordDocument;
 
   constructor(
@@ -130,10 +135,11 @@ class PdfLayout {
     for (const block of this.document.blocks) {
       await this.drawBlock(block);
     }
-    this.finishPage();
+    this.drawFooterIfNeeded();
   }
 
   private drawChrome(): void {
+    this.footerDrawn = false;
     this.page.drawRectangle({
       x: 0,
       y: PAGE_HEIGHT - HEADER_HEIGHT,
@@ -168,7 +174,10 @@ class PdfLayout {
     this.y = PAGE_HEIGHT - HEADER_HEIGHT - 28;
   }
 
-  private finishPage(): void {
+  private drawFooterIfNeeded(): void {
+    if (this.footerDrawn) {
+      return;
+    }
     const footer = [
       this.document.footerNote,
       this.document.generatedAtLabel
@@ -178,29 +187,28 @@ class PdfLayout {
     ]
       .filter(Boolean)
       .join("  |  ");
-    this.page.drawLine({
-      start: { x: MARGIN_X, y: MARGIN_BOTTOM - 8 },
-      end: { x: PAGE_WIDTH - MARGIN_X, y: MARGIN_BOTTOM - 8 },
-      thickness: 0.6,
-      color: RULE,
-    });
     this.page.drawText(toWinAnsi(footer), {
       x: MARGIN_X,
-      y: 22,
+      y: 24,
       size: 8,
       font: this.regular,
       color: MUTED,
     });
+    this.footerDrawn = true;
   }
 
-  private ensureSpace(needed: number): void {
-    if (this.y - needed >= MARGIN_BOTTOM) {
-      return;
-    }
-    this.finishPage();
+  private startNewPage(): void {
+    this.drawFooterIfNeeded();
     this.page = this.pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     this.pageNumber += 1;
     this.drawChrome();
+  }
+
+  private ensureSpace(needed: number): void {
+    if (this.y - needed >= MIN_Y) {
+      return;
+    }
+    this.startNewPage();
   }
 
   private drawTitleBlock(): void {
@@ -241,22 +249,23 @@ class PdfLayout {
         ? FLAGGED
         : NAVY,
     });
-    this.y -= 18;
+    this.y -= 20;
   }
 
   private drawMeta(): void {
     this.ensureSpace(28);
-    this.drawSectionHeading("Record details");
+    this.drawSectionHeading("Record details", { rule: false });
     const columnWidth = (CONTENT_WIDTH - 16) / 2;
-    const rows: Array<[typeof this.document.meta[number], typeof this.document.meta[number] | null]> =
-      [];
+    const rows: Array<
+      [typeof this.document.meta[number], typeof this.document.meta[number] | null]
+    > = [];
     for (let i = 0; i < this.document.meta.length; i += 2) {
       rows.push([this.document.meta[i], this.document.meta[i + 1] ?? null]);
     }
     for (const [left, right] of rows) {
       const leftLines = this.metaLines(left, columnWidth);
       const rightLines = right ? this.metaLines(right, columnWidth) : [];
-      const height = Math.max(leftLines.length, rightLines.length) * 12 + 6;
+      const height = Math.max(leftLines.length, rightLines.length) * LINE_HEIGHT + 4;
       this.ensureSpace(height);
       this.drawMetaColumn(leftLines, MARGIN_X);
       if (right) {
@@ -264,7 +273,7 @@ class PdfLayout {
       }
       this.y -= height;
     }
-    this.y -= 6;
+    this.y -= SECTION_GAP;
   }
 
   private metaLines(
@@ -295,43 +304,55 @@ class PdfLayout {
         font: line.bold ? this.bold : this.regular,
         color: line.color,
       });
-      y -= 12;
+      y -= LINE_HEIGHT;
     }
   }
 
-  private drawSectionHeading(title: string): void {
-    this.ensureSpace(28);
-    this.page.drawText(toWinAnsi(title), {
+  private drawSectionHeading(
+    title: string,
+    options: { rule?: boolean; continued?: boolean } = {},
+  ): void {
+    const label = options.continued ? `${title} (continued)` : title;
+    this.ensureSpace(24);
+    this.y -= 4;
+    this.page.drawText(toWinAnsi(label), {
       x: MARGIN_X,
       y: this.y,
       size: 12,
       font: this.bold,
       color: NAVY,
     });
-    this.y -= 8;
-    this.page.drawLine({
-      start: { x: MARGIN_X, y: this.y },
-      end: { x: PAGE_WIDTH - MARGIN_X, y: this.y },
-      thickness: 1,
-      color: TEAL,
-    });
-    this.y -= 14;
+    this.y -= 10;
+    if (options.rule !== false) {
+      this.page.drawLine({
+        start: { x: MARGIN_X, y: this.y },
+        end: { x: PAGE_WIDTH - MARGIN_X, y: this.y },
+        thickness: 0.75,
+        color: TEAL,
+      });
+      this.y -= 10;
+    } else {
+      this.y -= 4;
+    }
   }
 
-  private async drawBlock(block: RecordDocumentBlock): Promise<void> {
+  private async drawBlock(
+    block: RecordDocumentBlock,
+    continued = false,
+  ): Promise<void> {
     if (block.kind === "fields") {
-      this.drawSectionHeading(block.title);
+      this.drawSectionHeading(block.title, { continued });
       for (const field of block.fields) {
         this.drawField(field.label, field.value, field.flagged);
       }
-      this.y -= 6;
+      this.y -= SECTION_GAP;
       return;
     }
     if (block.kind === "text") {
-      this.drawSectionHeading(block.title);
+      this.drawSectionHeading(block.title, { continued });
       const lines = wrapText(this.regular, block.body, 10, CONTENT_WIDTH);
       for (const line of lines) {
-        this.ensureSpace(14);
+        this.ensureSpace(LINE_HEIGHT + 2);
         this.page.drawText(line, {
           x: MARGIN_X,
           y: this.y,
@@ -339,21 +360,16 @@ class PdfLayout {
           font: this.regular,
           color: BODY,
         });
-        this.y -= 14;
+        this.y -= LINE_HEIGHT + 2;
       }
-      this.y -= 6;
+      this.y -= SECTION_GAP;
       return;
     }
     if (block.kind === "list") {
-      this.drawSectionHeading(block.title);
+      this.drawSectionHeading(block.title, { continued });
       for (const item of block.items) {
-        const lines = wrapText(
-          this.regular,
-          item,
-          10,
-          CONTENT_WIDTH - 14,
-        );
-        this.ensureSpace(lines.length * 14 + 4);
+        const lines = wrapText(this.regular, item, 10, CONTENT_WIDTH - 14);
+        this.ensureSpace(lines.length * (LINE_HEIGHT + 2) + 2);
         this.page.drawText("-", {
           x: MARGIN_X,
           y: this.y,
@@ -369,22 +385,87 @@ class PdfLayout {
             font: this.regular,
             color: BODY,
           });
-          this.y -= 14;
+          this.y -= LINE_HEIGHT + 2;
           if (index < lines.length - 1) {
-            this.ensureSpace(14);
+            this.ensureSpace(LINE_HEIGHT + 2);
           }
         }
-        this.y -= 2;
       }
-      this.y -= 6;
+      this.y -= SECTION_GAP;
       return;
     }
 
-    this.drawSectionHeading(block.title);
-    if (block.description) {
-      const lines = wrapText(this.regular, block.description, 9, CONTENT_WIDTH);
-      for (const line of lines) {
-        this.ensureSpace(12);
+    await this.drawSignatureBlock(block, continued);
+  }
+
+  private drawField(label: string, value: string, flagged?: boolean): void {
+    const trimmedLabel = label.trim();
+    const labelWidth = CONTENT_WIDTH * 0.62;
+    const valueWidth = CONTENT_WIDTH * 0.34;
+    const valueX = MARGIN_X + CONTENT_WIDTH - valueWidth;
+
+    if (!trimmedLabel) {
+      const valueLines = wrapText(this.bold, value, 10, CONTENT_WIDTH);
+      const height = valueLines.length * LINE_HEIGHT + ROW_GAP;
+      this.ensureSpace(height);
+      for (const [index, line] of valueLines.entries()) {
+        this.page.drawText(line, {
+          x: MARGIN_X,
+          y: this.y - index * LINE_HEIGHT,
+          size: 10,
+          font: this.bold,
+          color: flagged ? FLAGGED : BODY,
+        });
+      }
+      this.y -= height;
+      return;
+    }
+
+    const labelLines = wrapText(this.regular, trimmedLabel, 9, labelWidth);
+    const valueLines = wrapText(this.bold, value, 10, valueWidth);
+    const rowLines = Math.max(labelLines.length, valueLines.length);
+    const height = rowLines * LINE_HEIGHT + ROW_GAP;
+    this.ensureSpace(height);
+    const top = this.y;
+
+    for (const [index, line] of labelLines.entries()) {
+      this.page.drawText(line, {
+        x: MARGIN_X,
+        y: top - index * LINE_HEIGHT,
+        size: 9,
+        font: this.regular,
+        color: MUTED,
+      });
+    }
+
+    const valueColor = flagged ? FLAGGED : BODY;
+    for (const [index, line] of valueLines.entries()) {
+      this.page.drawText(line, {
+        x: valueX,
+        y: top - index * LINE_HEIGHT,
+        size: 10,
+        font: this.bold,
+        color: valueColor,
+      });
+    }
+
+    this.y -= height;
+  }
+
+  private async drawSignatureBlock(
+    block: Extract<RecordDocumentBlock, { kind: "signatures" }>,
+    continued: boolean,
+  ): Promise<void> {
+    const descriptionLines = block.description
+      ? wrapText(this.regular, block.description, 9, CONTENT_WIDTH)
+      : [];
+    const headingSpace = 24 + descriptionLines.length * (LINE_HEIGHT + 1) + 6;
+
+    let index = 0;
+    if (!continued) {
+      this.ensureSpace(headingSpace + this.estimateSignatureHeight(block.signatures[0]));
+      this.drawSectionHeading(block.title);
+      for (const line of descriptionLines) {
         this.page.drawText(line, {
           x: MARGIN_X,
           y: this.y,
@@ -392,51 +473,42 @@ class PdfLayout {
           font: this.regular,
           color: MUTED,
         });
-        this.y -= 12;
+        this.y -= LINE_HEIGHT + 1;
       }
-      this.y -= 6;
+      this.y -= 4;
+    } else {
+      this.drawSectionHeading(block.title, { continued: true });
     }
-    for (const signature of block.signatures) {
+
+    while (index < block.signatures.length) {
+      const signature = block.signatures[index];
+      const height = this.estimateSignatureHeight(signature);
+      if (this.y - height < MIN_Y) {
+        this.startNewPage();
+        this.drawSectionHeading(block.title, { continued: true });
+      }
       await this.drawSignature(signature);
+      index += 1;
     }
-    this.y -= 6;
+
+    this.y -= SECTION_GAP;
   }
 
-  private drawField(label: string, value: string, flagged?: boolean): void {
-    const labelWidth = CONTENT_WIDTH * 0.58;
-    const valueWidth = CONTENT_WIDTH * 0.4;
-    const labelLines = wrapText(this.regular, label, 9, labelWidth);
-    const valueLines = wrapText(this.bold, value, 10, valueWidth);
-    const height = Math.max(labelLines.length, valueLines.length) * 12 + 8;
-    this.ensureSpace(height);
-    const top = this.y;
-    for (const [index, line] of labelLines.entries()) {
-      this.page.drawText(line, {
-        x: MARGIN_X,
-        y: top - index * 12,
-        size: 9,
-        font: this.regular,
-        color: MUTED,
-      });
-    }
-    const valueColor = flagged ? FLAGGED : BODY;
-    const valueX = MARGIN_X + CONTENT_WIDTH - valueWidth;
-    for (const [index, line] of valueLines.entries()) {
-      this.page.drawText(line, {
-        x: valueX,
-        y: top - index * 12,
-        size: 10,
-        font: this.bold,
-        color: valueColor,
-      });
-    }
-    this.y -= height - 2;
-    this.page.drawLine({
-      start: { x: MARGIN_X, y: this.y + 4 },
-      end: { x: PAGE_WIDTH - MARGIN_X, y: this.y + 4 },
-      thickness: 0.4,
-      color: RULE,
-    });
+  private estimateSignatureHeight(signature: RecordDocumentSignature): number {
+    const parsed = parseSignatureImageDataUrl(signature.imageDataUrl);
+    const textFallback = signatureDisplayText(signature.imageDataUrl);
+    const captionLines = signature.caption
+      ? wrapText(this.regular, signature.caption, 8, CONTENT_WIDTH - 20).length
+      : 0;
+    const nameLines = signature.name
+      ? wrapText(this.regular, signature.name, 10, CONTENT_WIDTH - 20).length
+      : 0;
+    const bodyHeight = parsed
+      ? SIGNATURE_MAX_HEIGHT + 12
+      : textFallback
+        ? 28
+        : 18;
+    return 16 + nameLines * LINE_HEIGHT + captionLines * 11 + bodyHeight + 12;
   }
 
   private async drawSignature(
@@ -457,48 +529,48 @@ class PdfLayout {
 
     const textFallback = signatureDisplayText(signature.imageDataUrl);
     const captionLines = signature.caption
-      ? wrapText(this.regular, signature.caption, 8, CONTENT_WIDTH - 16)
+      ? wrapText(this.regular, signature.caption, 8, CONTENT_WIDTH - 20)
       : [];
     const nameLines = signature.name
-      ? wrapText(this.regular, signature.name, 10, CONTENT_WIDTH - 16)
+      ? wrapText(this.regular, signature.name, 10, CONTENT_WIDTH - 20)
       : [];
-    const boxHeight = image ? SIGNATURE_MAX_HEIGHT + 12 : textFallback ? 36 : 28;
-    const height =
-      18 + nameLines.length * 12 + captionLines.length * 11 + boxHeight + 16;
-    this.ensureSpace(height);
-
-    this.page.drawRectangle({
-      x: MARGIN_X,
-      y: this.y - height + 10,
-      width: CONTENT_WIDTH,
-      height: height - 4,
-      borderColor: RULE,
-      borderWidth: 0.8,
-      color: WHITE,
-    });
+    const imageHeight = image ? SIGNATURE_MAX_HEIGHT + 8 : 0;
+    const bodyHeight = image
+      ? imageHeight
+      : textFallback
+        ? 24
+        : signature.unsigned
+          ? 16
+          : 16;
+    const cardHeight =
+      14 +
+      nameLines.length * LINE_HEIGHT +
+      captionLines.length * 11 +
+      bodyHeight +
+      10;
 
     this.page.drawText(toWinAnsi(signature.label), {
-      x: MARGIN_X + 10,
-      y: this.y - 8,
+      x: MARGIN_X,
+      y: this.y,
       size: 9,
       font: this.bold,
       color: NAVY,
     });
-    this.y -= 22;
+    this.y -= 14;
 
     for (const line of nameLines) {
       this.page.drawText(line, {
-        x: MARGIN_X + 10,
+        x: MARGIN_X + 8,
         y: this.y,
         size: 10,
         font: this.regular,
         color: BODY,
       });
-      this.y -= 12;
+      this.y -= LINE_HEIGHT;
     }
     for (const line of captionLines) {
       this.page.drawText(line, {
-        x: MARGIN_X + 10,
+        x: MARGIN_X + 8,
         y: this.y,
         size: 8,
         font: this.regular,
@@ -507,54 +579,52 @@ class PdfLayout {
       this.y -= 11;
     }
 
+    const contentTop = this.y;
+    this.page.drawRectangle({
+      x: MARGIN_X,
+      y: contentTop - bodyHeight,
+      width: CONTENT_WIDTH,
+      height: bodyHeight,
+      borderColor: MUTED,
+      borderWidth: 0.5,
+      color: WHITE,
+    });
+
     if (image) {
       const scaled = image.scaleToFit(SIGNATURE_MAX_WIDTH, SIGNATURE_MAX_HEIGHT);
-      this.page.drawRectangle({
-        x: MARGIN_X + 10,
-        y: this.y - scaled.height - 6,
-        width: scaled.width + 8,
-        height: scaled.height + 8,
-        color: WHITE,
-        borderColor: RULE,
-        borderWidth: 0.5,
-      });
       this.page.drawImage(image, {
-        x: MARGIN_X + 14,
-        y: this.y - scaled.height - 2,
+        x: MARGIN_X + 8,
+        y: contentTop - scaled.height - 4,
         width: scaled.width,
         height: scaled.height,
       });
-      this.y -= scaled.height + 18;
     } else if (textFallback) {
       this.page.drawText(toWinAnsi(textFallback), {
-        x: MARGIN_X + 10,
-        y: this.y - 4,
+        x: MARGIN_X + 8,
+        y: contentTop - 18,
         size: 16,
         font: this.bold,
         color: NAVY,
       });
-      this.y -= 28;
     } else if (signature.unsigned) {
       this.page.drawText("Not signed", {
-        x: MARGIN_X + 10,
-        y: this.y - 4,
+        x: MARGIN_X + 8,
+        y: contentTop - 16,
         size: 10,
         font: this.regular,
         color: MUTED,
       });
-      this.y -= 22;
     } else {
-      this.page.drawText("Signature on file (image could not be rendered)", {
-        x: MARGIN_X + 10,
-        y: this.y - 4,
+      this.page.drawText("Signature on file", {
+        x: MARGIN_X + 8,
+        y: contentTop - 16,
         size: 9,
         font: this.regular,
         color: MUTED,
       });
-      this.y -= 22;
     }
 
-    this.y -= 10;
+    this.y = contentTop - bodyHeight - 10;
   }
 }
 

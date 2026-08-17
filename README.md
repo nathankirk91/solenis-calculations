@@ -154,7 +154,7 @@ Default seeded inspections:
 | Daily Start-up | `/inspections/daily-startup` |
 | Daily Shut-down | `/inspections/daily-shutdown` |
 
-Completed inspections can be opened from **Inspections → Records**. Each record (and the history list) has **Download PDF**, which produces a human-readable copy of every answered field, notes, actions, and the operator signature.
+Completed inspections can be opened from **Inspections → Records**. Each record has **View PDF**, which opens a readable copy of every answered field, notes, actions, and the operator signature. From there you can share, download, or close the PDF (including when installed as a home-screen app).
 
 ## Permits
 
@@ -171,7 +171,7 @@ Permits live on `/permits`, with their own records and management (separate from
 
 Issuing a permit assigns a shared **YYMMXXX** permit number (e.g. `2608002`) used across Safe Work, Hot Work, and Line Break forms, and submits it as **pending authorization**. Duration is calculated from start and end time and cannot exceed **12 hours**. The first authorized person must sign on issue; additional authorized people may sign optionally. Eligible Operations representative / Account manager, Maintenance representative / Account technician, and Safe work coordinator users get a push notification (one per person even with multiple roles). Approvers must confirm a job-site visual inspection before signing. The same person cannot sign more than one role. Once **two different people** have signed, the permit becomes **open**; a third signature can still be added afterward. Close out with date, time, and operator/maintenance initials when work is finished. Retain closed permits for at least one year.
 
-Each permit record (and the records list) has **Download PDF**. The PDF includes every form field, calculated duration, authorized personnel signatures, authorisation slot signatures (including unsigned slots), and close-out initials when present.
+Each permit record has **View PDF**. The PDF includes every form field, calculated duration, authorized personnel signatures, authorisation slot signatures (including unsigned slots), and close-out initials when present. From the viewer you can share, download, or close the PDF.
 
 ## Scripts
 

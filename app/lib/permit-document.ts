@@ -122,8 +122,8 @@ export function buildPermitDocument(
         ? run.authorizedPersonnel.map((person, index) => ({
             label:
               index === 0
-                ? `${person.name} (required sign-off)`
-                : person.name,
+                ? "Authorized person (required sign-off)"
+                : "Authorized person",
             name: person.name,
             imageDataUrl: person.signature,
             unsigned: !person.signature?.trim(),
@@ -150,7 +150,7 @@ export function buildPermitDocument(
         : null;
       return {
         label: PERMIT_AUTH_SLOT_LABELS[key],
-        name: signed ? person.name : "Not signed yet",
+        name: signed ? person.name : undefined,
         caption: signed && siteInspected ? `Site inspected ${siteInspected}` : undefined,
         imageDataUrl: signed ? person.signature : null,
         unsigned: !signed,

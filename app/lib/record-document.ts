@@ -84,8 +84,11 @@ export function groupAnswersForDocument(
       continue;
     }
     const title = row.sectionTitle?.trim() || "Answers";
+    const label = row.label.trim();
+    const sectionTitle = title.trim();
     const field: RecordDocumentField = {
-      label: row.label,
+      label:
+        label.toLowerCase() === sectionTitle.toLowerCase() ? "" : row.label,
       value: formatAnswerForDocument(row),
       flagged: row.flagged,
     };

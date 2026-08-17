@@ -117,6 +117,7 @@ assert.equal(buildRecordFilename(["", null]), "record.pdf");
   assert.equal(groups[0].fields.length, 2);
   assert.equal(groups[0].fields[0].value, "17 Aug 2026");
   assert.equal(groups[0].fields[1].value, "—");
+  assert.equal(groups[0].fields[1].label, "Area");
   assert.equal(groups[1].fields[0].label, "Work");
 }
 
@@ -298,12 +299,29 @@ assert.equal(buildRecordFilename(["", null]), "record.pdf");
   assert.equal(doc.subtitle, "#2608002");
   assert.equal(doc.status, "Closed");
 
-  const fieldLabels = doc.blocks
+  const fieldRows = doc.blocks
     .filter((block) => block.kind === "fields")
-    .flatMap((block) => block.fields.map((field) => field.label));
+    .flatMap((block) =>
+      block.fields.map((field) => ({
+        sectionTitle: block.title,
+        label: field.label,
+        value: field.value,
+      })),
+    );
+  const fieldLabels = fieldRows.map((field) => field.label);
   for (const question of SAFE_WORK_PERMIT.questions) {
+    const answer = answers.find((row) => row.questionId === question.id)?.answer;
+    const hasLabel = fieldLabels.includes(question.label);
+    const sectionOnly =
+      !hasLabel &&
+      fieldRows.some(
+        (field) =>
+          field.sectionTitle === (question.sectionTitle ?? "Answers") &&
+          field.label === "" &&
+          field.value !== "—",
+      );
     assert.ok(
-      fieldLabels.includes(question.label),
+      hasLabel || sectionOnly || !answer?.trim(),
       `missing field: ${question.label}`,
     );
   }
@@ -338,6 +356,8 @@ assert.equal(buildRecordFilename(["", null]), "record.pdf");
       block.kind === "signatures" && block.title === "Authorized personnel",
   );
   assert.equal(personnel.signatures.length, 2);
+  assert.equal(personnel.signatures[0].label, "Authorized person (required sign-off)");
+  assert.equal(personnel.signatures[0].name, "Alex Operator");
   assert.equal(personnel.signatures[0].imageDataUrl, SAMPLE_SIGNATURE);
   assert.equal(personnel.signatures[1].unsigned, true);
 
@@ -346,7 +366,9 @@ assert.equal(buildRecordFilename(["", null]), "record.pdf");
   );
   assert.equal(auth.signatures.length, 3);
   assert.equal(auth.signatures[0].unsigned, false);
+  assert.equal(auth.signatures[0].name, "Pat Manager");
   assert.equal(auth.signatures[1].unsigned, true);
+  assert.equal(auth.signatures[1].name, undefined);
   assert.equal(auth.signatures[2].unsigned, true);
   assert.match(auth.signatures[0].caption ?? "", /Site inspected/);
 

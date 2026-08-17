@@ -6,13 +6,17 @@ function asciiFilename(filename: string): string {
 export function pdfFileResponse(
   bytes: Uint8Array,
   filename: string,
+  options: { inline?: boolean } = {},
 ): Response {
   const safeName = asciiFilename(filename);
+  const disposition = options.inline
+    ? `inline; filename="${safeName}"`
+    : `attachment; filename="${safeName}"`;
   return new Response(Buffer.from(bytes), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${safeName}"`,
+      "Content-Disposition": disposition,
       "Cache-Control": "private, no-store",
     },
   });
