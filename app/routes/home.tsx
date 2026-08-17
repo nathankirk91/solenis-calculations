@@ -45,6 +45,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   const date =
     parseYmd(url.searchParams.get("date")) ?? melbourneDateYmd();
   const prisma = getPrisma();
+
+  // Warm schema once before parallel list queries so they do not contend for
+  // the small pg pool while dozens of DDL statements run on cold start.
+  if (prisma) {
+    try {
+      const { ensureInspectionSchema } = await import("~/lib/migrate.server");
+      await ensureInspectionSchema();
+    } catch (error) {
+      console.error("[home] ensureInspectionSchema failed", error);
+    }
+  }
+
   const [pendingCount, forkliftDay, pendingPermits, openPermits] =
     await Promise.all([
       canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
