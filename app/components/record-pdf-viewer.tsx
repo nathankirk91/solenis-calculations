@@ -48,6 +48,7 @@ function PdfScrollView({ pdfUrl }: { pdfUrl: string }) {
         const data = await response.arrayBuffer();
         const pdf = await pdfjs.getDocument({ data }).promise;
         const width = target.clientWidth || window.innerWidth;
+        const pixelRatio = window.devicePixelRatio || 1;
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
           if (cancelled) {
@@ -58,13 +59,16 @@ function PdfScrollView({ pdfUrl }: { pdfUrl: string }) {
           const scale = width / unscaled.width;
           const viewport = page.getViewport({ scale });
           const canvas = document.createElement("canvas");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
+          canvas.width = Math.floor(viewport.width * pixelRatio);
+          canvas.height = Math.floor(viewport.height * pixelRatio);
+          canvas.style.width = `${Math.floor(viewport.width)}px`;
+          canvas.style.height = `${Math.floor(viewport.height)}px`;
           canvas.className = "mx-auto mb-3 block max-w-full bg-white shadow-sm";
           const context = canvas.getContext("2d");
           if (!context) {
             continue;
           }
+          context.scale(pixelRatio, pixelRatio);
           await page.render({ canvas, canvasContext: context, viewport }).promise;
           if (cancelled) {
             return;
