@@ -1,20 +1,22 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { PrismaClient } from "../../generated/prisma/client";
-import { normalizeDatabaseUrl } from "~/lib/db-url";
+import { normalizeDatabaseUrl, postgresSslConfig } from "~/lib/db-url";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   pgPool: pg.Pool | undefined;
 };
 
-export { normalizeDatabaseUrl } from "~/lib/db-url";
+export { normalizeDatabaseUrl, postgresSslConfig } from "~/lib/db-url";
 
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
   }
+
+  const normalized = normalizeDatabaseUrl(connectionString);
 
   // Reuse one pool per warm function instance.
   // max > 1 so a single request can run Promise.all loaders without queueing
@@ -23,7 +25,8 @@ function createPrismaClient(): PrismaClient {
   const pool =
     globalForPrisma.pgPool ??
     new pg.Pool({
-      connectionString: normalizeDatabaseUrl(connectionString),
+      connectionString: normalized,
+      ssl: postgresSslConfig(normalized),
       max: 3,
       idleTimeoutMillis: 5_000,
       connectionTimeoutMillis: 20_000,

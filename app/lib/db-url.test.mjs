@@ -1,25 +1,42 @@
 import assert from "node:assert/strict";
 
-const { normalizeDatabaseUrl } = await import("./db-url.ts");
+const { normalizeDatabaseUrl, postgresSslConfig } = await import("./db-url.ts");
 
 {
   const normalized = normalizeDatabaseUrl(
     "postgresql://postgres.abc:secret@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres",
   );
   const url = new URL(normalized);
-  assert.equal(url.searchParams.get("sslmode"), "require");
+  assert.equal(url.searchParams.get("sslmode"), "no-verify");
   assert.equal(url.searchParams.get("connect_timeout"), "15");
   assert.equal(url.searchParams.get("pgbouncer"), "true");
 }
 
 {
   const normalized = normalizeDatabaseUrl(
-    "postgresql://user:pass@db.example.com:5432/postgres?sslmode=prefer&connect_timeout=5",
+    "postgresql://user:pass@db.example.com:5432/postgres?sslmode=require&connect_timeout=5",
   );
   const url = new URL(normalized);
-  assert.equal(url.searchParams.get("sslmode"), "prefer");
+  assert.equal(url.searchParams.get("sslmode"), "no-verify");
   assert.equal(url.searchParams.get("connect_timeout"), "5");
-  assert.equal(url.searchParams.has("pgbouncer"), false);
+}
+
+{
+  const normalized = normalizeDatabaseUrl(
+    "postgresql://user:pass@localhost:5432/postgres",
+  );
+  const url = new URL(normalized);
+  assert.equal(url.searchParams.has("sslmode"), false);
+}
+
+{
+  assert.deepEqual(
+    postgresSslConfig(
+      "postgresql://postgres.abc:secret@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres",
+    ),
+    { rejectUnauthorized: false },
+  );
+  assert.equal(postgresSslConfig("postgresql://u:p@localhost:5432/postgres"), false);
 }
 
 {
