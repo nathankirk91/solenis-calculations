@@ -33,9 +33,11 @@ import {
   formatPermitNumber,
   isPermitAuthSlotSigned,
   isPermitReadyToOpen,
+  normalizeRequiredSignerCount,
   parseAuthorizedPersonnel,
   PERMIT_AUTH_SLOT_KEYS,
   userHasAlreadySignedPermit,
+  DEFAULT_PERMIT_REQUIRED_SIGNERS,
 } from "~/lib/permit.schema";
 import { ensureInspectionSchema } from "~/lib/migrate.server";
 import {
@@ -74,6 +76,7 @@ export type PermitRunDetail = {
   inspectionId: string;
   inspectionTitle: string;
   inspectionHref: string;
+  requiredSignerCount: number;
   equipmentRef: string | null;
   inspectionVersion: number | null;
   answers: InspectionAnswerRecord[];
@@ -144,12 +147,14 @@ export async function createManagedPermit(args: {
   title: string;
   description?: string;
   equipmentLabel?: string;
+  requiredSignerCount?: number;
 }): Promise<ManagedInspection> {
   const created = await createManagedInspection({
     title: args.title,
     description: args.description,
     category: PERMIT_CATEGORY,
     equipmentLabel: args.equipmentLabel,
+    requiredSignerCount: args.requiredSignerCount ?? 2,
   });
 
   const prisma = getPrisma();
@@ -159,6 +164,7 @@ export async function createManagedPermit(args: {
       data: {
         category: PERMIT_CATEGORY,
         href: `/permits/${created.slug}`,
+        requiredSignerCount: args.requiredSignerCount ?? 2,
       },
     });
   }
@@ -167,6 +173,7 @@ export async function createManagedPermit(args: {
     ...created,
     category: PERMIT_CATEGORY,
     href: `/permits/${created.slug}`,
+    requiredSignerCount: args.requiredSignerCount ?? 2,
   };
 }
 
@@ -209,6 +216,7 @@ export async function duplicateManagedPermit(args: {
     title,
     description: source.description,
     equipmentLabel: source.equipmentLabel ?? undefined,
+    requiredSignerCount: source.requiredSignerCount ?? 2,
   });
 
   for (const question of [...questions].sort(
@@ -449,7 +457,14 @@ export async function getPermitRunById(
         closeout: true,
         createdAt: true,
         closedAt: true,
-        inspection: { select: { id: true, title: true, href: true } },
+        inspection: {
+          select: {
+            id: true,
+            title: true,
+            href: true,
+            requiredSignerCount: true,
+          },
+        },
         submittedBy: { select: { name: true, email: true } },
         closedBy: { select: { name: true, email: true } },
       },
@@ -465,6 +480,9 @@ export async function getPermitRunById(
       inspectionId: row.inspectionId,
       inspectionTitle: row.inspection.title,
       inspectionHref: row.inspection.href,
+      requiredSignerCount: normalizeRequiredSignerCount(
+        row.inspection.requiredSignerCount ?? DEFAULT_PERMIT_REQUIRED_SIGNERS,
+      ),
       equipmentRef: row.equipmentRef,
       inspectionVersion: row.inspectionVersion,
       answers: parseAnswers(row.responses),
@@ -524,7 +542,12 @@ export async function signOffPermitSlot(args: {
 
   const existing = await prisma.permitRun.findUnique({
     where: { id: args.permitRunId },
-    select: { id: true, status: true, authorization: true },
+    select: {
+      id: true,
+      status: true,
+      authorization: true,
+      inspection: { select: { requiredSignerCount: true } },
+    },
   });
   if (!existing) {
     throw new Error("Permit not found.");
@@ -576,9 +599,14 @@ export async function signOffPermitSlot(args: {
     siteVerifiedAt: new Date().toISOString(),
   };
 
-  // Two different people open the permit; a third signature can still be added later.
+  const requiredSignerCount = normalizeRequiredSignerCount(
+    existing.inspection.requiredSignerCount ?? DEFAULT_PERMIT_REQUIRED_SIGNERS,
+  );
+
+  // Opens when enough distinct people have signed; remaining slots can still be added later.
   const nextStatus =
-    existing.status === "OPEN" || isPermitReadyToOpen(authorization)
+    existing.status === "OPEN" ||
+    isPermitReadyToOpen(authorization, requiredSignerCount)
       ? "OPEN"
       : "PENDING_AUTHORIZATION";
 

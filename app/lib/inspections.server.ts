@@ -35,6 +35,14 @@ import {
   inferPermitFieldRoleFromId,
 } from "~/lib/inspections";
 
+function clampRequiredSignerCount(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    return 2;
+  }
+  return Math.min(3, Math.max(1, Math.round(n)));
+}
+
 function isKnownQuestionType(value: unknown): value is InspectionQuestionType {
   return (
     value === "YES_NO" ||
@@ -78,6 +86,7 @@ export type ManagedInspection = {
   category: string;
   href: string;
   equipmentLabel: string | null;
+  requiredSignerCount: number | null;
   templateInspectionId: string | null;
   fixedEquipmentRef: string | null;
   isAvailable: boolean;
@@ -259,6 +268,7 @@ function mapDefinition(row: {
   category: string;
   href: string;
   equipmentLabel: string | null;
+  requiredSignerCount?: number | null;
   templateInspectionId?: string | null;
   fixedEquipmentRef?: string | null;
   isAvailable: boolean;
@@ -289,6 +299,7 @@ function mapDefinition(row: {
     category: row.category,
     href: row.href,
     equipmentLabel: row.equipmentLabel,
+    requiredSignerCount: row.requiredSignerCount ?? null,
     templateInspectionId: row.templateInspectionId ?? null,
     fixedEquipmentRef: row.fixedEquipmentRef ?? null,
     isAvailable: row.isAvailable,
@@ -474,6 +485,10 @@ function mergeStaticDefinitionMeta(
       definition.equipmentLabel ??
       fallback?.equipmentLabel ??
       templateFallback?.equipmentLabel,
+    requiredSignerCount:
+      definition.requiredSignerCount ??
+      fallback?.requiredSignerCount ??
+      null,
     equipmentChoices:
       fallback?.equipmentChoices ?? definition.equipmentChoices,
     fixedEquipmentRef:
@@ -552,6 +567,7 @@ async function listManagedInspectionsOnce(): Promise<ManagedInspection[]> {
       category: row.category,
       href: row.href,
       equipmentLabel: row.equipmentLabel,
+      requiredSignerCount: row.requiredSignerCount ?? null,
       templateInspectionId: row.templateInspectionId,
       fixedEquipmentRef: row.fixedEquipmentRef,
       isAvailable: row.isAvailable,
@@ -1058,6 +1074,7 @@ export async function seedDefaultInspections(): Promise<number> {
         category: inspection.category,
         href: inspection.href,
         equipmentLabel: inspection.equipmentLabel ?? null,
+        requiredSignerCount: inspection.requiredSignerCount ?? null,
         templateInspectionId: inspection.templateInspectionId ?? null,
         fixedEquipmentRef: inspection.fixedEquipmentRef ?? null,
         isAvailable: inspection.isAvailable,
@@ -1071,6 +1088,7 @@ export async function seedDefaultInspections(): Promise<number> {
         category: inspection.category,
         href: inspection.href,
         equipmentLabel: inspection.equipmentLabel ?? null,
+        requiredSignerCount: inspection.requiredSignerCount ?? null,
         templateInspectionId: inspection.templateInspectionId ?? null,
         fixedEquipmentRef: inspection.fixedEquipmentRef ?? null,
         isAvailable: inspection.isAvailable,
@@ -1165,6 +1183,7 @@ export async function createManagedInspection(args: {
   description?: string;
   category?: string;
   equipmentLabel?: string;
+  requiredSignerCount?: number | null;
 }): Promise<ManagedInspection> {
   const prisma = getPrisma();
   if (!prisma) {
@@ -1182,14 +1201,21 @@ export async function createManagedInspection(args: {
     _max: { sortOrder: true },
   });
 
+  const category = args.category?.trim() || "General";
+  const isPermit = category.toLowerCase() === "permits";
+  const requiredSignerCount = isPermit
+    ? clampRequiredSignerCount(args.requiredSignerCount ?? 2)
+    : null;
+
   const row = await prisma.inspection.create({
     data: {
       slug,
       title,
       description: args.description?.trim() || "",
-      category: args.category?.trim() || "General",
-      href: `/inspections/${slug}`,
+      category,
+      href: isPermit ? `/permits/${slug}` : `/inspections/${slug}`,
       equipmentLabel: args.equipmentLabel?.trim() || null,
+      requiredSignerCount,
       isAvailable: true,
       sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
       version: 1,
@@ -1206,6 +1232,7 @@ export async function createManagedInspection(args: {
     category: row.category,
     href: row.href,
     equipmentLabel: row.equipmentLabel,
+    requiredSignerCount: row.requiredSignerCount ?? null,
     templateInspectionId: null,
     fixedEquipmentRef: null,
     isAvailable: row.isAvailable,
@@ -1223,6 +1250,7 @@ export async function updateManagedInspection(args: {
   category: string;
   equipmentLabel: string;
   isAvailable: boolean;
+  requiredSignerCount?: number | null;
 }): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) {
@@ -1244,6 +1272,9 @@ export async function updateManagedInspection(args: {
 
   const category = args.category.trim() || "General";
   const isPermit = category.toLowerCase() === "permits";
+  const requiredSignerCount = isPermit
+    ? clampRequiredSignerCount(args.requiredSignerCount ?? 2)
+    : null;
 
   await prisma.inspection.update({
     where: { id: args.id },
@@ -1255,6 +1286,7 @@ export async function updateManagedInspection(args: {
         ? `/permits/${existing.slug}`
         : `/inspections/${existing.slug}`,
       equipmentLabel: args.equipmentLabel.trim() || null,
+      requiredSignerCount,
       isAvailable: args.isAvailable,
     },
   });
@@ -2283,6 +2315,7 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
         category: definition.category,
         href: definition.href,
         equipmentLabel: definition.equipmentLabel ?? null,
+        requiredSignerCount: definition.requiredSignerCount ?? null,
         templateInspectionId: definition.templateInspectionId ?? null,
         fixedEquipmentRef: definition.fixedEquipmentRef ?? null,
         isAvailable: definition.isAvailable,
@@ -2296,6 +2329,7 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
         category: definition.category,
         href: definition.href,
         equipmentLabel: definition.equipmentLabel ?? null,
+        requiredSignerCount: definition.requiredSignerCount ?? null,
         templateInspectionId: definition.templateInspectionId ?? null,
         fixedEquipmentRef: definition.fixedEquipmentRef ?? null,
         isAvailable: definition.isAvailable,

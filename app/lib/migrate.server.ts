@@ -138,10 +138,15 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
       CONSTRAINT "inspections_pkey" PRIMARY KEY ("id")
     )`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "equipment_label" TEXT`,
+    `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "required_signer_count" INTEGER`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "template_inspection_id" TEXT`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "fixed_equipment_ref" TEXT`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
     `ALTER TABLE "inspections" ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 1`,
+    `UPDATE "inspections"
+       SET "required_signer_count" = 2
+       WHERE lower("category") = 'permits'
+         AND ("required_signer_count" IS NULL)`,
     `ALTER TABLE "inspections" ALTER COLUMN "description" SET DEFAULT ''`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "inspections_slug_key" ON "inspections"("slug")`,
     `CREATE INDEX IF NOT EXISTS "inspections_template_inspection_id_idx" ON "inspections"("template_inspection_id")`,

@@ -75,6 +75,7 @@ export async function action({ request }: Route.ActionArgs) {
         title: String(formData.get("title") ?? ""),
         description: String(formData.get("description") ?? ""),
         equipmentLabel: String(formData.get("equipmentLabel") ?? ""),
+        requiredSignerCount: Number(formData.get("requiredSignerCount") ?? 2),
       });
       throw redirect(`/permits/manage/${created.id}`);
     }
@@ -206,6 +207,20 @@ export default function PermitsManagePage({
                     placeholder="e.g. Equipment number"
                     autoComplete="off"
                   />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="requiredSignerCount">
+                    Signatures required to open
+                  </Label>
+                  <select
+                    id="requiredSignerCount"
+                    name="requiredSignerCount"
+                    defaultValue="2"
+                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <option value="2">2 different people</option>
+                    <option value="3">All 3 authorisation slots</option>
+                  </select>
                 </div>
                 <div>
                   <Button type="submit">Create permit form</Button>

@@ -78,8 +78,11 @@ export function PermitIssueForm({
           <CardDescription>
             Complete the checks and authorized personnel (technicians,
             contractors, or visitors). Duration is calculated from start and end
-            time (max 12 hours). The permit opens after two different people
-            sign off.
+            time (max 12 hours). The permit opens after{" "}
+            {definition.requiredSignerCount === 3
+              ? "all three authorisation signatures"
+              : "two different people sign off"}
+            .
           </CardDescription>
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
@@ -429,9 +432,15 @@ export function PermitIssueForm({
         <CardHeader>
           <CardTitle>Status</CardTitle>
           <CardDescription>
-            After submit, the permit is pending until two different people sign
-            off. A third role can still sign after it opens. Approvers must
-            visually inspect the job site first.
+            After submit, the permit is pending until{" "}
+            {definition.requiredSignerCount === 3
+              ? "all three authorisation slots are signed"
+              : "two different people sign off"}
+            .
+            {definition.requiredSignerCount === 3
+              ? ""
+              : " A third role can still sign after it opens."}{" "}
+            Approvers must visually inspect the job site first.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">

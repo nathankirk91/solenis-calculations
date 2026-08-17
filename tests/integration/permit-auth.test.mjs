@@ -29,6 +29,7 @@ const { SAFE_WORK_PERMIT } = await import("../../app/lib/inspections.ts");
 {
   const auth = emptyPermitAuthorization();
   assert.equal(isPermitReadyToOpen(auth), false);
+  assert.equal(isPermitReadyToOpen(auth, 3), false);
 
   auth.operationsRep = {
     userId: "user-1",
@@ -45,7 +46,16 @@ const { SAFE_WORK_PERMIT } = await import("../../app/lib/inspections.ts");
     signature: "sig-2",
   };
   assert.equal(isPermitReadyToOpen(auth), true);
+  assert.equal(isPermitReadyToOpen(auth, 2), true);
+  assert.equal(isPermitReadyToOpen(auth, 3), false);
   assert.deepEqual(distinctPermitSignerIds(auth).sort(), ["user-1", "user-2"]);
+
+  auth.safeWorkCoordinator = {
+    userId: "user-3",
+    name: "SWC",
+    signature: "sig-3",
+  };
+  assert.equal(isPermitReadyToOpen(auth, 3), true);
 
   // Same person on two slots does not open the permit.
   const samePerson = emptyPermitAuthorization();
@@ -61,6 +71,7 @@ const { SAFE_WORK_PERMIT } = await import("../../app/lib/inspections.ts");
   };
   assert.equal(distinctPermitSignerIds(samePerson).length, 1);
   assert.equal(isPermitReadyToOpen(samePerson), false);
+  assert.equal(isPermitReadyToOpen(samePerson, 3), false);
 }
 
 {

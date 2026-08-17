@@ -97,8 +97,8 @@ export function PermitDashboard({
             Pending authorization
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Waiting for two different authorized signatures before work can
-            start.
+            Waiting for the required authorisation signatures before work can
+            start (2 or 3, depending on the permit type).
           </p>
         </div>
         <PermitList
@@ -118,8 +118,8 @@ export function PermitDashboard({
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Authorized permits in progress (max 12 hours from start to end).
-            Close out when work is finished; a third signature can still be
-            added.
+            Close out when work is finished; remaining sign-offs can still be
+            added when only two were required to open.
           </p>
         </div>
         <PermitList

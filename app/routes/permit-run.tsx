@@ -158,8 +158,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (run.status !== "OPEN") {
     return data(
       {
-        error:
-          "Permit needs two different authorized signatures before close-out.",
+        error: `Permit needs ${run.requiredSignerCount} different authorized signature${
+          run.requiredSignerCount === 1 ? "" : "s"
+        } before close-out.`,
       },
       { status: 400 },
     );
@@ -400,9 +401,11 @@ export default function PermitRunPage({
               <CardHeader>
                 <CardTitle>Awaiting authorization</CardTitle>
                 <CardDescription>
-                  Two different people must sign before this permit opens.
-                  Approvers must visually inspect the job site first. You do not
-                  currently have an unsigned role on this permit
+                  {run.requiredSignerCount} different{" "}
+                  {run.requiredSignerCount === 1 ? "person" : "people"} must
+                  sign before this permit opens. Approvers must visually inspect
+                  the job site first. You do not currently have an unsigned role
+                  on this permit
                   {remainingUnsignedSlots.length > 0
                     ? ` (still waiting: ${remainingUnsignedSlots
                         .map((key) => PERMIT_AUTH_SLOT_LABELS[key])
@@ -421,8 +424,9 @@ export default function PermitRunPage({
               <CardHeader>
                 <CardTitle>Additional signatures</CardTitle>
                 <CardDescription>
-                  This permit is open with two authorized signatures. A third
-                  signature can still be added for:{" "}
+                  This permit is open with {run.requiredSignerCount} authorized
+                  signature{run.requiredSignerCount === 1 ? "" : "s"}. Remaining
+                  slots can still be signed:{" "}
                   {remainingUnsignedSlots
                     .map((key) => PERMIT_AUTH_SLOT_LABELS[key])
                     .join(", ")}

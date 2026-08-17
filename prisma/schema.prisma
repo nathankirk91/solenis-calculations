@@ -207,6 +207,8 @@ model Inspection {
   category             String   @default("general")
   href                 String
   equipmentLabel       String?  @map("equipment_label")
+  /// For permit forms: how many distinct authorisation signatures open the permit (2 or 3).
+  requiredSignerCount  Int?     @map("required_signer_count")
   /// When set, this form inherits questions from the template inspection.
   templateInspectionId String?  @map("template_inspection_id")
   template             Inspection?  @relation("InspectionTemplate", fields: [templateInspectionId], references: [id], onDelete: Restrict)

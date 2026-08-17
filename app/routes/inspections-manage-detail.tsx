@@ -96,6 +96,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         category: nextCategory,
         equipmentLabel: String(formData.get("equipmentLabel") ?? ""),
         isAvailable: String(formData.get("isAvailable") ?? "") === "on",
+        requiredSignerCount: existing && isPermitInspection(existing)
+          ? Number(formData.get("requiredSignerCount") ?? 2)
+          : null,
       });
       return { ok: true as const, message: "Details saved." };
     }
@@ -896,6 +899,32 @@ export default function InspectionsManageDetailPage({
                     />
                   </div>
                 </div>
+                {isPermit ? (
+                  <div className="grid gap-2">
+                    <Label htmlFor="requiredSignerCount">
+                      Signatures required to open
+                    </Label>
+                    <select
+                      id="requiredSignerCount"
+                      name="requiredSignerCount"
+                      defaultValue={String(
+                        inspection.requiredSignerCount ?? 2,
+                      )}
+                      className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:max-w-xs"
+                    >
+                      <option value="2">
+                        2 different people (e.g. Safe Work)
+                      </option>
+                      <option value="3">
+                        All 3 authorisation slots (e.g. Hot Work)
+                      </option>
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                      Who may sign each slot is set under Permits → Settings.
+                      The same person still cannot sign more than one role.
+                    </p>
+                  </div>
+                ) : null}
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"

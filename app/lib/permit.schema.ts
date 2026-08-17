@@ -102,6 +102,25 @@ export const PERMIT_AUTH_SLOT_KEYS = [
 
 export type PermitAuthSlotKey = (typeof PERMIT_AUTH_SLOT_KEYS)[number];
 
+/** Max distinct signers (one per authorisation slot). */
+export const MAX_PERMIT_REQUIRED_SIGNERS = PERMIT_AUTH_SLOT_KEYS.length;
+
+/** Default for Safe Work and new permit forms. */
+export const DEFAULT_PERMIT_REQUIRED_SIGNERS = 2;
+
+export function normalizeRequiredSignerCount(
+  value: unknown,
+): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    return DEFAULT_PERMIT_REQUIRED_SIGNERS;
+  }
+  return Math.min(
+    MAX_PERMIT_REQUIRED_SIGNERS,
+    Math.max(1, Math.round(n)),
+  );
+}
+
 export const PERMIT_AUTH_SLOT_LABELS: Record<PermitAuthSlotKey, string> = {
   operationsRep: "Operations representative / Account manager",
   maintenanceRep: "Maintenance representative / Account technician",
@@ -183,11 +202,13 @@ export function distinctPermitSignerIds(
   ];
 }
 
-/** Open once two different people have signed (third slot may still be blank). */
+/** Open once enough distinct people have signed (third slot may still be blank when only 2 are required). */
 export function isPermitReadyToOpen(
   authorization: PermitAuthorization,
+  requiredSignerCount: number = DEFAULT_PERMIT_REQUIRED_SIGNERS,
 ): boolean {
-  return distinctPermitSignerIds(authorization).length >= 2;
+  const required = normalizeRequiredSignerCount(requiredSignerCount);
+  return distinctPermitSignerIds(authorization).length >= required;
 }
 
 export function userHasAlreadySignedPermit(
