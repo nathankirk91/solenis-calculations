@@ -357,7 +357,7 @@ export function PermitIssueForm({
                         </Label>
                         {personnelFields.length > 1 ? (
                           <button
-                            type="button"
+                            type="submit"
                             className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
                             {...form.remove.getButtonProps({
                               name: fields.authorizedPersonnel.name,
