@@ -10,6 +10,7 @@ import { data, redirect } from "react-router";
 import type { Route } from "./+types/permit-run";
 
 import { AppHeader } from "~/components/app-header";
+import { DownloadPdfLink } from "~/components/download-pdf-link";
 import { SignaturePad } from "~/components/signature-pad";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -240,6 +241,7 @@ export default function PermitRunPage({
             >
               ← Permits
             </Link>
+            <DownloadPdfLink href={`/permits/runs/${run.id}/pdf`} />
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">
             {run.inspectionTitle}

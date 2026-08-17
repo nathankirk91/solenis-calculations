@@ -3,6 +3,7 @@ import { Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/inspections-history";
 
 import { AppHeader } from "~/components/app-header";
+import { DownloadPdfLink } from "~/components/download-pdf-link";
 import { ForkliftDayDashboardCard } from "~/components/forklift-day-dashboard";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -189,7 +190,12 @@ export default function InspectionsHistoryPage({
                           {run.equipmentRef ? ` · ${run.equipmentRef}` : null}
                         </CardDescription>
                       </div>
-                      <InspectionStatusBadge status={run.status} />
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <InspectionStatusBadge status={run.status} />
+                        <DownloadPdfLink
+                          href={`/inspections/submissions/${run.id}/pdf`}
+                        />
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

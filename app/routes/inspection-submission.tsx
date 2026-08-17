@@ -3,6 +3,7 @@ import { Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/inspection-submission";
 
 import { AppHeader } from "~/components/app-header";
+import { DownloadPdfLink } from "~/components/download-pdf-link";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -178,16 +179,21 @@ export default function InspectionSubmissionPage({
                   {submittedAt ? ` · ${submittedAt}` : null}
                 </CardDescription>
               </div>
-              <Badge
-                variant="outline"
-                className={cn(
-                  !needsAttention &&
-                    "border-emerald-600/40 text-emerald-700",
-                  needsAttention && "border-amber-600/40 text-amber-800",
-                )}
-              >
-                {needsAttention ? "Needs attention" : "Passed"}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    !needsAttention &&
+                      "border-emerald-600/40 text-emerald-700",
+                    needsAttention && "border-amber-600/40 text-amber-800",
+                  )}
+                >
+                  {needsAttention ? "Needs attention" : "Passed"}
+                </Badge>
+                <DownloadPdfLink
+                  href={`/inspections/submissions/${run.id}/pdf`}
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="grid gap-6">

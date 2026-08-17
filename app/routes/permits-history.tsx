@@ -3,6 +3,7 @@ import { Form, Link } from "react-router";
 import type { Route } from "./+types/permits-history";
 
 import { AppHeader } from "~/components/app-header";
+import { DownloadPdfLink } from "~/components/download-pdf-link";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
@@ -91,10 +92,13 @@ export default function PermitsHistoryPage({
         {runs.length > 0 ? (
           <ul className="grid gap-3">
             {runs.map((run) => (
-              <li key={run.id}>
+              <li
+                key={run.id}
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-border/70 bg-white/70 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-brand/5"
+              >
                 <Link
                   to={`/permits/runs/${run.id}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-white/70 px-4 py-3 transition-colors hover:border-brand/40 hover:bg-brand/5"
+                  className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3"
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-brand-navy">
@@ -129,6 +133,7 @@ export default function PermitsHistoryPage({
                         : "Closed"}
                   </Badge>
                 </Link>
+                <DownloadPdfLink href={`/permits/runs/${run.id}/pdf`} />
               </li>
             ))}
           </ul>

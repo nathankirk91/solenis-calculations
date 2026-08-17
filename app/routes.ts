@@ -32,6 +32,7 @@ export default [
     "routes/permits-manage-detail.tsx",
   ),
   route("permits/settings", "routes/permits-settings.tsx"),
+  route("permits/runs/:permitRunId/pdf", "routes/permit-run-pdf.tsx"),
   route("permits/runs/:permitRunId", "routes/permit-run.tsx"),
   route("permits/:permitId", "routes/permit-page.tsx"),
   route("inspections/history", "routes/inspections-history.tsx"),
@@ -41,6 +42,10 @@ export default [
     "routes/inspections-manage-detail.tsx",
   ),
   route("inspections/forklifts", "routes/inspections-forklifts.tsx"),
+  route(
+    "inspections/submissions/:runId/pdf",
+    "routes/inspection-submission-pdf.tsx",
+  ),
   route("inspections/submissions/:runId", "routes/inspection-submission.tsx"),
   route(
     "inspections/:inspectionId/last-answers",
