@@ -328,6 +328,7 @@ export function PermitIssueForm({
                   </p>
                 </div>
                 <Button
+                  type="submit"
                   variant="outline"
                   size="sm"
                   {...form.insert.getButtonProps({
