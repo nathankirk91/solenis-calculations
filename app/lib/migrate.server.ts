@@ -172,6 +172,19 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
     `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "applicable_equipment_refs" JSONB`,
     `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "applicable_shifts" JSONB`,
     `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "first_of_week_only" BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE "inspection_questions" ADD COLUMN IF NOT EXISTS "permit_field_role" TEXT`,
+    `UPDATE "inspection_questions"
+       SET "permit_field_role" = 'start_time'
+       WHERE "id" LIKE '%__start-time'
+         AND ("permit_field_role" IS NULL OR "permit_field_role" = '')`,
+    `UPDATE "inspection_questions"
+       SET "permit_field_role" = 'end_time'
+       WHERE "id" LIKE '%__end-time'
+         AND ("permit_field_role" IS NULL OR "permit_field_role" = '')`,
+    `UPDATE "inspection_questions"
+       SET "permit_field_role" = 'area'
+       WHERE "id" LIKE '%__area'
+         AND ("permit_field_role" IS NULL OR "permit_field_role" = '')`,
     `UPDATE "inspection_questions" SET "show_last_value" = true WHERE "id" = 'forklift-daily-check__service-date'`,
     `UPDATE "inspection_questions" SET "attention_values" = '[]'::jsonb WHERE "id" = 'forklift-daily-check__shift'`,
     `UPDATE "inspection_questions"

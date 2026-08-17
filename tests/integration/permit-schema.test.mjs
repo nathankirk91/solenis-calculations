@@ -40,9 +40,11 @@ function fillRequired(definition, overrides = {}) {
     } else if (question.type === "DATE") {
       responses[question.id] = "2026-07-28";
     } else if (question.type === "TIME") {
-      responses[question.id] = question.id.endsWith("__end-time")
-        ? "16:00"
-        : "08:00";
+      responses[question.id] =
+        question.permitFieldRole === "end_time" ||
+        question.id.endsWith("__end-time")
+          ? "16:00"
+          : "08:00";
     } else {
       responses[question.id] = "ok";
     }
@@ -179,6 +181,114 @@ function fillRequired(definition, overrides = {}) {
   assert.equal(parsed.success, false);
   assert.ok(
     parsed.error.issues.some((issue) =>
+      String(issue.message).includes("12 hours"),
+    ),
+  );
+}
+
+{
+  // Manager-built forms use cuid IDs + permitFieldRole instead of magic suffixes.
+  const customPermit = {
+    ...SAFE_WORK_PERMIT,
+    id: "hot-work-custom",
+    slug: "hot-work-custom",
+    title: "Hot Work Permit",
+    questions: [
+      {
+        id: "q-date",
+        label: "Date",
+        type: "DATE",
+        options: [],
+        attentionValues: [],
+        required: true,
+        showLastValue: false,
+        applicableEquipmentRefs: [],
+        applicableShifts: [],
+        firstOfWeekOnly: false,
+        sortOrder: 1,
+        sectionTitle: "Permit details",
+      },
+      {
+        id: "q-start",
+        label: "Begin",
+        type: "TIME",
+        options: [],
+        attentionValues: [],
+        required: true,
+        showLastValue: false,
+        applicableEquipmentRefs: [],
+        applicableShifts: [],
+        firstOfWeekOnly: false,
+        permitFieldRole: "start_time",
+        sortOrder: 2,
+        sectionTitle: "Permit details",
+      },
+      {
+        id: "q-end",
+        label: "Finish",
+        type: "TIME",
+        options: [],
+        attentionValues: [],
+        required: true,
+        showLastValue: false,
+        applicableEquipmentRefs: [],
+        applicableShifts: [],
+        firstOfWeekOnly: false,
+        permitFieldRole: "end_time",
+        sortOrder: 3,
+        sectionTitle: "Permit details",
+      },
+      {
+        id: "q-area",
+        label: "Location",
+        type: "TEXT",
+        options: [],
+        attentionValues: [],
+        required: true,
+        showLastValue: false,
+        applicableEquipmentRefs: [],
+        applicableShifts: [],
+        firstOfWeekOnly: false,
+        permitFieldRole: "area",
+        sortOrder: 4,
+        sectionTitle: "Permit details",
+      },
+    ],
+  };
+
+  const ok = createPermitIssueSchema(customPermit).safeParse({
+    equipmentRef: "P-200",
+    authorizedPersonnel: [
+      { name: "Alex Operator", signature: SAMPLE_SIGNATURE },
+    ],
+    responses: {
+      "q-date": "2026-08-17",
+      "q-start": "08:00",
+      "q-end": "16:00",
+      "q-area": "Bay 3",
+    },
+  });
+  assert.equal(ok.success, true);
+  assert.equal(
+    ok.data.answers.find((row) => row.questionId === "q-area")?.permitFieldRole,
+    "area",
+  );
+
+  const tooLong = createPermitIssueSchema(customPermit).safeParse({
+    equipmentRef: "P-200",
+    authorizedPersonnel: [
+      { name: "Alex Operator", signature: SAMPLE_SIGNATURE },
+    ],
+    responses: {
+      "q-date": "2026-08-17",
+      "q-start": "07:00",
+      "q-end": "20:00",
+      "q-area": "Bay 3",
+    },
+  });
+  assert.equal(tooLong.success, false);
+  assert.ok(
+    tooLong.error.issues.some((issue) =>
       String(issue.message).includes("12 hours"),
     ),
   );

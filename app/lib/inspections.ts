@@ -25,6 +25,82 @@ export const PERMIT_CATEGORY = "Permits";
 /** Joiner for multi-select CHECKBOX answers stored as a single string. */
 export const CHECKBOX_ANSWER_SEPARATOR = "|";
 
+/**
+ * Special permit checklist roles. Managers assign these in Manage so duration
+ * validation and area display work without hard-coded question IDs.
+ */
+export const PERMIT_FIELD_ROLES = ["start_time", "end_time", "area"] as const;
+
+export type PermitFieldRole = (typeof PERMIT_FIELD_ROLES)[number];
+
+export const PERMIT_FIELD_ROLE_LABELS: Record<PermitFieldRole, string> = {
+  start_time: "Start time",
+  end_time: "End time",
+  area: "Area",
+};
+
+export function parsePermitFieldRole(value: unknown): PermitFieldRole | null {
+  if (
+    value === "start_time" ||
+    value === "end_time" ||
+    value === "area"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+export function inferPermitFieldRoleFromId(id: string): PermitFieldRole | null {
+  if (id.endsWith("__start-time")) {
+    return "start_time";
+  }
+  if (id.endsWith("__end-time")) {
+    return "end_time";
+  }
+  if (id.endsWith("__area")) {
+    return "area";
+  }
+  return null;
+}
+
+export function resolvePermitFieldRole(question: {
+  id: string;
+  label: string;
+  permitFieldRole?: PermitFieldRole | null;
+}): PermitFieldRole | null {
+  const explicit = parsePermitFieldRole(question.permitFieldRole);
+  if (explicit) {
+    return explicit;
+  }
+  const fromId = inferPermitFieldRoleFromId(question.id);
+  if (fromId) {
+    return fromId;
+  }
+  const label = question.label.trim().toLowerCase();
+  if (label === "start time") {
+    return "start_time";
+  }
+  if (label === "end time") {
+    return "end_time";
+  }
+  if (label === "area") {
+    return "area";
+  }
+  return null;
+}
+
+export function findQuestionByPermitFieldRole<
+  T extends {
+    id: string;
+    label: string;
+    permitFieldRole?: PermitFieldRole | null;
+  },
+>(questions: T[], role: PermitFieldRole): T | undefined {
+  return questions.find(
+    (question) => resolvePermitFieldRole(question) === role,
+  );
+}
+
 export type InspectionQuestionDef = {
   id: string;
   label: string;
@@ -56,6 +132,11 @@ export type InspectionQuestionDef = {
    * (week starts Monday after Sunday, Australia/Melbourne).
    */
   firstOfWeekOnly: boolean;
+  /**
+   * When set on a permit form, marks this question as start/end/area for
+   * duration checks and dashboard display.
+   */
+  permitFieldRole?: PermitFieldRole | null;
   sortOrder: number;
 };
 
@@ -101,6 +182,8 @@ export type InspectionAnswerRecord = {
   type: InspectionQuestionType;
   answer: string;
   flagged: boolean;
+  /** Present on newer permit runs so area/duration work without magic IDs. */
+  permitFieldRole?: PermitFieldRole | null;
 };
 
 export type InspectionResponseRow = {
@@ -238,6 +321,7 @@ function textQuestion(
     applicableEquipmentRefs?: string[];
     applicableShifts?: string[];
     firstOfWeekOnly?: boolean;
+    permitFieldRole?: PermitFieldRole | null;
   },
 ): InspectionQuestionDef {
   return {
@@ -252,6 +336,7 @@ function textQuestion(
     applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
     applicableShifts: opts?.applicableShifts ?? [],
     firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
+    permitFieldRole: opts?.permitFieldRole ?? null,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -334,6 +419,7 @@ function timeQuestion(
     applicableEquipmentRefs?: string[];
     applicableShifts?: string[];
     firstOfWeekOnly?: boolean;
+    permitFieldRole?: PermitFieldRole | null;
   },
 ): InspectionQuestionDef {
   return {
@@ -348,6 +434,7 @@ function timeQuestion(
     applicableEquipmentRefs: opts?.applicableEquipmentRefs ?? [],
     applicableShifts: opts?.applicableShifts ?? [],
     firstOfWeekOnly: opts?.firstOfWeekOnly ?? false,
+    permitFieldRole: opts?.permitFieldRole ?? null,
     sortOrder,
     helpText: opts?.helpText,
   };
@@ -812,6 +899,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       {
         helpText:
           "24-hour clock (e.g. 07:30). Permit must be approved before work begins. Duration is calculated from start and end time (max 12 hours).",
+        permitFieldRole: "start_time",
       },
     ),
     timeQuestion(
@@ -823,6 +911,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       {
         helpText:
           "24-hour clock (e.g. 15:30). Must be within 12 hours of start time.",
+        permitFieldRole: "end_time",
       },
     ),
     textQuestion(
@@ -831,6 +920,7 @@ export const SAFE_WORK_PERMIT: InspectionDefinition = {
       "Area",
       "Permit details",
       4,
+      { permitFieldRole: "area" },
     ),
     textQuestion(
       "safe-work-permit",
@@ -1363,6 +1453,7 @@ export function buildAnswersFromResponses(
       type: question.type,
       answer,
       flagged: Boolean(answer) && isAnswerFlagged(question, answer),
+      permitFieldRole: resolvePermitFieldRole(question),
     };
   });
 }

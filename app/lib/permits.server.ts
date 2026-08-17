@@ -6,6 +6,7 @@ import {
   buildAnswersFromResponses,
   buildPermitCatalog,
   isPermitInspection,
+  resolvePermitFieldRole,
   summarizeInspectionAnswers,
   type InspectionAnswerRecord,
   type InspectionCard,
@@ -15,6 +16,7 @@ import {
 import {
   createManagedInspection,
   getInspectionDefinition,
+  getManagedInspection,
   listInspectionCards,
   listManagedInspections,
   type ManagedInspection,
@@ -168,6 +170,94 @@ export async function createManagedPermit(args: {
   };
 }
 
+/**
+ * Copy an existing permit form (title/description/questions) so managers can
+ * start Hot Work / Line Break / etc. without rebuilding the checklist by hand.
+ */
+export async function duplicateManagedPermit(args: {
+  sourceInspectionId: string;
+  title?: string;
+}): Promise<ManagedInspection> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+
+  const source = await getManagedInspection(args.sourceInspectionId);
+  if (!source || !isPermitInspection(source)) {
+    throw new Error("Permit form not found.");
+  }
+
+  const questions = source.inheritsQuestions
+    ? (
+        await getManagedInspection(
+          source.questionSourceId ?? args.sourceInspectionId,
+        )
+      )?.questions
+    : source.questions;
+  if (!questions) {
+    throw new Error("Could not load questions to copy.");
+  }
+
+  const title =
+    args.title?.trim() ||
+    (source.title.toLowerCase().includes("copy")
+      ? source.title
+      : `${source.title} (copy)`);
+
+  const created = await createManagedPermit({
+    title,
+    description: source.description,
+    equipmentLabel: source.equipmentLabel ?? undefined,
+  });
+
+  for (const question of [...questions].sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  )) {
+    const permitFieldRole =
+      resolvePermitFieldRole(question) ?? question.permitFieldRole ?? null;
+    await prisma.inspectionQuestion.create({
+      data: {
+        inspectionId: created.id,
+        label: question.label,
+        helpText: question.helpText ?? null,
+        sectionTitle: question.sectionTitle ?? null,
+        type: question.type,
+        options:
+          question.options.length > 0 ? question.options : Prisma.DbNull,
+        attentionValues:
+          question.type === "TEXT" ||
+          question.type === "NUMBER" ||
+          question.type === "DATE" ||
+          question.type === "TIME"
+            ? Prisma.DbNull
+            : question.attentionValues,
+        required: question.required,
+        showLastValue: question.showLastValue,
+        applicableEquipmentRefs:
+          question.applicableEquipmentRefs.length > 0
+            ? question.applicableEquipmentRefs
+            : Prisma.DbNull,
+        applicableShifts:
+          question.applicableShifts.length > 0
+            ? question.applicableShifts
+            : Prisma.DbNull,
+        firstOfWeekOnly: question.firstOfWeekOnly,
+        permitFieldRole,
+        isActive: true,
+        sortOrder: question.sortOrder,
+      },
+    });
+  }
+
+  const duplicated = await listManagedPermits();
+  const found = duplicated.find((permit) => permit.id === created.id);
+  if (!found) {
+    throw new Error("Duplicated permit form could not be loaded.");
+  }
+  return found;
+}
+
 export async function getPermitDefinition(
   idOrSlug: string,
 ): Promise<InspectionDefinition | null> {
@@ -310,8 +400,8 @@ export async function listPermitRuns(args?: {
 
     return rows.map((row) => {
       const answers = parseAnswers(row.responses);
-      const areaAnswer = answers.find((answer) =>
-        answer.questionId.endsWith("__area"),
+      const areaAnswer = answers.find(
+        (answer) => answer.permitFieldRole === "area",
       );
       const summary = parseSummary(row.summary);
       return {
@@ -589,6 +679,11 @@ function parseAnswers(value: unknown): InspectionAnswerRecord[] {
           : "TEXT",
       answer: String(row.answer ?? ""),
       flagged: Boolean(row.flagged),
+      permitFieldRole: resolvePermitFieldRole({
+        id: String(row.questionId ?? ""),
+        label: String(row.label ?? ""),
+        permitFieldRole: row.permitFieldRole,
+      }),
     };
   });
 }

@@ -19,6 +19,7 @@ import { requireOperatorManager } from "~/lib/auth.server";
 import { seedDefaultInspections, setInspectionAvailability } from "~/lib/inspections.server";
 import {
   createManagedPermit,
+  duplicateManagedPermit,
   listManagedPermits,
 } from "~/lib/permits.server";
 import { ensureInspectionSchema } from "~/lib/migrate.server";
@@ -78,6 +79,20 @@ export async function action({ request }: Route.ActionArgs) {
       throw redirect(`/permits/manage/${created.id}`);
     }
 
+    if (intent === "duplicate") {
+      const sourceInspectionId = String(
+        formData.get("sourceInspectionId") ?? "",
+      );
+      if (!sourceInspectionId) {
+        return data({ error: "Missing permit to copy." }, { status: 400 });
+      }
+      const created = await duplicateManagedPermit({
+        sourceInspectionId,
+        title: String(formData.get("title") ?? ""),
+      });
+      throw redirect(`/permits/manage/${created.id}`);
+    }
+
     if (intent === "toggle") {
       const inspectionId = String(formData.get("inspectionId") ?? "");
       const isAvailable = String(formData.get("isAvailable") ?? "") === "true";
@@ -129,8 +144,10 @@ export default function PermitsManagePage({
             Manage permits
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Create permit forms and edit their questions. Issued permits and
-            close-out live on the Permits page.
+            Build new permit types here — Hot Work, Line Break, Confined Space,
+            and so on — without a code deploy. Create a blank form or duplicate
+            Safe Work Permit, edit the checklist, then show it on the Permits
+            page.
           </p>
           {migrateNote ? (
             <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
@@ -152,8 +169,8 @@ export default function PermitsManagePage({
             <CardHeader>
               <CardTitle>Add permit form</CardTitle>
               <CardDescription>
-                After creating, add the questions people complete when issuing
-                the permit.
+                Starts empty. After creating, add questions and mark Start time,
+                End time, and Area so duration and dashboard display work.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -201,7 +218,8 @@ export default function PermitsManagePage({
             <CardHeader>
               <CardTitle>Permit forms</CardTitle>
               <CardDescription>
-                Edit questions, or hide a form from the Permits page.
+                Edit questions, duplicate an existing form as a starting point,
+                or hide a form from the Permits page.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -244,6 +262,17 @@ export default function PermitsManagePage({
                             Edit questions
                           </Link>
                         </Button>
+                        <Form method="post">
+                          <input type="hidden" name="intent" value="duplicate" />
+                          <input
+                            type="hidden"
+                            name="sourceInspectionId"
+                            value={permit.id}
+                          />
+                          <Button type="submit" variant="outline" size="sm">
+                            Duplicate
+                          </Button>
+                        </Form>
                         <Form method="post">
                           <input type="hidden" name="intent" value="toggle" />
                           <input

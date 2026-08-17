@@ -263,6 +263,8 @@ model InspectionQuestion {
   applicableShifts Json?                  @map("applicable_shifts")
   /// When true, only show on the first matching inspection of the Mon–Sun week.
   firstOfWeekOnly Boolean                 @default(false) @map("first_of_week_only")
+  /// Permit semantics: start_time | end_time | area (null for ordinary checklist items).
+  permitFieldRole String?                 @map("permit_field_role")
   isActive        Boolean                 @default(true) @map("is_active")
   sortOrder       Int                     @default(0) @map("sort_order")
   createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)

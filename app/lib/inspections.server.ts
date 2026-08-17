@@ -30,6 +30,9 @@ import {
   type InspectionResponseRow,
   type InspectionSummary,
   type LastInspectionAnswers,
+  type PermitFieldRole,
+  parsePermitFieldRole,
+  inferPermitFieldRoleFromId,
 } from "~/lib/inspections";
 
 function isKnownQuestionType(value: unknown): value is InspectionQuestionType {
@@ -213,6 +216,7 @@ function mapQuestion(row: {
   applicableEquipmentRefs?: unknown;
   applicableShifts?: unknown;
   firstOfWeekOnly?: boolean | null;
+  permitFieldRole?: string | null;
   sortOrder: number;
 }): InspectionQuestionDef {
   const options = questionOptionsForType(
@@ -220,6 +224,9 @@ function mapQuestion(row: {
     parseStringArray(row.options),
   );
   const attentionValues = parseStringArray(row.attentionValues);
+  const permitFieldRole =
+    parsePermitFieldRole(row.permitFieldRole) ??
+    inferPermitFieldRoleFromId(row.id);
 
   return {
     id: row.id,
@@ -239,6 +246,7 @@ function mapQuestion(row: {
     applicableEquipmentRefs: parseStringArray(row.applicableEquipmentRefs),
     applicableShifts: parseStringArray(row.applicableShifts),
     firstOfWeekOnly: row.firstOfWeekOnly === true,
+    permitFieldRole,
     sortOrder: row.sortOrder,
   };
 }
@@ -268,6 +276,7 @@ function mapDefinition(row: {
     applicableEquipmentRefs?: unknown;
     applicableShifts?: unknown;
     firstOfWeekOnly?: boolean | null;
+    permitFieldRole?: string | null;
     sortOrder: number;
   }>;
 }): InspectionDefinition {
@@ -729,6 +738,9 @@ function parseVersionSnapshot(value: unknown): InspectionVersionSnapshot {
             ? row.applicableShifts.map(String)
             : [],
           firstOfWeekOnly: row.firstOfWeekOnly === true,
+          permitFieldRole:
+            parsePermitFieldRole(row.permitFieldRole) ??
+            inferPermitFieldRoleFromId(String(row.id ?? "")),
           sortOrder: Number(row.sortOrder ?? 0),
         } satisfies InspectionQuestionDef;
       })
@@ -789,6 +801,7 @@ function normalizeQuestionsForCompare(questions: InspectionQuestionDef[]) {
       applicableEquipmentRefs: [...question.applicableEquipmentRefs].sort(),
       applicableShifts: [...question.applicableShifts].sort(),
       firstOfWeekOnly: question.firstOfWeekOnly,
+      permitFieldRole: question.permitFieldRole ?? null,
       sortOrder: question.sortOrder,
     };
   });
@@ -1094,6 +1107,7 @@ export async function seedDefaultInspections(): Promise<number> {
               ? question.applicableShifts
               : Prisma.DbNull,
           firstOfWeekOnly: question.firstOfWeekOnly,
+          permitFieldRole: question.permitFieldRole ?? null,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -1118,6 +1132,7 @@ export async function seedDefaultInspections(): Promise<number> {
               ? question.applicableShifts
               : Prisma.DbNull,
           firstOfWeekOnly: question.firstOfWeekOnly,
+          permitFieldRole: question.permitFieldRole ?? null,
           isActive: true,
           sortOrder: question.sortOrder,
         },
@@ -1284,6 +1299,28 @@ async function assertQuestionSourceInspection(
   }
 }
 
+async function clearConflictingPermitFieldRoles(args: {
+  inspectionId: string;
+  role: PermitFieldRole;
+  exceptQuestionId?: string;
+}): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error("Database is not configured.");
+  }
+  await prisma.inspectionQuestion.updateMany({
+    where: {
+      inspectionId: args.inspectionId,
+      isActive: true,
+      permitFieldRole: args.role,
+      ...(args.exceptQuestionId
+        ? { id: { not: args.exceptQuestionId } }
+        : {}),
+    },
+    data: { permitFieldRole: null },
+  });
+}
+
 export async function addInspectionQuestion(args: {
   inspectionId: string;
   label: string;
@@ -1297,6 +1334,7 @@ export async function addInspectionQuestion(args: {
   applicableEquipmentRefs?: string[];
   applicableShifts?: string[];
   firstOfWeekOnly?: boolean;
+  permitFieldRole?: PermitFieldRole | null;
 }): Promise<InspectionQuestionDef> {
   await assertQuestionSourceInspection(args.inspectionId);
   const prisma = getPrisma();
@@ -1331,10 +1369,27 @@ export async function addInspectionQuestion(args: {
             : options.includes(value),
         );
 
+  const permitFieldRole = parsePermitFieldRole(args.permitFieldRole);
+  if (permitFieldRole === "start_time" || permitFieldRole === "end_time") {
+    if (args.type !== "TIME") {
+      throw new Error("Start and end time fields must use the Time answer type.");
+    }
+  }
+  if (permitFieldRole === "area" && args.type !== "TEXT") {
+    throw new Error("Area fields must use the Text answer type.");
+  }
+
   const maxSort = await prisma.inspectionQuestion.aggregate({
     where: { inspectionId: args.inspectionId, isActive: true },
     _max: { sortOrder: true },
   });
+
+  if (permitFieldRole) {
+    await clearConflictingPermitFieldRoles({
+      inspectionId: args.inspectionId,
+      role: permitFieldRole,
+    });
+  }
 
   const row = await prisma.inspectionQuestion.create({
     data: {
@@ -1356,6 +1411,7 @@ export async function addInspectionQuestion(args: {
           ? args.applicableShifts
           : Prisma.DbNull,
       firstOfWeekOnly: args.firstOfWeekOnly ?? false,
+      permitFieldRole,
       isActive: true,
       sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
     },
@@ -1407,6 +1463,7 @@ export async function updateInspectionQuestion(args: {
   applicableEquipmentRefs?: string[];
   applicableShifts?: string[];
   firstOfWeekOnly?: boolean;
+  permitFieldRole?: PermitFieldRole | null;
 }): Promise<InspectionQuestionDef> {
   const prisma = getPrisma();
   if (!prisma) {
@@ -1449,6 +1506,24 @@ export async function updateInspectionQuestion(args: {
             : options.includes(value),
         );
 
+  const permitFieldRole = parsePermitFieldRole(args.permitFieldRole);
+  if (permitFieldRole === "start_time" || permitFieldRole === "end_time") {
+    if (args.type !== "TIME") {
+      throw new Error("Start and end time fields must use the Time answer type.");
+    }
+  }
+  if (permitFieldRole === "area" && args.type !== "TEXT") {
+    throw new Error("Area fields must use the Text answer type.");
+  }
+
+  if (permitFieldRole) {
+    await clearConflictingPermitFieldRoles({
+      inspectionId: existing.inspectionId,
+      role: permitFieldRole,
+      exceptQuestionId: existing.id,
+    });
+  }
+
   const row = await prisma.inspectionQuestion.update({
     where: { id: args.questionId },
     data: {
@@ -1469,6 +1544,7 @@ export async function updateInspectionQuestion(args: {
           ? args.applicableShifts
           : Prisma.DbNull,
       firstOfWeekOnly: args.firstOfWeekOnly ?? false,
+      permitFieldRole,
     },
   });
 
@@ -2253,6 +2329,7 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
               ? question.applicableShifts
               : Prisma.DbNull,
           firstOfWeekOnly: question.firstOfWeekOnly,
+          permitFieldRole: question.permitFieldRole ?? null,
           isActive: true,
           sortOrder: question.sortOrder,
           inspectionId: definition.id,
@@ -2278,6 +2355,7 @@ export async function ensureSeededInspectionQuestions(): Promise<void> {
               ? question.applicableShifts
               : Prisma.DbNull,
           firstOfWeekOnly: question.firstOfWeekOnly,
+          permitFieldRole: question.permitFieldRole ?? null,
           isActive: true,
           sortOrder: question.sortOrder,
         },

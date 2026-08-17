@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   buildAnswersFromResponses,
   filterQuestionsForContext,
+  findQuestionByPermitFieldRole,
   parseCheckboxAnswer,
   summarizeInspectionAnswers,
   type InspectionDefinition,
@@ -362,11 +363,13 @@ export function createPermitIssueFormSchema(definition: InspectionDefinition) {
         }
       }
 
-      const startId = applicableQuestions.find((q) =>
-        q.id.endsWith("__start-time"),
+      const startId = findQuestionByPermitFieldRole(
+        applicableQuestions,
+        "start_time",
       )?.id;
-      const endId = applicableQuestions.find((q) =>
-        q.id.endsWith("__end-time"),
+      const endId = findQuestionByPermitFieldRole(
+        applicableQuestions,
+        "end_time",
       )?.id;
       if (startId && endId) {
         const start = String(value.responses[startId] ?? "");

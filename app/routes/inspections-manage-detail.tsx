@@ -20,12 +20,17 @@ import { requireOperatorManager } from "~/lib/auth.server";
 import {
   INSPECTION_QUESTION_TYPES,
   INSPECTION_SHIFT_OPTIONS,
+  PERMIT_FIELD_ROLE_LABELS,
+  PERMIT_FIELD_ROLES,
   YES_NO_OPTIONS,
   isPermitInspection,
   looksLikeAttentionOption,
+  parsePermitFieldRole,
   questionTypeLabel,
+  resolvePermitFieldRole,
   type InspectionQuestionDef,
   type InspectionQuestionType,
+  type PermitFieldRole,
 } from "~/lib/inspections";
 import {
   addInspectionQuestion,
@@ -144,6 +149,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         applicableEquipmentRefs,
         applicableShifts,
         firstOfWeekOnly: String(formData.get("firstOfWeekOnly") ?? "") === "on",
+        permitFieldRole: parsePermitFieldRole(
+          String(formData.get("permitFieldRole") ?? "") || null,
+        ),
       };
 
       if (intent === "add-question") {
@@ -225,6 +233,7 @@ function QuestionFields({
   radioOptions,
   setRadioOptions,
   unitOptions = [],
+  showPermitFieldRole = false,
   defaults,
 }: {
   questionType: InspectionQuestionType;
@@ -232,6 +241,7 @@ function QuestionFields({
   radioOptions: string;
   setRadioOptions: (value: string) => void;
   unitOptions?: Array<{ value: string; label: string }>;
+  showPermitFieldRole?: boolean;
   defaults?: {
     label?: string;
     helpText?: string | null;
@@ -242,6 +252,7 @@ function QuestionFields({
     applicableShifts?: string[];
     firstOfWeekOnly?: boolean;
     attentionValues?: string[];
+    permitFieldRole?: PermitFieldRole | null;
   };
 }) {
   const radioOptionList = radioOptions
@@ -306,6 +317,34 @@ function QuestionFields({
           <option value="CHECKBOX">Checkboxes (multi-select)</option>
         </select>
       </div>
+
+      {showPermitFieldRole ? (
+        <div className="grid gap-2">
+          <Label htmlFor="permitFieldRole">Special permit field</Label>
+          <select
+            id="permitFieldRole"
+            name="permitFieldRole"
+            defaultValue={defaults?.permitFieldRole ?? ""}
+            className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <option value="">None (ordinary checklist item)</option>
+            {PERMIT_FIELD_ROLES.map((role) => (
+              <option key={role} value={role}>
+                {PERMIT_FIELD_ROLE_LABELS[role]}
+                {role === "start_time" || role === "end_time"
+                  ? " — use Time type"
+                  : " — use Text type"}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Mark start time, end time, and area once per form so the 12-hour
+            duration rule and dashboard area column work without coding.
+          </p>
+        </div>
+      ) : (
+        <input type="hidden" name="permitFieldRole" value="" />
+      )}
 
       {questionType === "RADIO" || questionType === "CHECKBOX" ? (
         <div className="grid gap-2">
@@ -462,6 +501,7 @@ function QuestionEditor({
   onEdit,
   onCancel,
   unitOptions = [],
+  showPermitFieldRole = false,
 }: {
   question: InspectionQuestionDef;
   index: number;
@@ -470,6 +510,7 @@ function QuestionEditor({
   onEdit: () => void;
   onCancel: () => void;
   unitOptions?: Array<{ value: string; label: string }>;
+  showPermitFieldRole?: boolean;
 }) {
   const [questionType, setQuestionType] = useState<InspectionQuestionType>(
     question.type,
@@ -479,6 +520,7 @@ function QuestionEditor({
       ? question.options.join("\n")
       : "OK\nNeeds attention\nN/A",
   );
+  const fieldRole = resolvePermitFieldRole(question);
 
   if (isEditing) {
     return (
@@ -493,6 +535,7 @@ function QuestionEditor({
             radioOptions={radioOptions}
             setRadioOptions={setRadioOptions}
             unitOptions={unitOptions}
+            showPermitFieldRole={showPermitFieldRole}
             defaults={{
               label: question.label,
               helpText: question.helpText,
@@ -503,6 +546,7 @@ function QuestionEditor({
               applicableShifts: question.applicableShifts,
               firstOfWeekOnly: question.firstOfWeekOnly,
               attentionValues: question.attentionValues,
+              permitFieldRole: fieldRole,
             }}
           />
           <div className="flex flex-wrap gap-2">
@@ -526,6 +570,11 @@ function QuestionEditor({
             <Badge variant="secondary">
               {questionTypeLabel(question.type)}
             </Badge>
+            {fieldRole ? (
+              <Badge variant="outline">
+                {PERMIT_FIELD_ROLE_LABELS[fieldRole]}
+              </Badge>
+            ) : null}
             {!question.required ? (
               <Badge variant="outline">Optional</Badge>
             ) : null}
@@ -913,6 +962,7 @@ export default function InspectionsManageDetailPage({
                     radioOptions={radioOptions}
                     setRadioOptions={setRadioOptions}
                     unitOptions={inspection.unitOptions}
+                    showPermitFieldRole={isPermit}
                   />
                   <div>
                     <Button type="submit">Add question</Button>
@@ -989,6 +1039,7 @@ export default function InspectionsManageDetailPage({
                       onEdit={() => setEditingQuestionId(question.id)}
                       onCancel={() => setEditingQuestionId(null)}
                       unitOptions={inspection.unitOptions}
+                      showPermitFieldRole={isPermit}
                     />
                   ))}
                 </ul>

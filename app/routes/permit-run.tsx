@@ -27,6 +27,7 @@ import { requireUser } from "~/lib/auth.server";
 import { formatMelbourneDateTime } from "~/lib/datetime";
 import {
   formatLastAnswerDisplay,
+  resolvePermitFieldRole,
   type InspectionAnswerRecord,
 } from "~/lib/inspections";
 import {
@@ -790,11 +791,23 @@ function groupAnswersBySection(rows: InspectionAnswerRecord[]) {
 function durationLabelFromAnswers(
   answers: InspectionAnswerRecord[],
 ): string | null {
-  const start = answers.find((row) =>
-    row.questionId.endsWith("__start-time"),
+  const start = answers.find(
+    (row) =>
+      row.permitFieldRole === "start_time" ||
+      resolvePermitFieldRole({
+        id: row.questionId,
+        label: row.label,
+        permitFieldRole: row.permitFieldRole,
+      }) === "start_time",
   )?.answer;
-  const end = answers.find((row) =>
-    row.questionId.endsWith("__end-time"),
+  const end = answers.find(
+    (row) =>
+      row.permitFieldRole === "end_time" ||
+      resolvePermitFieldRole({
+        id: row.questionId,
+        label: row.label,
+        permitFieldRole: row.permitFieldRole,
+      }) === "end_time",
   )?.answer;
   if (!start || !end) {
     return null;
