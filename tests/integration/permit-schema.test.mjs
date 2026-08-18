@@ -168,6 +168,24 @@ function fillRequired(definition, overrides = {}) {
 
 {
   const schema = createPermitIssueSchema(SAFE_WORK_PERMIT);
+  const hugeSignature = `data:image/jpeg;base64,${"A".repeat(250_001)}`;
+  const parsed = schema.safeParse({
+    equipmentRef: "P-100",
+    authorizedPersonnel: [
+      { name: "Alex Operator", signature: hugeSignature },
+    ],
+    responses: fillRequired(SAFE_WORK_PERMIT),
+  });
+  assert.equal(parsed.success, false);
+  assert.ok(
+    parsed.error.issues.some((issue) =>
+      String(issue.message).includes("too large to save"),
+    ),
+  );
+}
+
+{
+  const schema = createPermitIssueSchema(SAFE_WORK_PERMIT);
   const parsed = schema.safeParse({
     equipmentRef: "P-100",
     authorizedPersonnel: [

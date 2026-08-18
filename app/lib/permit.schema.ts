@@ -8,6 +8,7 @@ import {
   summarizeInspectionAnswers,
   type InspectionDefinition,
 } from "~/lib/inspections";
+import { MAX_PERMIT_SIGNATURE_LENGTH } from "~/lib/permit-form-errors";
 
 function emptyToUndefined(value: unknown) {
   if (value === "" || value === null || value === undefined) {
@@ -329,11 +330,19 @@ export function createPermitIssueFormSchema(definition: InspectionDefinition) {
       }
 
       value.authorizedPersonnel.forEach((person, index) => {
+        const name = person.name?.trim() ?? "";
+        const signature = person.signature?.trim() ?? "";
+        if (signature.length > MAX_PERMIT_SIGNATURE_LENGTH) {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              "That signature is too large to save. Clear it and sign again with a simpler mark.",
+            path: ["authorizedPersonnel", index, "signature"],
+          });
+        }
         if (index === 0) {
           return;
         }
-        const name = person.name?.trim() ?? "";
-        const signature = person.signature?.trim() ?? "";
         if (!name && signature) {
           ctx.addIssue({
             code: "custom",

@@ -4,6 +4,7 @@ import {
   type SubmissionResult,
 } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
+import { useRef } from "react";
 import { Form, useNavigation } from "react-router";
 
 import { SignaturePad } from "~/components/signature-pad";
@@ -19,6 +20,7 @@ import {
 } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { listPermitFormIssues } from "~/lib/permit-form-errors";
 import { createPermitIssueFormSchema } from "~/lib/permit.schema";
 import {
   YES_NO_OPTIONS,
@@ -69,6 +71,16 @@ export function PermitIssueForm({
 
   const responseFields = fields.responses.getFieldset();
   const personnelFields = fields.authorizedPersonnel.getFieldList();
+  const issueItems = listPermitFormIssues({
+    definition,
+    formError,
+    formErrors: form.errors,
+    allErrors: form.allErrors,
+  });
+  const issueKey = issueItems
+    .map((issue) => `${issue.path}:${issue.messages.join("|")}`)
+    .join(";");
+  const scrolledIssueKeyRef = useRef("");
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -410,11 +422,36 @@ export function PermitIssueForm({
               </div>
             </section>
 
-            {formError ? (
-              <p className="text-sm text-destructive">{formError}</p>
-            ) : null}
-            {form.errors ? (
-              <p className="text-sm text-destructive">{form.errors.join(" ")}</p>
+            {issueItems.length > 0 ? (
+              <div
+                ref={(node) => {
+                  if (!node || !issueKey || scrolledIssueKeyRef.current === issueKey) {
+                    return;
+                  }
+                  scrolledIssueKeyRef.current = issueKey;
+                  node.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+                className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3"
+                role="alert"
+              >
+                <p className="text-sm font-medium text-destructive">
+                  {formError
+                    ? "Permit was not saved"
+                    : "Permit could not be submitted"}
+                </p>
+                <ul className="mt-2 grid gap-1 text-sm text-destructive">
+                  {issueItems.map((issue) => (
+                    <li key={`${issue.path}:${issue.messages.join("|")}`}>
+                      {issue.path ? (
+                        <>
+                          <span className="font-medium">{issue.label}:</span>{" "}
+                        </>
+                      ) : null}
+                      {issue.messages.join(" ")}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
           </CardContent>
           <CardFooter>
@@ -445,7 +482,15 @@ export function PermitIssueForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          {summary && status ? (
+          {formError ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <p className="text-sm font-medium text-destructive">Not saved</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                This is a save problem, not a safety rejection. The checklist
+                was accepted, but the permit was not stored.
+              </p>
+            </div>
+          ) : summary && status ? (
             <>
               <Badge
                 variant="outline"

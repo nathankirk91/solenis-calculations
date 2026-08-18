@@ -286,11 +286,11 @@ export async function createPermitRun(args: {
   summary: InspectionSummary;
   authorizedPersonnel: AuthorizedPerson[];
   authorization?: PermitAuthorization;
-}): Promise<{ id: string; permitNumber: string } | null> {
+}): Promise<{ id: string; permitNumber: string }> {
   await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
-    return null;
+    throw new Error("Database is not configured.");
   }
 
   const inspection = await prisma.inspection.findUnique({

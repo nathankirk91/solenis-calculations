@@ -3,6 +3,10 @@ import type { SubmissionResult } from "@conform-to/react";
 import { data, redirect } from "react-router";
 
 import { getAppBaseUrl } from "~/lib/app-url.server";
+import {
+  permitSaveErrorMessage,
+  withTransientRetry,
+} from "~/lib/permit-form-errors";
 import { createPermitIssueSchema } from "~/lib/permit.schema";
 import type { InspectionDefinition, InspectionSummary } from "~/lib/inspections";
 import { createPermitRun } from "~/lib/permits.server";
@@ -47,38 +51,44 @@ export async function handlePermitIssueSubmit(args: {
   let runId: string | null = null;
   let permitNumber: string | null = null;
   try {
-    await ensureInspectionSchema();
-    const run = await createPermitRun({
-      inspectionId: definition.id,
-      submittedById: user.id,
-      equipmentRef,
-      answers,
-      summary,
-      authorizedPersonnel,
+    const run = await withTransientRetry(async () => {
+      await ensureInspectionSchema();
+      return createPermitRun({
+        inspectionId: definition.id,
+        submittedById: user.id,
+        equipmentRef,
+        answers,
+        summary,
+        authorizedPersonnel,
+      });
     });
-    runId = run?.id ?? null;
-    permitNumber = run?.permitNumber ?? null;
-  } catch {
+    runId = run.id;
+    permitNumber = run.permitNumber;
+  } catch (error) {
+    console.error("Permit save failed:", error);
     return data(
       {
         summary,
         runId: null,
-        status: null,
+        status: summary.status,
         lastResult: submission.reply(),
-        formError: "Permit could not be saved. Try again.",
+        formError: permitSaveErrorMessage(error),
       } satisfies PermitSubmitActionData,
       { status: 500 },
     );
   }
 
   if (!runId) {
+    console.error("Permit save failed: createPermitRun returned no id");
     return data(
       {
         summary,
         runId: null,
-        status: null,
+        status: summary.status,
         lastResult: submission.reply(),
-        formError: "Permit could not be saved. Try again.",
+        formError: permitSaveErrorMessage(
+          new Error("Database is not configured."),
+        ),
       } satisfies PermitSubmitActionData,
       { status: 500 },
     );
