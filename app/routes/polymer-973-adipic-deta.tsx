@@ -53,10 +53,10 @@ export default function Polymer973AdipicDetaPage({
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Polymer</Badge>
             <Link
-              to="/"
+              to="/#calculations"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              ← Home
+              ← Calculations
             </Link>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">

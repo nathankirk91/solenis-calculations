@@ -34,7 +34,7 @@ export function meta({}: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Quick view of today's forklift checks, active permits, and plant calculation shortcuts.",
+        "Quick view of active permits, today's forklift checks, and plant calculation shortcuts.",
     },
   ];
 }
@@ -153,9 +153,32 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             Springvale
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-            Quick view of forklift checks for {dayLabel}, active permits, and
+            Quick view of active permits, forklift checks for {dayLabel}, and
             shortcuts into plant calculations.
           </p>
+        </section>
+
+        <section
+          id="permits"
+          aria-labelledby="permits-dashboard-heading"
+          className="mb-14 scroll-mt-24 animate-in fade-in slide-in-from-bottom-2 duration-500"
+        >
+          <div className="mb-4">
+            <h2
+              id="permits-dashboard-heading"
+              className="font-heading text-2xl font-semibold tracking-tight text-brand-navy"
+            >
+              Permits
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pending authorization and open permits.
+            </p>
+          </div>
+          <PermitDashboard
+            pendingPermits={pendingPermits}
+            openPermits={openPermits}
+            compact
+          />
         </section>
 
         <section
@@ -204,28 +227,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               <Link to="/inspections">All checklists</Link>
             </Button>
           </div>
-        </section>
-
-        <section
-          aria-labelledby="permits-dashboard-heading"
-          className="mb-14 animate-in fade-in slide-in-from-bottom-2 duration-500"
-        >
-          <div className="mb-4">
-            <h2
-              id="permits-dashboard-heading"
-              className="font-heading text-2xl font-semibold tracking-tight text-brand-navy"
-            >
-              Permits
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pending authorization and open permits.
-            </p>
-          </div>
-          <PermitDashboard
-            pendingPermits={pendingPermits}
-            openPermits={openPermits}
-            compact
-          />
         </section>
 
         <section

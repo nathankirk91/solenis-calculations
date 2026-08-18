@@ -83,7 +83,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Submission</Badge>
             <Link
-              to="/"
+              to="/#calculations"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
               ← Calculations

@@ -5,6 +5,14 @@ import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
+  buildNavItems,
+  groupHasMultipleSections,
+  groupIsActive,
+  pathMatches,
+  type NavGroupChild,
+  type NavGroupItem,
+} from "~/lib/nav";
+import {
   canManageOperators,
   canManageRoles,
   canManageUsers,
@@ -17,26 +25,6 @@ type Props = {
   user?: AuthUser | null;
   pendingCount?: number;
 };
-
-type NavLinkItem = {
-  type: "link";
-  to: string;
-  label: string;
-  badge?: number;
-};
-
-type NavGroupItem = {
-  type: "group";
-  id: string;
-  label: string;
-  children: Array<{
-    to: string;
-    label: string;
-    description?: string;
-  }>;
-};
-
-type NavItem = NavLinkItem | NavGroupItem;
 
 function SolenisMark({ className }: { className?: string }) {
   return (
@@ -59,61 +47,109 @@ function SolenisMark({ className }: { className?: string }) {
   );
 }
 
-function pathMatches(
-  location: { pathname: string; hash: string },
-  to: string,
+function GroupBadge({ count }: { count?: number }) {
+  if (count == null) {
+    return null;
+  }
+
+  return (
+    <Badge
+      variant="secondary"
+      className="bg-brand/15 text-brand-navy tabular-nums"
+    >
+      {count}
+    </Badge>
+  );
+}
+
+function NavChildLink({
+  child,
+  onNavigate,
+  className,
+}: {
+  child: NavGroupChild;
+  onNavigate?: () => void;
+  className: string;
+}) {
+  return (
+    <Link
+      to={child.to}
+      role="menuitem"
+      className={className}
+      onClick={onNavigate}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span>{child.label}</span>
+        <GroupBadge count={child.badge} />
+      </span>
+      {child.description ? (
+        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+          {child.description}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
+function GroupSectionHeading({
+  label,
+  divided,
+}: {
+  label: string;
+  divided?: boolean;
+}) {
+  return (
+    <div>
+      {divided ? (
+        <div className="mx-2 mt-1 mb-0.5 border-t border-border/70" />
+      ) : null}
+      <p className="px-3 pt-2 pb-1 text-[0.65rem] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function childStartsSection(
+  group: NavGroupItem,
+  index: number,
+  showSections: boolean,
 ) {
-  const [targetPath = "/", targetHash = ""] = to.split("#");
-  const hash = targetHash ? `#${targetHash}` : "";
-
-  // Hub pages should only match exactly so nested routes don't steal active state.
-  const exactOnly =
-    targetPath === "/" ||
-    targetPath === "/inspections" ||
-    targetPath === "/permits" ||
-    targetPath === "/history";
-
-  const pathOk = exactOnly
-    ? location.pathname === targetPath
-    : location.pathname === targetPath ||
-      location.pathname.startsWith(`${targetPath}/`);
-
-  if (!pathOk) {
+  if (!showSections) {
     return false;
   }
 
-  if (!hash) {
-    return true;
+  const child = group.children[index];
+  if (!child?.section) {
+    return false;
   }
 
-  return location.hash === hash;
+  return group.children[index - 1]?.section !== child.section;
 }
 
-function groupIsActive(
-  location: { pathname: string; hash: string },
-  group: NavGroupItem,
-) {
-  return group.children.some((child) => {
-    const [targetPath = "/", targetHash = ""] = child.to.split("#");
-    const hash = targetHash ? `#${targetHash}` : "";
+function GroupChildren({
+  group,
+  onNavigate,
+  linkClassName,
+}: {
+  group: NavGroupItem;
+  onNavigate?: () => void;
+  linkClassName: (child: NavGroupChild) => string;
+}) {
+  const showSections = groupHasMultipleSections(group);
 
-    if (targetPath === "/") {
-      return location.pathname === "/" && (!hash || location.hash === hash);
-    }
-
-    const pathOk =
-      location.pathname === targetPath ||
-      location.pathname.startsWith(`${targetPath}/`);
-    if (!pathOk) {
-      return false;
-    }
-
-    if (hash && location.hash) {
-      return location.hash === hash;
-    }
-
-    return true;
-  });
+  return group.children.map((child, index) => (
+    <div key={child.to}>
+      {childStartsSection(group, index, showSections) && child.section ? (
+        <GroupSectionHeading label={child.section} divided={index > 0} />
+      ) : null}
+      <NavChildLink
+        child={child}
+        onNavigate={onNavigate}
+        className={linkClassName(child)}
+      />
+    </div>
+  ));
 }
 
 function DesktopNavGroup({
@@ -169,6 +205,7 @@ function DesktopNavGroup({
         onClick={() => setOpen((value) => !value)}
       >
         {group.label}
+        <GroupBadge count={group.badge} />
         <ChevronDownIcon
           className={cn(
             "size-3.5 opacity-70 transition-transform",
@@ -182,25 +219,16 @@ function DesktopNavGroup({
           role="menu"
           className="absolute top-full left-0 z-50 mt-1 min-w-56 rounded-lg border border-border/80 bg-white p-1 shadow-md"
         >
-          {group.children.map((child) => (
-            <Link
-              key={child.to}
-              to={child.to}
-              role="menuitem"
-              className={cn(
+          <GroupChildren
+            group={group}
+            onNavigate={() => setOpen(false)}
+            linkClassName={(child) =>
+              cn(
                 "block rounded-md px-3 py-2 text-sm text-brand-navy transition-colors hover:bg-muted",
                 pathMatches(location, child.to) && "bg-muted font-medium",
-              )}
-              onClick={() => setOpen(false)}
-            >
-              <span className="block">{child.label}</span>
-              {child.description ? (
-                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                  {child.description}
-                </span>
-              ) : null}
-            </Link>
-          ))}
+              )
+            }
+          />
         </div>
       ) : null}
     </div>
@@ -228,7 +256,10 @@ function MobileNavGroup({
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
       >
-        <span>{group.label}</span>
+        <span className="flex items-center gap-2">
+          {group.label}
+          <GroupBadge count={group.badge} />
+        </span>
         <ChevronDownIcon
           className={cn(
             "size-4 opacity-70 transition-transform",
@@ -237,24 +268,19 @@ function MobileNavGroup({
         />
       </button>
       {open ? (
-        <div id={panelId} className="mb-1 ml-2 grid gap-0.5 border-l border-border/70 pl-2">
-          {group.children.map((child) => (
-            <Link
-              key={child.to}
-              to={child.to}
-              className={cn(
-                "rounded-lg px-3 py-2 text-sm text-brand-navy hover:bg-muted",
+        <div
+          id={panelId}
+          className="mb-1 ml-2 grid gap-0.5 border-l border-border/70 pl-2"
+        >
+          <GroupChildren
+            group={group}
+            linkClassName={(child) =>
+              cn(
+                "block rounded-lg px-3 py-2 text-sm text-brand-navy hover:bg-muted",
                 pathMatches(location, child.to) && "bg-muted font-medium",
-              )}
-            >
-              <span className="block">{child.label}</span>
-              {child.description ? (
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {child.description}
-                </span>
-              ) : null}
-            </Link>
-          ))}
+              )
+            }
+          />
         </div>
       ) : null}
     </div>
@@ -265,10 +291,14 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const menuId = useId();
-  const showApprovals = user ? canReviewRuns(user.role) : false;
-  const showOperators = user ? canManageOperators(user.role) : false;
-  const showUsers = user ? canManageUsers(user.role) : false;
-  const showRoles = user ? canManageRoles(user.role) : false;
+  const navItems = buildNavItems({
+    signedIn: Boolean(user),
+    canReview: user ? canReviewRuns(user.role) : false,
+    canManageOperators: user ? canManageOperators(user.role) : false,
+    canManageUsers: user ? canManageUsers(user.role) : false,
+    canManageRoles: user ? canManageRoles(user.role) : false,
+    pendingCount,
+  });
 
   useEffect(() => {
     setOpen(false);
@@ -292,146 +322,6 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
       document.body.style.overflow = "";
     };
   }, [open]);
-
-  const navItems: NavItem[] = [
-    { type: "link", to: "/", label: "Home" },
-    ...(user
-      ? ([
-          {
-            type: "group",
-            id: "calculations",
-            label: "Calculations",
-            children: [
-              {
-                to: "/#calculations",
-                label: "Calculators",
-                description: "Batch make-up calculators",
-              },
-              {
-                to: "/history",
-                label: "History",
-                description: "Past submissions and approvals",
-              },
-            ],
-          },
-          {
-            type: "group",
-            id: "inspections",
-            label: "Inspections",
-            children: [
-              {
-                to: "/inspections",
-                label: "Checklists",
-                description: "Run equipment and shift checks",
-              },
-              {
-                to: "/inspections/history",
-                label: "Records",
-                description: "Completed inspection history",
-              },
-              ...(showOperators
-                ? [
-                    {
-                      to: "/inspections/manage",
-                      label: "Manage",
-                      description: "Edit inspection templates",
-                    },
-                  ]
-                : []),
-            ],
-          },
-          {
-            type: "group",
-            id: "permits",
-            label: "Permits",
-            children: [
-              {
-                to: "/permits/dashboard",
-                label: "Dashboard",
-                description: "Pending and open permits",
-              },
-              {
-                to: "/permits",
-                label: "Forms",
-                description: "Issue a new permit",
-              },
-              {
-                to: "/permits/history",
-                label: "Records",
-                description: "Open and closed permit history",
-              },
-              ...(showOperators
-                ? [
-                    {
-                      to: "/permits/manage",
-                      label: "Manage",
-                      description: "Edit permit form templates",
-                    },
-                    {
-                      to: "/permits/settings",
-                      label: "Settings",
-                      description: "Who can sign each authorisation",
-                    },
-                  ]
-                : []),
-            ],
-          },
-        ] satisfies NavItem[])
-      : []),
-    ...(showApprovals
-      ? ([
-          {
-            type: "link",
-            to: "/approvals",
-            label: "Approvals",
-            badge: pendingCount > 0 ? pendingCount : undefined,
-          },
-        ] satisfies NavItem[])
-      : []),
-    ...(showApprovals
-      ? ([
-          {
-            type: "group",
-            id: "settings",
-            label: "Settings",
-            children: [
-              {
-                to: "/settings",
-                label: "Notifications",
-                description: "Push alerts for this device",
-              },
-              ...(showOperators
-                ? [
-                    {
-                      to: "/operators",
-                      label: "Operators",
-                      description: "Names shown on forms",
-                    },
-                  ]
-                : []),
-              ...(showUsers
-                ? [
-                    {
-                      to: "/users",
-                      label: "Users",
-                      description: "Accounts and assigned roles",
-                    },
-                  ]
-                : []),
-              ...(showRoles
-                ? [
-                    {
-                      to: "/roles",
-                      label: "Roles",
-                      description: "Create and edit access roles",
-                    },
-                  ]
-                : []),
-            ],
-          },
-        ] satisfies NavItem[])
-      : []),
-  ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-white/95 backdrop-blur-sm">
@@ -465,14 +355,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
               >
                 <Link to={item.to}>
                   {item.label}
-                  {item.badge != null ? (
-                    <Badge
-                      variant="secondary"
-                      className="bg-brand/15 text-brand-navy tabular-nums"
-                    >
-                      {item.badge}
-                    </Badge>
-                  ) : null}
+                  <GroupBadge count={item.badge} />
                 </Link>
               </Button>
             ) : (
@@ -549,14 +432,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
                 )}
               >
                 <span>{item.label}</span>
-                {item.badge != null ? (
-                  <Badge
-                    variant="secondary"
-                    className="bg-brand/15 text-brand-navy tabular-nums"
-                  >
-                    {item.badge}
-                  </Badge>
-                ) : null}
+                <GroupBadge count={item.badge} />
               </Link>
             ) : (
               <MobileNavGroup
