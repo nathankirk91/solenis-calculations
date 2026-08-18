@@ -147,12 +147,15 @@ export async function handleInspectionSubmit(args: {
   const url = `${getAppBaseUrl(request)}/inspections/submissions/${runId}`;
 
   if (summary.status === "NEEDS_ATTENTION") {
-    const pushResult = await notifyManagersPush({
-      title: "Inspection needs attention",
-      message: `${definition.shortName}: ${summary.attentionCount} item(s) (${operator.name})`,
-      url,
-      tag: `inspection-${runId}`,
-    });
+    const pushResult = await notifyManagersPush(
+      {
+        title: "Inspection needs attention",
+        message: `${definition.shortName}: ${summary.attentionCount} item(s) (${operator.name})`,
+        url,
+        tag: `inspection-${runId}`,
+      },
+      "inspection.needs_attention",
+    );
 
     if (pushResult.sent === 0 && pushResult.reason) {
       console.warn("Web push skipped/failed:", pushResult.reason);
@@ -160,15 +163,18 @@ export async function handleInspectionSubmit(args: {
   }
 
   if (createdActionCount > 0) {
-    const pushResult = await notifyManagersPush({
-      title:
-        createdActionCount === 1
-          ? "New inspection action"
-          : "New inspection actions",
-      message: `${definition.shortName}: ${createdActionCount} open action${createdActionCount === 1 ? "" : "s"} (${operator.name})`,
-      url,
-      tag: `inspection-actions-${runId}`,
-    });
+    const pushResult = await notifyManagersPush(
+      {
+        title:
+          createdActionCount === 1
+            ? "New inspection action"
+            : "New inspection actions",
+        message: `${definition.shortName}: ${createdActionCount} open action${createdActionCount === 1 ? "" : "s"} (${operator.name})`,
+        url,
+        tag: `inspection-actions-${runId}`,
+      },
+      "inspection.new_actions",
+    );
 
     if (pushResult.sent === 0 && pushResult.reason) {
       console.warn("Web push skipped/failed:", pushResult.reason);

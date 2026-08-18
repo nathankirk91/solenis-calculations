@@ -107,12 +107,15 @@ export async function handlePolymerAdipicDetaSubmit(args: {
   const approvalsUrl = `${getAppBaseUrl(request)}/approvals`;
 
   // Must await on Vercel serverless — fire-and-forget is frozen before fetch completes.
-  const pushResult = await notifyManagersPush({
-    title: "Calculation pending approval",
-    message: `${product.shortName}: Extra DETA ${outputs.extraDetaKg} kg (${operator.name})`,
-    url: approvalsUrl,
-    tag: `pending-${runId}`,
-  });
+  const pushResult = await notifyManagersPush(
+    {
+      title: "Calculation pending approval",
+      message: `${product.shortName}: Extra DETA ${outputs.extraDetaKg} kg (${operator.name})`,
+      url: approvalsUrl,
+      tag: `pending-${runId}`,
+    },
+    "calculation.pending",
+  );
 
   if (pushResult.sent === 0 && pushResult.reason) {
     console.warn("Web push skipped/failed:", pushResult.reason);

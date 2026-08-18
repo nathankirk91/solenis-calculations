@@ -1,6 +1,8 @@
 import webpush from "web-push";
 
 import { getPrisma } from "~/lib/db.server";
+import { ensureDefaultNotificationPreferences } from "~/lib/notification-preferences.server";
+import type { NotificationTypeId } from "~/lib/notification-preferences";
 
 export type PushPayload = {
   title: string;
@@ -53,7 +55,7 @@ export async function savePushSubscription(args: {
     throw new Error("Database is not configured.");
   }
 
-  return prisma.pushSubscription.upsert({
+  const subscription = await prisma.pushSubscription.upsert({
     where: { endpoint: args.endpoint },
     update: {
       userId: args.userId,
@@ -69,6 +71,11 @@ export async function savePushSubscription(args: {
       userAgent: args.userAgent ?? null,
     },
   });
+
+  // First registration (or any register with no saved prefs) opts the user into every type.
+  await ensureDefaultNotificationPreferences(args.userId);
+
+  return subscription;
 }
 
 export async function deletePushSubscription(args: {
@@ -188,12 +195,27 @@ export async function notifyUserPush(
   return sendPushToSubscriptions(subscriptions, payload);
 }
 
+function subscribedToTypeFilter(type: NotificationTypeId) {
+  return {
+    NOT: {
+      notificationPreferences: {
+        some: {
+          type,
+          enabled: false,
+        },
+      },
+    },
+  };
+}
+
 /**
- * Best-effort push to specific users (deduped). Never throws.
+ * Best-effort push to specific users (deduped) who have this event type enabled.
+ * Missing preference rows mean the user is opted in. Never throws.
  */
 export async function notifyUsersPush(
   userIds: string[],
   payload: PushPayload,
+  type: NotificationTypeId,
 ): Promise<{ sent: number; failed: number; reason?: string }> {
   const config = configureWebPush();
   if (!config) {
@@ -212,17 +234,22 @@ export async function notifyUsersPush(
   }
 
   const subscriptions = await prisma.pushSubscription.findMany({
-    where: { userId: { in: uniqueIds } },
+    where: {
+      userId: { in: uniqueIds },
+      user: subscribedToTypeFilter(type),
+    },
   });
 
   return sendPushToSubscriptions(subscriptions, payload);
 }
 
 /**
- * Best-effort push to all manager/admin subscriptions. Never throws.
+ * Best-effort push to manager/admin subscriptions opted into this event type.
+ * Never throws.
  */
 export async function notifyManagersPush(
   payload: PushPayload,
+  type: NotificationTypeId,
 ): Promise<{ sent: number; failed: number; reason?: string }> {
   const config = configureWebPush();
   if (!config) {
@@ -239,6 +266,7 @@ export async function notifyManagersPush(
     where: {
       user: {
         role: { in: ["MANAGER", "ADMIN"] },
+        ...subscribedToTypeFilter(type),
       },
     },
   });

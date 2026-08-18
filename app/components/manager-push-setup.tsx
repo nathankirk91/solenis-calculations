@@ -231,7 +231,7 @@ export function ManagerPushSetup({
 
       setStatus("subscribed");
       setMessage(
-        "Permission granted. This device will receive approval push notifications.",
+        "Permission granted. This device will receive the alert types you selected below.",
       );
     } catch (error) {
       setStatus("error");
@@ -287,8 +287,8 @@ export function ManagerPushSetup({
       <div>
         <h2 className="font-medium">Phone push notifications</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Enable on this phone or computer, then use Send test notification to
-          confirm it works.
+              Enable on this phone or computer, then use Send test notification
+              to confirm it works. Alert types are chosen below.
         </p>
       </div>
 

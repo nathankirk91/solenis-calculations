@@ -94,18 +94,22 @@ export async function handlePermitIssueSubmit(args: {
       url,
       tag: `permit-auth-${runId}`,
     },
+    "permit.pending_authorization",
   );
   if (pushResult.sent === 0 && pushResult.reason) {
     console.warn("Permit auth push skipped/failed:", pushResult.reason);
   }
 
   if (summary.status === "NEEDS_ATTENTION") {
-    const managerPush = await notifyManagersPush({
-      title: "Permit needs attention",
-      message: `${definition.shortName}: ${summary.attentionCount} item(s)`,
-      url,
-      tag: `permit-${runId}`,
-    });
+    const managerPush = await notifyManagersPush(
+      {
+        title: "Permit needs attention",
+        message: `${definition.shortName}: ${summary.attentionCount} item(s)`,
+        url,
+        tag: `permit-${runId}`,
+      },
+      "permit.needs_attention",
+    );
     if (managerPush.sent === 0 && managerPush.reason) {
       console.warn("Web push skipped/failed:", managerPush.reason);
     }
