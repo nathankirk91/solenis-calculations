@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "~/components/ui/button";
+import { pdfRenderErrorMessage } from "~/lib/pdfjs-module";
+import { loadPdfJs } from "~/lib/pdfjs-viewer";
 import {
   DOUBLE_TAP_ZOOM,
   clampPdfZoom,
@@ -90,11 +92,7 @@ function PdfScrollView({ pdfUrl }: { pdfUrl: string }) {
       target.style.transform = "scale(1)";
 
       try {
-        const pdfjs = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url,
-        ).toString();
+        const pdfjs = await loadPdfJs();
 
         const response = await fetch(pdfUrl, { credentials: "same-origin" });
         if (!response.ok) {
@@ -142,9 +140,7 @@ function PdfScrollView({ pdfUrl }: { pdfUrl: string }) {
         setLoading(false);
       } catch (cause) {
         if (!cancelled) {
-          setError(
-            cause instanceof Error ? cause.message : "Could not render PDF.",
-          );
+          setError(pdfRenderErrorMessage(cause));
           setLoading(false);
         }
       }

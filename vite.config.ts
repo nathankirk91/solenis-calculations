@@ -7,4 +7,12 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
+  optimizeDeps: {
+    // Prebundling wraps pdfjs-dist as a default export, which makes
+    // GlobalWorkerOptions undefined on some Android WebViews.
+    exclude: ["pdfjs-dist"],
+  },
+  worker: {
+    format: "es",
+  },
 });
