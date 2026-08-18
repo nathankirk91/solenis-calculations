@@ -224,7 +224,7 @@ export function buildNavItems({
         {
           to: "/settings",
           label: "Notifications",
-          description: "Push alerts for this device",
+          description: "Devices and alert types for this account",
         },
         ...(canManageOperators
           ? [

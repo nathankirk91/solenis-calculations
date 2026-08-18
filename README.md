@@ -51,7 +51,7 @@ Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` 
 - `/history` — calculation submission history and approval status
 - `/inspections` — inspection checklist catalog
 - `/inspections/history` — completed inspection records
-- `/settings` — managers and admin enable/test phone push notifications
+- `/settings` — managers and admin enable devices and choose which permit, inspection, and calculation alerts they receive
 - `/operators` — managers and admin add/remove operator names
 
 Roles:
@@ -75,7 +75,7 @@ Seed also creates placeholder operator names (`Operator A`–`D`) for the calcul
 1. Operator selects who is running the batch, enters weights, and clicks **Submit for approval**.
 2. The run is stored as `PENDING`.
 3. A manager/admin opens **Approvals**, reviews the numbers, and **Approves** or **Rejects**.
-4. Managers/admin can enable **phone push notifications** on `/approvals` (requires VAPID env keys).
+4. Managers/admin can enable **phone push notifications** on **Settings** (requires VAPID env keys) and choose which permit, inspection, and calculation alerts they receive.
 
 Optional env:
 
@@ -86,9 +86,9 @@ Optional env:
 
 1. Sign in as manager/admin and open **Settings**.
 2. Optionally install the site to your phone home screen.
-3. Tap **Enable on this device** and allow notifications.
-4. Tap **Send test notification** to confirm it arrives.
-5. New pending calculations will then push a notification that opens Approvals.
+3. Tap **Enable on this device** and allow notifications. The first registration opts this account into every alert type.
+4. Under **What you receive**, turn off any permit, inspection, or calculation alerts you do not want.
+5. Tap **Send test notification** to confirm it arrives.
 
 ### Vercel
 

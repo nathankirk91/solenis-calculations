@@ -70,17 +70,18 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  submittedRuns           CalculationRun[]  @relation("SubmittedBy")
-  reviewedRuns            CalculationRun[]  @relation("ReviewedBy")
-  submittedInspectionRuns InspectionRun[]   @relation("InspectionSubmittedBy")
-  submittedPermitRuns     PermitRun[]       @relation("PermitSubmittedBy")
-  closedPermitRuns        PermitRun[]       @relation("PermitClosedBy")
-  inspectionVersions      InspectionVersion[] @relation("InspectionVersionChangedBy")
-  createdInspectionActions InspectionAction[] @relation("InspectionActionCreatedBy")
-  closedInspectionActions InspectionAction[] @relation("InspectionActionClosedBy")
-  pushSubscriptions       PushSubscription[]
-  roleAssignments         UserRoleAssignment[]
-  assignedRolesBy         UserRoleAssignment[] @relation("RoleAssignedBy")
+  submittedRuns              CalculationRun[]  @relation("SubmittedBy")
+  reviewedRuns               CalculationRun[]  @relation("ReviewedBy")
+  submittedInspectionRuns    InspectionRun[]   @relation("InspectionSubmittedBy")
+  submittedPermitRuns        PermitRun[]       @relation("PermitSubmittedBy")
+  closedPermitRuns           PermitRun[]       @relation("PermitClosedBy")
+  inspectionVersions         InspectionVersion[] @relation("InspectionVersionChangedBy")
+  createdInspectionActions   InspectionAction[] @relation("InspectionActionCreatedBy")
+  closedInspectionActions    InspectionAction[] @relation("InspectionActionClosedBy")
+  pushSubscriptions          PushSubscription[]
+  notificationPreferences    UserNotificationPreference[]
+  roleAssignments            UserRoleAssignment[]
+  assignedRolesBy            UserRoleAssignment[] @relation("RoleAssignedBy")
 
   @@map("users")
 }
@@ -375,4 +376,19 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+/// Per-user opt-in for each push event type. Missing rows mean enabled.
+model UserNotificationPreference {
+  userId    String   @map("user_id")
+  type      String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, type])
+  @@index([type, enabled])
+  @@map("user_notification_preferences")
 }
