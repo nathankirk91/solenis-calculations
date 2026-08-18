@@ -32,14 +32,14 @@ const {
     isNotificationEnabled(optedOut, "permit.pending_authorization"),
     false,
   );
-  assert.equal(isNotificationEnabled(optedOut, "permit.needs_attention"), true);
+  assert.equal(isNotificationEnabled(optedOut, "inspection.needs_attention"), true);
   assert.equal(isNotificationEnabled(optedOut, "calculation.pending"), true);
 }
 
 {
   const formData = new FormData();
   formData.append("types", "calculation.pending");
-  formData.append("types", "permit.needs_attention");
+  formData.append("types", "permit.pending_authorization");
   formData.append("types", "inspection.new_actions");
   const submission = parseWithZod(formData, {
     schema: notificationPreferenceSchema,
@@ -51,8 +51,7 @@ const {
   const rows = preferenceRowsFromEnabledTypes(submission.value.types);
   const prefs = mergeNotificationPreferences(rows);
   assert.equal(prefs["calculation.pending"], true);
-  assert.equal(prefs["permit.pending_authorization"], false);
-  assert.equal(prefs["permit.needs_attention"], true);
+  assert.equal(prefs["permit.pending_authorization"], true);
   assert.equal(prefs["inspection.needs_attention"], false);
   assert.equal(prefs["inspection.new_actions"], true);
 }

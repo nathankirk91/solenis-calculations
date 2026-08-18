@@ -7,7 +7,7 @@ import { createPermitIssueSchema } from "~/lib/permit.schema";
 import type { InspectionDefinition, InspectionSummary } from "~/lib/inspections";
 import { createPermitRun } from "~/lib/permits.server";
 import { ensureInspectionSchema } from "~/lib/migrate.server";
-import { notifyManagersPush, notifyUsersPush } from "~/lib/push.server";
+import { notifyUsersPush } from "~/lib/push.server";
 import { listUsersEligibleForAnyPermitSignOff } from "~/lib/roles.server";
 import type { AuthUser } from "~/lib/user.server";
 
@@ -98,21 +98,6 @@ export async function handlePermitIssueSubmit(args: {
   );
   if (pushResult.sent === 0 && pushResult.reason) {
     console.warn("Permit auth push skipped/failed:", pushResult.reason);
-  }
-
-  if (summary.status === "NEEDS_ATTENTION") {
-    const managerPush = await notifyManagersPush(
-      {
-        title: "Permit needs attention",
-        message: `${definition.shortName}: ${summary.attentionCount} item(s)`,
-        url,
-        tag: `permit-${runId}`,
-      },
-      "permit.needs_attention",
-    );
-    if (managerPush.sent === 0 && managerPush.reason) {
-      console.warn("Web push skipped/failed:", managerPush.reason);
-    }
   }
 
   throw redirect(`/permits/runs/${runId}`);

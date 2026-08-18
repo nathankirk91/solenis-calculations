@@ -15,7 +15,7 @@ const {
 
 {
   const prefs = defaultNotificationPreferences();
-  assert.equal(NOTIFICATION_TYPE_IDS.length, 5);
+  assert.equal(NOTIFICATION_TYPE_IDS.length, 4);
   for (const type of NOTIFICATION_TYPE_IDS) {
     assert.equal(prefs[type], true);
     assert.equal(isNotificationEnabled(prefs, type), true);
@@ -33,22 +33,26 @@ const {
 }
 
 {
-  assert.equal(isNotificationTypeId("permit.needs_attention"), true);
+  assert.equal(isNotificationTypeId("permit.pending_authorization"), true);
+  assert.equal(isNotificationTypeId("permit.needs_attention"), false);
   assert.equal(isNotificationTypeId("permit.unknown"), false);
 }
 
 {
   const merged = mergeNotificationPreferences([
+    { type: "permit.pending_authorization", enabled: false },
     { type: "permit.needs_attention", enabled: false },
     { type: "not-a-real-type", enabled: false },
     { type: "inspection.new_actions", enabled: true },
   ]);
   assert.equal(merged["calculation.pending"], true);
-  assert.equal(merged["permit.pending_authorization"], true);
-  assert.equal(merged["permit.needs_attention"], false);
+  assert.equal(merged["permit.pending_authorization"], false);
   assert.equal(merged["inspection.needs_attention"], true);
   assert.equal(merged["inspection.new_actions"], true);
-  assert.equal(isNotificationEnabled(merged, "permit.needs_attention"), false);
+  assert.equal(
+    isNotificationEnabled(merged, "permit.pending_authorization"),
+    false,
+  );
   assert.equal(isNotificationEnabled(merged, "calculation.pending"), true);
 }
 

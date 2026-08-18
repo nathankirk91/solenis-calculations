@@ -3,7 +3,6 @@ import { z } from "zod";
 export const NOTIFICATION_TYPE_IDS = [
   "calculation.pending",
   "permit.pending_authorization",
-  "permit.needs_attention",
   "inspection.needs_attention",
   "inspection.new_actions",
 ] as const;
@@ -42,17 +41,12 @@ export const NOTIFICATION_CATEGORIES: NotificationCategory[] = [
   {
     id: "permits",
     label: "Permits",
-    description: "Alerts for permit authorisation and attention items.",
+    description: "Alerts when a permit needs authorisation.",
     types: [
       {
         id: "permit.pending_authorization",
         label: "Pending authorisation",
         description: "When a permit is issued and needs your sign-off.",
-      },
-      {
-        id: "permit.needs_attention",
-        label: "Needs attention",
-        description: "When a permit is issued with attention items.",
       },
     ],
   },
@@ -86,7 +80,6 @@ export function defaultNotificationPreferences(): NotificationPreferenceMap {
   return {
     "calculation.pending": true,
     "permit.pending_authorization": true,
-    "permit.needs_attention": true,
     "inspection.needs_attention": true,
     "inspection.new_actions": true,
   };
