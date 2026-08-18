@@ -241,7 +241,5 @@ export function buildPermitDocument(
       },
     ],
     blocks,
-    footerNote:
-      "Retain closed permits for at least one year. Springvale Solenis plant record.",
   };
 }
