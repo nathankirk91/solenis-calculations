@@ -11,6 +11,27 @@ type SignaturePadProps = {
   error?: string;
 };
 
+const EXPORT_MAX_WIDTH = 640;
+const EXPORT_JPEG_QUALITY = 0.65;
+
+function exportSignature(source: HTMLCanvasElement): string {
+  const rect = source.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  const scale = Math.min(1, EXPORT_MAX_WIDTH / width);
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(width * scale));
+  out.height = Math.max(1, Math.round(height * scale));
+  const ctx = out.getContext("2d");
+  if (!ctx) {
+    return source.toDataURL("image/jpeg", EXPORT_JPEG_QUALITY);
+  }
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(source, 0, 0, out.width, out.height);
+  return out.toDataURL("image/jpeg", EXPORT_JPEG_QUALITY);
+}
+
 export function SignaturePad({
   name,
   id,
@@ -20,40 +41,44 @@ export function SignaturePad({
   error,
 }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [hasStrokes, setHasStrokes] = useState(false);
+  const drawingRef = useRef(false);
+  const hasStrokesRef = useRef(Boolean(value));
+  const dataUrlRef = useRef(value ?? "");
   const [dataUrl, setDataUrl] = useState(value ?? "");
+  const [hasStrokes, setHasStrokes] = useState(Boolean(value));
 
-  const getCtx = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    return ctx;
-  }, []);
-
-  const resizeCanvas = useCallback(() => {
+  const paintCanvas = useCallback((imageSrc?: string) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
     const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.scale(dpr, dpr);
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#072635";
-    }
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#072635";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    const src = imageSrc ?? dataUrlRef.current;
+    if (!src) return;
+    const image = new Image();
+    image.onload = () => {
+      ctx.drawImage(image, 0, 0, rect.width, rect.height);
+    };
+    image.src = src;
   }, []);
 
   useEffect(() => {
-    resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
-    return () => window.removeEventListener("resize", resizeCanvas);
-  }, [resizeCanvas]);
+    paintCanvas();
+    const onResize = () => paintCanvas();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [paintCanvas]);
 
   function getPos(
     event: React.MouseEvent | React.TouchEvent,
@@ -72,46 +97,48 @@ export function SignaturePad({
   function startDraw(event: React.MouseEvent | React.TouchEvent) {
     const pos = getPos(event);
     if (!pos) return;
-    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
     if (!ctx) return;
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
-    setIsDrawing(true);
+    drawingRef.current = true;
   }
 
   function draw(event: React.MouseEvent | React.TouchEvent) {
-    if (!isDrawing) return;
+    if (!drawingRef.current) return;
     const pos = getPos(event);
     if (!pos) return;
-    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
     if (!ctx) return;
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
-    setHasStrokes(true);
+    if (!hasStrokesRef.current) {
+      hasStrokesRef.current = true;
+      setHasStrokes(true);
+    }
   }
 
   function endDraw() {
-    if (!isDrawing) return;
-    setIsDrawing(false);
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
     const canvas = canvasRef.current;
-    if (canvas && hasStrokes) {
-      const url = canvas.toDataURL("image/png");
+    if (canvas && hasStrokesRef.current) {
+      const url = exportSignature(canvas);
+      dataUrlRef.current = url;
       setDataUrl(url);
       onChange?.(url);
     }
   }
 
   function clear() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-    resizeCanvas();
+    hasStrokesRef.current = false;
+    dataUrlRef.current = "";
     setHasStrokes(false);
     setDataUrl("");
     onChange?.("");
+    paintCanvas("");
   }
 
   return (
