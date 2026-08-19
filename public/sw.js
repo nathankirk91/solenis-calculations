@@ -13,7 +13,7 @@ self.addEventListener("push", function (event) {
     console.error("SW: Failed to parse push payload", error);
   }
 
-  const title = data.title || "Springvale Solenis";
+  const title = data.title || "Hercules 1612";
   const message =
     data.message || "A calculation is waiting for approval.";
   const icon = data.icon || "/brand/icon-192.png";

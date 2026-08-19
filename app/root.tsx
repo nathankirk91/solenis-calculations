@@ -37,7 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#072635" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Springvale Solenis" />
+        <meta name="apple-mobile-web-app-title" content="Hercules 1612" />
         <Meta />
         <Links />
       </head>
