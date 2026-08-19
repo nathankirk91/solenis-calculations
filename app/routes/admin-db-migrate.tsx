@@ -86,7 +86,7 @@ export default function AdminDbMigratePage({
             Apply database migrations
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Use this if a Vercel build-time migrate hangs on the Supabase
+            Use this if a build-time migrate hangs on the Supabase
             pooler. Applies any pending Prisma migrations through the app DB
             connection.
           </p>

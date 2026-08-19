@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Run `prisma migrate deploy` during Vercel builds with a hard timeout.
+ * Run `prisma migrate deploy` during production builds with a hard timeout.
  * Prefers DIRECT_URL; falls back to DATABASE_URL with advisory lock disabled.
  * On timeout or migrate failure, exits 0 so the app build still completes —
  * apply pending SQL via /admin/db-migrate when the pooler hangs.

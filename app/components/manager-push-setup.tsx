@@ -79,7 +79,7 @@ export function ManagerPushSetup({
         if (!cancelled) {
           setStatus("unsupported");
           setMessage(
-            "Push notifications are not configured on the server yet (VAPID keys missing on Vercel).",
+            "Push notifications are not configured on the server yet (VAPID keys missing).",
           );
         }
         return;
@@ -168,7 +168,7 @@ export function ManagerPushSetup({
   async function enablePush() {
     if (!vapidPublicKey) {
       setMessage(
-        "Push notifications are not configured on the server yet (VAPID keys missing on Vercel).",
+        "Push notifications are not configured on the server yet (VAPID keys missing).",
       );
       return;
     }

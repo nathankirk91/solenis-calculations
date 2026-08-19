@@ -12,7 +12,7 @@ node_modules
 
 # OS / editor
 .DS_Store
-.vercel
+.netlify
 *.local
 
 /generated/prisma

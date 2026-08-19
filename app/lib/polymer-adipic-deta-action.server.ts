@@ -106,7 +106,7 @@ export async function handlePolymerAdipicDetaSubmit(args: {
 
   const approvalsUrl = `${getAppBaseUrl(request)}/approvals`;
 
-  // Must await on Vercel serverless — fire-and-forget is frozen before fetch completes.
+  // Must await on serverless — fire-and-forget is frozen before fetch completes.
   const pushResult = await notifyManagersPush(
     {
       title: "Calculation pending approval",
