@@ -3,6 +3,7 @@ import { data, Link } from "react-router";
 
 import type { Route } from "./+types/settings";
 
+import { APP_NAME, pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { ManagerPushSetup } from "~/components/manager-push-setup";
 import { NotificationPreferencesForm } from "~/components/notification-preferences-form";
@@ -34,7 +35,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Settings | Springvale Solenis" },
+    { title: pageTitle("Settings") },
     {
       name: "description",
       content: "Manager settings for push notifications.",
@@ -92,7 +93,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const result = await notifyUserPush(user.id, {
-    title: "Springvale Solenis test",
+    title: `${APP_NAME} test`,
     message: "Push notifications are working on this device.",
     url: `${getAppBaseUrl(request)}/settings`,
     tag: `test-${user.id}-${Date.now()}`,

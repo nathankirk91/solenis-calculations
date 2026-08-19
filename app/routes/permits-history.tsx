@@ -2,6 +2,7 @@ import { Form, Link } from "react-router";
 
 import type { Route } from "./+types/permits-history";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { PermitRecordCard } from "~/components/permit-record-card";
 import { Badge } from "~/components/ui/badge";
@@ -14,7 +15,7 @@ import { canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Permit records | Springvale Solenis" },
+    { title: pageTitle("Permit records") },
     {
       name: "description",
       content: "Open and closed work permit history.",

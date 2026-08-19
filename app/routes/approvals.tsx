@@ -2,6 +2,7 @@ import { data, Form, Link } from "react-router";
 
 import type { Route } from "./+types/approvals";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -24,7 +25,7 @@ import { formatMelbourneDateTime } from "~/lib/datetime";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Approvals | Springvale Solenis" },
+    { title: pageTitle("Approvals") },
     {
       name: "description",
       content: "Review pending calculation runs before vessel charge.",

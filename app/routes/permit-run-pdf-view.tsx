@@ -1,5 +1,6 @@
 import type { Route } from "./+types/permit-run-pdf-view";
 
+import { pageTitle } from "~/lib/brand";
 import { RecordPdfViewer } from "~/components/record-pdf-viewer";
 import { requireUser } from "~/lib/auth.server";
 import { buildPermitDocument } from "~/lib/permit-document";
@@ -7,7 +8,7 @@ import { getPermitRunById } from "~/lib/permits.server";
 
 export function meta({ loaderData }: Route.MetaArgs) {
   return [
-    { title: `${loaderData?.title ?? "Permit"} PDF | Springvale Solenis` },
+    { title: pageTitle(`${loaderData?.title ?? "Permit"} PDF`) },
   ];
 }
 

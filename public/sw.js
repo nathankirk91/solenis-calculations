@@ -22,7 +22,7 @@ self.addEventListener("push", function (event) {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: message,
-      tag: data.tag || `solenis-${new Date().toISOString()}`,
+      tag: data.tag || `hercules-${new Date().toISOString()}`,
       icon,
       data: { url },
     }),

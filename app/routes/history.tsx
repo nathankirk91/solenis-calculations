@@ -2,6 +2,7 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/history";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
 import {
@@ -23,7 +24,7 @@ import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Calculation history | Springvale Solenis" },
+    { title: pageTitle("Calculation history") },
     {
       name: "description",
       content:

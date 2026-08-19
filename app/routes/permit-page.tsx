@@ -2,6 +2,7 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/permit-page";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { PermitIssueForm } from "~/components/permit-issue-form";
 import { Badge } from "~/components/ui/badge";
@@ -13,10 +14,10 @@ import { canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Permit | Springvale Solenis" },
+    { title: pageTitle("Permit") },
     {
       name: "description",
-      content: "Issue a work permit for Solenis Springvale.",
+      content: "Issue a work permit for Hercules 1612.",
     },
   ];
 }

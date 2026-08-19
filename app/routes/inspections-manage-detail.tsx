@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { Route } from "./+types/inspections-manage-detail";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -45,7 +46,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Edit inspection | Springvale Solenis" },
+    { title: pageTitle("Edit inspection") },
     {
       name: "description",
       content: "Edit inspection details and checklist questions.",

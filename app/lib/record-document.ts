@@ -1,6 +1,8 @@
 import { formatLastAnswerDisplay, type InspectionAnswerRecord } from "~/lib/inspections";
 
-export const RECORD_SITE_NAME = "Springvale Solenis";
+import { APP_NAME } from "~/lib/brand";
+
+export const RECORD_SITE_NAME = APP_NAME;
 export const EMPTY_FIELD_VALUE = "—";
 
 export type RecordDocumentKind = "inspection" | "permit";

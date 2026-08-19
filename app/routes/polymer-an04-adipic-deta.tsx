@@ -2,6 +2,7 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/polymer-an04-adipic-deta";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { PolymerAdipicDetaForm } from "~/components/polymer-adipic-deta-form";
 import { Badge } from "~/components/ui/badge";
@@ -16,7 +17,7 @@ const product = POLYMER_AN04;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: `${product.title} | Springvale Solenis` },
+    { title: pageTitle(product.title) },
     {
       name: "description",
       content: `Calculate extra DETA required after charging Adipic Acid for ${product.shortName}.`,

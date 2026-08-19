@@ -2,6 +2,7 @@ import { data, Form, Link } from "react-router";
 
 import type { Route } from "./+types/admin-db-migrate";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -19,7 +20,7 @@ import { applyPendingMigrations, ensureInspectionSchema } from "~/lib/migrate.se
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "DB migrate | Springvale Solenis" },
+    { title: pageTitle("DB migrate") },
     {
       name: "description",
       content: "Apply pending Prisma migrations through the app database connection.",

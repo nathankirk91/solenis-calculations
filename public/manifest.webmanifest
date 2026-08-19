@@ -1,7 +1,7 @@
 {
   "name": "Hercules 1612",
   "short_name": "Hercules 1612",
-  "description": "Plant calculation tools and approval workflow for Solenis.",
+  "description": "Plant calculation tools and approval workflow for Hercules 1612.",
   "start_url": "/",
   "display": "standalone",
   "lang": "en",

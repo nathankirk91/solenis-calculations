@@ -2,6 +2,7 @@ import { data, Form, Link } from "react-router";
 
 import type { Route } from "./+types/users";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -25,7 +26,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Users | Springvale Solenis" },
+    { title: pageTitle("Users") },
     {
       name: "description",
       content: "Create users and assign one or more roles.",

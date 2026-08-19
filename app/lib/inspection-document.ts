@@ -158,7 +158,7 @@ export function buildInspectionDocument(
       },
     ],
     blocks,
-    footerNote: "Plant inspection record — Springvale Solenis.",
+    footerNote: `Plant inspection record — ${RECORD_SITE_NAME}.`,
   };
 }
 

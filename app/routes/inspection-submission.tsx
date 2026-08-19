@@ -2,6 +2,7 @@ import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inspection-submission";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { DownloadPdfLink } from "~/components/download-pdf-link";
 import { Badge } from "~/components/ui/badge";
@@ -32,7 +33,7 @@ import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Inspection submission | Springvale Solenis" },
+    { title: pageTitle("Inspection submission") },
     {
       name: "description",
       content: "Recorded plant inspection checklist results.",

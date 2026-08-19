@@ -1,5 +1,6 @@
 import type { Route } from "./+types/inspection-submission-pdf-view";
 
+import { pageTitle } from "~/lib/brand";
 import { RecordPdfViewer } from "~/components/record-pdf-viewer";
 import { requireUser } from "~/lib/auth.server";
 import { buildInspectionDocument } from "~/lib/inspection-document";
@@ -8,7 +9,7 @@ import { getInspectionRunById } from "~/lib/inspections.server";
 export function meta({ loaderData }: Route.MetaArgs) {
   return [
     {
-      title: `${loaderData?.title ?? "Inspection"} PDF | Springvale Solenis`,
+      title: pageTitle(`${loaderData?.title ?? "Inspection"} PDF`),
     },
   ];
 }

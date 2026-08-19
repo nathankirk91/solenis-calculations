@@ -2,6 +2,7 @@ import { data, Form, Link, redirect } from "react-router";
 
 import type { Route } from "./+types/permits-manage";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -26,7 +27,7 @@ import { ensureInspectionSchema } from "~/lib/migrate.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Manage permits | Springvale Solenis" },
+    { title: pageTitle("Manage permits") },
     {
       name: "description",
       content: "Create and manage work permit forms and questions.",

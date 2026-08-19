@@ -2,6 +2,7 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/inspections-forklifts";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { CatalogLinkCard } from "~/components/catalog-link-card";
 import { Badge } from "~/components/ui/badge";
@@ -18,7 +19,7 @@ import { canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Forklift inspections | Springvale Solenis" },
+    { title: pageTitle("Forklift inspections") },
     {
       name: "description",
       content:

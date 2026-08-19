@@ -9,6 +9,7 @@ import { data, redirect } from "react-router";
 
 import type { Route } from "./+types/permit-run";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { DownloadPdfLink } from "~/components/download-pdf-link";
 import { SignaturePad } from "~/components/signature-pad";
@@ -52,7 +53,7 @@ import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Permit record | Springvale Solenis" },
+    { title: pageTitle("Permit record") },
     {
       name: "description",
       content: "Review, authorize, or close out a work permit.",

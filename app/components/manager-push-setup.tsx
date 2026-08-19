@@ -131,7 +131,7 @@ export function ManagerPushSetup({
           if (!cancelled) {
             setStatus("denied");
             setMessage(
-              "Notifications are blocked for this site. In browser settings, allow notifications for solenis-calculations.vercel.app, then try again.",
+              "Notifications are blocked for this site. In browser settings, allow notifications for this site, then try again.",
             );
           }
           return;

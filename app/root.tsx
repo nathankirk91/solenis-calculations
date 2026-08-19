@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 
+import { APP_NAME } from "~/lib/brand";
 import type { Route } from "./+types/root";
 import "./app.css";
 
@@ -37,7 +38,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#072635" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Hercules 1612" />
+        <meta name="apple-mobile-web-app-title" content={APP_NAME} />
         <Meta />
         <Links />
       </head>

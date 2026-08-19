@@ -3,6 +3,7 @@ import { Link, useNavigate, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/submission";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -24,7 +25,7 @@ const POLL_MS = 60_000;
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Submission | Springvale Solenis" },
+    { title: pageTitle("Submission") },
     {
       name: "description",
       content: "Waiting for management approval of a submitted calculation.",

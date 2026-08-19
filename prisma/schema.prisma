@@ -1,4 +1,4 @@
-// Prisma schema for Solenis Springvale (Supabase Postgres)
+// Prisma schema for Hercules 1612 (Supabase Postgres)
 // https://pris.ly/d/prisma-schema
 
 generator client {

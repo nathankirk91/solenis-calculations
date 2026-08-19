@@ -1,6 +1,6 @@
-# Solenis Calculations
+# Hercules 1612
 
-Plant calculation and inspection tools for Solenis production processes.
+Plant calculation and inspection tools for Hercules 1612 production processes.
 
 ## Stack
 

@@ -2,6 +2,7 @@ import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inspections-history";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { DownloadPdfLink } from "~/components/download-pdf-link";
 import { ForkliftDayDashboardCard } from "~/components/forklift-day-dashboard";
@@ -38,7 +39,7 @@ import { cn } from "~/lib/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Inspection records | Springvale Solenis" },
+    { title: pageTitle("Inspection records") },
     {
       name: "description",
       content:

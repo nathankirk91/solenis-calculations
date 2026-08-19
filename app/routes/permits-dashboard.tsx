@@ -2,6 +2,7 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/permits-dashboard";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { PermitDashboard } from "~/components/permit-dashboard";
 import { Badge } from "~/components/ui/badge";
@@ -15,11 +16,11 @@ import { canManageOperators, canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Permit dashboard | Springvale Solenis" },
+    { title: pageTitle("Permit dashboard") },
     {
       name: "description",
       content:
-        "Active permits awaiting authorization or close-out at Solenis Springvale.",
+        "Active permits awaiting authorization or close-out at Hercules 1612.",
     },
   ];
 }

@@ -2,6 +2,7 @@ import { Link, redirect } from "react-router";
 
 import type { Route } from "./+types/inspection-page";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { InspectionChecklistForm } from "~/components/inspection-checklist-form";
 import { Badge } from "~/components/ui/badge";
@@ -35,10 +36,10 @@ function permitIssueHref(definition: {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Inspection | Springvale Solenis" },
+    { title: pageTitle("Inspection") },
     {
       name: "description",
-      content: "Plant inspection checklist or work permit for Solenis Springvale.",
+      content: "Plant inspection checklist or work permit for Hercules 1612.",
     },
   ];
 }

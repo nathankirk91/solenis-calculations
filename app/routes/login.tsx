@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import type { Route } from "./+types/login";
 
+import { APP_NAME, pageTitle } from "~/lib/brand";
 import {
   authenticator,
   createUserSession,
@@ -28,7 +29,7 @@ const loginSchema = z.object({
 });
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "Sign in | Springvale Solenis" }];
+  return [{ title: pageTitle("Sign in") }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -87,11 +88,8 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
     <div className="flex app-shell items-center justify-center px-4">
       <Card className="w-full max-w-md border-border/80 shadow-sm">
         <CardHeader>
-          <p className="text-xs font-semibold tracking-[0.2em] text-brand uppercase">
-            Solenis
-          </p>
           <CardTitle className="font-heading text-2xl text-brand-navy">
-            Springvale sign in
+            {APP_NAME} sign in
           </CardTitle>
           <CardDescription>
             Use your email and password to access plant calculators.

@@ -4,8 +4,8 @@ test.describe("authentication gates", () => {
   test("login page renders sign-in form", async ({ page }) => {
     await page.goto("/login");
 
-    await expect(page.getByText("Springvale sign in")).toBeVisible();
-    await expect(page.getByText("Solenis")).toBeVisible();
+    await expect(page.getByText("Hercules 1612 sign in")).toBeVisible();
+    await expect(page.getByText("Hercules 1612")).toBeVisible();
     await expect(page.locator('input[name="email"]')).toBeVisible();
     await expect(page.locator('input[name="password"]')).toBeVisible();
     await expect(

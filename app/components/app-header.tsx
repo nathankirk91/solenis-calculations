@@ -4,6 +4,7 @@ import { ChevronDownIcon, MenuIcon, XIcon } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { APP_NAME } from "~/lib/brand";
 import {
   buildNavItems,
   groupHasMultipleSections,
@@ -331,11 +332,8 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
             <SolenisMark className="size-full" />
           </span>
           <span className="min-w-0 flex-col">
-            <span className="block text-[0.7rem] font-semibold tracking-[0.18em] text-brand uppercase">
-              Solenis
-            </span>
             <span className="font-heading block truncate text-lg font-semibold tracking-tight text-brand-navy transition-colors group-hover:text-brand-navy/80">
-              Springvale
+              {APP_NAME}
             </span>
           </span>
         </Link>

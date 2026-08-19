@@ -2,6 +2,7 @@ import { Form, Link } from "react-router";
 
 import type { Route } from "./+types/home";
 
+import { APP_NAME, pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { CatalogLinkCard } from "~/components/catalog-link-card";
 import { ForkliftDayDashboardCard } from "~/components/forklift-day-dashboard";
@@ -30,7 +31,7 @@ import { canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Home | Springvale Solenis" },
+    { title: pageTitle("Home") },
     {
       name: "description",
       content:
@@ -146,11 +147,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <AppHeader user={user} pendingCount={pendingCount} />
       <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <section className="mb-10 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-brand uppercase">
-            Solenis
-          </p>
           <h1 className="font-heading text-4xl font-semibold tracking-tight text-brand-navy sm:text-5xl">
-            Springvale
+            {APP_NAME}
           </h1>
           <p className="mt-3 text-base text-muted-foreground sm:text-lg">
             Quick view of active permits, forklift checks for {dayLabel}, and

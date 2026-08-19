@@ -2,6 +2,7 @@ import { data, Form, Link, redirect } from "react-router";
 
 import type { Route } from "./+types/inspections-manage";
 
+import { pageTitle } from "~/lib/brand";
 import { AppHeader } from "~/components/app-header";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -27,7 +28,7 @@ import { ensureInspectionSchema } from "~/lib/migrate.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Manage inspections | Springvale Solenis" },
+    { title: pageTitle("Manage inspections") },
     {
       name: "description",
       content: "Create and manage plant inspection checklists and questions.",
