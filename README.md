@@ -79,7 +79,7 @@ Seed also creates placeholder operator names (`Operator A`–`D`) for the calcul
 
 Optional env:
 
-- `APP_BASE_URL` — canonical site URL for push notification deep links (default / recommended: `https://solenis-calculations.vercel.app`)
+- `APP_BASE_URL` — canonical site URL for push notification deep links (default / recommended: `https://hercules1612.com`)
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — Web Push for managers
 
 ### Manager phone setup

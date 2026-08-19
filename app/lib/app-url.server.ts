@@ -1,5 +1,5 @@
 /** Canonical production URL for push deep links and absolute URLs. */
-export const PRODUCTION_APP_BASE_URL = "https://solenis-calculations.vercel.app";
+export const PRODUCTION_APP_BASE_URL = "https://hercules1612.com";
 
 export function getAppBaseUrl(request: Request): string {
   const configured = process.env.APP_BASE_URL?.trim();
