@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 /**
- * Run `prisma db seed` during production builds when DATABASE_URL is set.
- * Idempotent — upserts calculations, inspections, operators, and roles.
- * Existing user passwords are not overwritten (see prisma/seed.ts).
+ * Run `prisma db seed` during production builds when RUN_DB_SEED=true.
+ * Opt-in only — normal deploys skip seeding. Set RUN_DB_SEED=true in Netlify
+ * for a one-off deploy when you need to (re)seed the database.
  */
 import { spawn } from "node:child_process";
+
+if (process.env.RUN_DB_SEED !== "true") {
+  console.log(
+    "Skipping prisma db seed (set RUN_DB_SEED=true on a deploy to run seed).",
+  );
+  process.exit(0);
+}
 
 const database = process.env.DATABASE_URL;
 
 if (!database) {
   console.warn("Skipping prisma db seed: DATABASE_URL is not set.");
-  process.exit(0);
-}
-
-if (process.env.RUN_DB_SEED === "false") {
-  console.log("Skipping prisma db seed: RUN_DB_SEED=false.");
   process.exit(0);
 }
 

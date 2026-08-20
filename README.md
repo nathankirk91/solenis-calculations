@@ -151,6 +151,7 @@ The Netlify React Router plugin lives in `vite.config.ts`. Build settings are in
 | `SEED_ADMIN_PASSWORD` | Local/seed only | Override default admin password when seeding. |
 | `SEED_OPERATOR_EMAIL` | Local/seed only | Shared operator login email for seeding. |
 | `SEED_OPERATOR_PASSWORD` | Local/seed only | Shared operator login password for seeding. |
+| `RUN_DB_SEED` | Optional | Set to `true` on a **single** Netlify deploy to run `prisma db seed` at build time. Omit (or remove) for normal deploys. |
 
 **Supabase step-by-step**
 
