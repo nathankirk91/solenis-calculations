@@ -28,7 +28,7 @@ export function meta({}: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Choose which roles may sign Operations representative, Maintenance representative, and Safe work coordinator authorisations.",
+        "Choose which roles may sign each permit authorisation slot.",
     },
   ];
 }
@@ -95,7 +95,8 @@ export default function PermitsSettingsPage({
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             Choose which roles may sign each authorisation slot when a permit is
-            issued. Only users with those roles appear in the sign-off lists.
+            issued. Create roles on the Roles page, assign them to users, then
+            select which roles may sign each slot here.
           </p>
           {actionData && "error" in actionData && actionData.error ? (
             <p className="mt-3 text-sm text-destructive">{actionData.error}</p>

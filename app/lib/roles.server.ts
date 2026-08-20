@@ -79,33 +79,6 @@ const DEFAULT_ROLES: Array<{
     isSystem: true,
     sortOrder: 4,
   },
-  {
-    id: "role-operations-rep",
-    slug: "operations-rep",
-    name: "Operations representative / Account manager",
-    description:
-      "Knows the equipment; can sign Operations authorisation on Safe Work Permits.",
-    isSystem: true,
-    sortOrder: 10,
-  },
-  {
-    id: "role-maintenance-rep",
-    slug: "maintenance-rep",
-    name: "Maintenance representative / Account technician",
-    description:
-      "Person performing the work or lead for a group; can sign Maintenance authorisation.",
-    isSystem: true,
-    sortOrder: 11,
-  },
-  {
-    id: "role-safe-work-coordinator",
-    slug: "safe-work-coordinator",
-    name: "Safe work coordinator",
-    description:
-      "Knows the equipment and SWP process; can sign Safe work coordinator authorisation.",
-    isSystem: true,
-    sortOrder: 12,
-  },
 ];
 
 const DEFAULT_SLOTS: Array<{
@@ -113,28 +86,24 @@ const DEFAULT_SLOTS: Array<{
   code: PermitSlotCode;
   label: string;
   sortOrder: number;
-  defaultRoleSlug: string;
 }> = [
   {
     id: "slot-operations-rep",
     code: PERMIT_SLOT_CODES.operationsRep,
     label: "Operations representative / Account manager",
     sortOrder: 1,
-    defaultRoleSlug: "operations-rep",
   },
   {
     id: "slot-maintenance-rep",
     code: PERMIT_SLOT_CODES.maintenanceRep,
     label: "Maintenance representative / Account technician",
     sortOrder: 2,
-    defaultRoleSlug: "maintenance-rep",
   },
   {
     id: "slot-safe-work-coordinator",
     code: PERMIT_SLOT_CODES.safeWorkCoordinator,
     label: "Safe work coordinator",
     sortOrder: 3,
-    defaultRoleSlug: "safe-work-coordinator",
   },
 ];
 
@@ -199,31 +168,6 @@ export async function ensureRolesAndSignOffDefaults(): Promise<void> {
         sortOrder: slot.sortOrder,
       },
     });
-  }
-
-  const slots = await prisma.permitSignOffSlot.findMany({
-    where: { code: { in: DEFAULT_SLOTS.map((slot) => slot.code) } },
-    select: {
-      id: true,
-      code: true,
-      allowedRoles: { select: { roleId: true } },
-    },
-  });
-
-  for (const slot of slots) {
-    const defaults = DEFAULT_SLOTS.find((item) => item.code === slot.code);
-    if (!defaults) {
-      continue;
-    }
-    const roleId = rolesBySlug[defaults.defaultRoleSlug];
-    if (!roleId) {
-      continue;
-    }
-    if (slot.allowedRoles.length === 0) {
-      await prisma.permitSignOffSlotRole.create({
-        data: { slotId: slot.id, roleId },
-      });
-    }
   }
 
   // Backfill assignments from legacy users.role when a user has none yet.
