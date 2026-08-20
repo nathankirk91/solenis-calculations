@@ -6,7 +6,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "node ./scripts/migrate-deploy.mjs && react-router build",
+    "build": "node ./scripts/migrate-deploy.mjs && node ./scripts/seed-deploy.mjs && react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",

@@ -33,14 +33,25 @@ async function upsertUser(args: {
   role: "OPERATOR" | "MANAGER" | "ADMIN";
 }) {
   const passwordHash = await bcrypt.hash(args.password, 10);
-  await prisma.user.upsert({
+  const existing = await prisma.user.findUnique({
     where: { email: args.email },
-    update: {
-      passwordHash,
-      name: args.name,
-      role: args.role,
-    },
-    create: {
+    select: { id: true },
+  });
+
+  if (existing) {
+    await prisma.user.update({
+      where: { email: args.email },
+      data: {
+        name: args.name,
+        role: args.role,
+      },
+    });
+    console.log(`Updated ${args.role.toLowerCase()} ${args.email} (password unchanged)`);
+    return;
+  }
+
+  await prisma.user.create({
+    data: {
       email: args.email,
       passwordHash,
       name: args.name,
