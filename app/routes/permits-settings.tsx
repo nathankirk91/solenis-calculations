@@ -37,7 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireOperatorManager(request, "/permits/settings");
   const [slots, roles, pendingCount] = await Promise.all([
     listPermitSignOffSlots(),
-    listRoles({ activeOnly: true }),
+    listRoles({ activeOnly: true, excludeAccessLevels: true }),
     canReviewRuns(user.role) ? countPendingRuns() : Promise.resolve(0),
   ]);
   return { user, slots, roles, pendingCount };

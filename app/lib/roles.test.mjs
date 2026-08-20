@@ -12,6 +12,7 @@ const {
   canManageRoles,
   HSOLENIS_OPERATOR_ROLE_SLUG,
   accessLevelLabel,
+  isAccessLevelRole,
 } = await import("./roles.ts");
 
 assert.deepEqual(USER_ROLES, ["STANDARD", "APPROVER", "ADMIN"]);
@@ -47,5 +48,13 @@ assert.equal(canManageRoles("APPROVER"), false);
 assert.equal(canManageRoles("ADMIN"), true);
 
 assert.equal(HSOLENIS_OPERATOR_ROLE_SLUG, "hsolenis-operator");
+
+assert.equal(isAccessLevelRole("admin"), true);
+assert.equal(isAccessLevelRole("approver"), true);
+assert.equal(isAccessLevelRole("standard"), true);
+assert.equal(isAccessLevelRole("manager"), true);
+assert.equal(isAccessLevelRole("operator"), true);
+assert.equal(isAccessLevelRole("hsolenis-operator"), false);
+assert.equal(isAccessLevelRole("operations-rep"), false);
 
 console.log("roles tests passed");

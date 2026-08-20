@@ -482,18 +482,22 @@ export async function updatePermitSignOffSlotRoles(args: {
 
   const validRoles = await prisma.role.findMany({
     where: { id: { in: uniqueRoleIds }, isActive: true },
-    select: { id: true },
+    select: { id: true, slug: true },
   });
-  if (validRoles.length !== uniqueRoleIds.length) {
+  const businessRoles = validRoles.filter((role) => !isAccessLevelRole(role.slug));
+  if (businessRoles.length === 0) {
+    throw new Error("Select at least one role for this sign-off.");
+  }
+  if (businessRoles.length !== uniqueRoleIds.length) {
     throw new Error("One or more selected roles are invalid.");
   }
 
   await prisma.$transaction([
     prisma.permitSignOffSlotRole.deleteMany({ where: { slotId: slot.id } }),
     prisma.permitSignOffSlotRole.createMany({
-      data: uniqueRoleIds.map((roleId) => ({
+      data: businessRoles.map((role) => ({
         slotId: slot.id,
-        roleId,
+        roleId: role.id,
       })),
     }),
   ]);
