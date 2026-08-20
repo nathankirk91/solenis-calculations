@@ -21,7 +21,7 @@ async function listMigrationDirs(): Promise<string[]> {
 
 /**
  * Ensure inspection tables/enums exist without reading prisma/migrations from disk.
- * Serverless builds do not ship the migrations folder, so runtime
+ * Vercel serverless builds do not ship the migrations folder, so runtime
  * `readdir(prisma/migrations)` fails — this is the production-safe path.
  *
  * Memoized per warm function instance so navigations do not re-run ~24 DDL

@@ -1,7 +1,7 @@
 /**
  * Ensure serverless-friendly query params on DATABASE_URL.
  * - sslmode=no-verify for Supabase/pooler (avoids "self-signed certificate in
- *   certificate chain" with node-pg on serverless hosts)
+ *   certificate chain" with node-pg on Vercel)
  * - connect_timeout for slow cold connects / paused projects
  * - pgbouncer=true on transaction pooler hosts (disables prepared statements)
  */

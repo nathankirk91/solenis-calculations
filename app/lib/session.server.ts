@@ -8,7 +8,7 @@ function getSessionSecrets(): string[] {
 
   if (process.env.NODE_ENV === "production") {
     console.warn(
-      "SESSION_SECRET is not set. Set it in your deployment env vars for secure sessions.",
+      "SESSION_SECRET is not set. Set it in Vercel env vars for secure sessions.",
     );
   }
 

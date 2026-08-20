@@ -7,7 +7,7 @@ Plant calculation and inspection tools for Hercules 1612 production processes.
 - **React Router 8** (framework mode + Vite SSR)
 - **Prisma 7** ORM against **Supabase Postgres**
 - **remix-auth** + **FormStrategy** (email/password)
-- **Netlify** (`@netlify/vite-plugin-react-router`) — SSR via Netlify Functions; set region to **Sydney (`syd`)** for low latency at the plant
+- **Vercel** (`@vercel/react-router` preset) — functions run in **Sydney (`syd1`)** close to the plant
 - **Tailwind CSS 4** + **shadcn/ui**
 - **Conform** + **Zod** for forms
 
@@ -90,97 +90,23 @@ Optional env:
 4. Under **What you receive**, turn off any permit, inspection, or calculation alerts you do not want.
 5. Tap **Send test notification** to confirm it arrives.
 
-### Netlify deployment
-
-#### 1. Create a Netlify site
-
-1. Sign in at [app.netlify.com](https://app.netlify.com).
-2. **Add new site → Import an existing project** and connect your Git provider (GitHub, GitLab, or Bitbucket).
-3. Select this repository. Netlify reads `netlify.toml` automatically:
-   - **Build command:** `npm run build`
-   - **Publish directory:** `build/client`
-   - **Node version:** 22
-
-#### 2. Set environment variables
-
-In Netlify: **Site configuration → Environment variables**. Add the variables below for **Production** (and **Deploy previews** if you want previews to work with the database).
-
-See [Environment variables](#environment-variables) for how to find or generate each value.
-
-#### 3. Choose the Sydney function region (recommended)
-
-The plant is in Australia, so run server-side code close by:
-
-1. **Site configuration → Functions → Function region**
-2. Select **Asia Pacific (Sydney) — `syd`**
-3. Redeploy the site for the change to take effect
-
-> **Note:** Custom function regions require a **Netlify Pro** (or Enterprise) plan. On the free tier, functions run in US East (Ohio) by default — the app still works, but page loads may feel slower.
-
-#### 4. First deploy
-
-1. Trigger a deploy (push to `main` or click **Deploy site**).
-2. The build runs `prisma migrate deploy` automatically when `DIRECT_URL` is set.
-3. If build-time migration times out on Supabase, sign in as admin and open **`/admin/db-migrate`** to apply pending migrations manually.
-4. Seed data is **not** run on deploy — run `npm run db:seed` locally against your Supabase database once, or use `/admin/db-migrate` → **Seed default inspections** after migrations.
-
-#### 5. Custom domain (optional)
-
-1. **Domain management → Add a domain** (e.g. `hercules1612.com`).
-2. Follow Netlify’s DNS instructions.
-3. Set `APP_BASE_URL` to your custom domain (e.g. `https://hercules1612.com`).
-
-#### 6. Manager push notifications (optional)
-
-After deploy, managers can enable phone alerts on **Settings**. Requires the VAPID env vars (see below).
-
-The Netlify React Router plugin lives in `vite.config.ts`. Build settings are in `netlify.toml`.
-
-### Environment variables
-
-| Variable | Required | Where to get it |
-|---|---|---|
-| `DATABASE_URL` | **Yes** | Supabase → **Project Settings → Database → Connection string → URI** (Transaction pooler, port **6543**). Append `?pgbouncer=true` if not present. |
-| `DIRECT_URL` | Recommended | Same Supabase page → **Session mode** connection string (port **5432**). Used for Prisma Migrate at build time and locally. |
-| `SESSION_SECRET` | **Yes** | Generate a long random string, e.g. `openssl rand -base64 32` in a terminal. Used to sign login cookies. |
-| `APP_BASE_URL` | Recommended | Your public site URL, e.g. `https://hercules1612.netlify.app` or your custom domain. Used for push notification deep links. |
-| `VAPID_PUBLIC_KEY` | Optional | Generate with `npx web-push generate-vapid-keys --json`. Needed for manager phone push. |
-| `VAPID_PRIVATE_KEY` | Optional | Same command as above — keep the private key secret. |
-| `VAPID_SUBJECT` | Optional | A contact URI, e.g. `mailto:manager@company.com`. |
-| `SEED_ADMIN_EMAIL` | Local/seed only | Override default admin email when running `npm run db:seed` locally. |
-| `SEED_ADMIN_PASSWORD` | Local/seed only | Override default admin password when seeding. |
-| `SEED_OPERATOR_EMAIL` | Local/seed only | Shared operator login email for seeding. |
-| `SEED_OPERATOR_PASSWORD` | Local/seed only | Shared operator login password for seeding. |
-| `RUN_DB_SEED` | Optional | Set to `true` on a **single** Netlify deploy to run `prisma db seed` at build time. Omit (or remove) for normal deploys. |
-
-**Supabase step-by-step**
-
-1. Go to [supabase.com/dashboard](https://supabase.com/dashboard) and open your project (or create one).
-2. **Project Settings** (gear icon) → **Database**.
-3. Under **Connection string**, choose **URI** and copy:
-   - **Transaction pooler** → paste into `DATABASE_URL` (port 6543).
-   - **Session pooler** or **Direct connection** → paste into `DIRECT_URL` (port 5432).
-4. Replace `[YOUR-PASSWORD]` with your database password (reset under **Database → Database password** if needed).
-5. For Australia, create the Supabase project in **ap-southeast-2 (Sydney)** if possible — this keeps DB latency low alongside Netlify `syd` functions.
-
-**Generate `SESSION_SECRET`**
+### Vercel
 
 ```bash
-openssl rand -base64 32
+npx vercel link
+npx vercel env pull .env
+npm run build
 ```
 
-Copy the output into Netlify env vars (no quotes needed).
+Set these on the Vercel project:
 
-**Generate VAPID keys (push notifications)**
+- `DATABASE_URL` (required for login + persistence)
+- `DIRECT_URL` (optional on Vercel; needed for local/CI migrations)
+- `SESSION_SECRET` (required for secure cookies)
+- `APP_BASE_URL` (recommended: `https://hercules1612.com`)
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (optional; manager phone push)
 
-```bash
-npx web-push generate-vapid-keys --json
-```
-
-Copy `publicKey` → `VAPID_PUBLIC_KEY`, `privateKey` → `VAPID_PRIVATE_KEY`, and set `VAPID_SUBJECT=mailto:you@company.com`.
-
-Netlify injects `URL`, `DEPLOY_PRIME_URL`, and `CONTEXT` automatically — you do not need to set these.
-
+The React Router Vercel preset lives in `react-router.config.ts`.
 
 ## Calculators
 

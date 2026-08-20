@@ -31,9 +31,9 @@ function withEnv(overrides, fn) {
 withEnv(
   {
     APP_BASE_URL: "https://custom.example.com/",
-    URL: "https://ignored.netlify.app",
-    DEPLOY_PRIME_URL: undefined,
-    CONTEXT: undefined,
+    VERCEL_PROJECT_PRODUCTION_URL: "ignored.vercel.app",
+    VERCEL_URL: undefined,
+    VERCEL_ENV: undefined,
     NODE_ENV: undefined,
   },
   () => {
@@ -44,38 +44,22 @@ withEnv(
 withEnv(
   {
     APP_BASE_URL: undefined,
-    URL: "https://hercules1612.netlify.app",
-    DEPLOY_PRIME_URL: undefined,
-    CONTEXT: "production",
+    VERCEL_PROJECT_PRODUCTION_URL: "hercules1612.vercel.app",
+    VERCEL_URL: "preview-abc.vercel.app",
+    VERCEL_ENV: "production",
     NODE_ENV: "production",
   },
   () => {
-    assert.equal(getAppBaseUrl(request), "https://hercules1612.netlify.app");
+    assert.equal(getAppBaseUrl(request), "https://hercules1612.vercel.app");
   },
 );
 
 withEnv(
   {
     APP_BASE_URL: undefined,
-    URL: undefined,
-    DEPLOY_PRIME_URL: "https://deploy-preview--hercules1612.netlify.app",
-    CONTEXT: "deploy-preview",
-    NODE_ENV: "production",
-  },
-  () => {
-    assert.equal(
-      getAppBaseUrl(request),
-      "https://deploy-preview--hercules1612.netlify.app",
-    );
-  },
-);
-
-withEnv(
-  {
-    APP_BASE_URL: undefined,
-    URL: undefined,
-    DEPLOY_PRIME_URL: undefined,
-    CONTEXT: "production",
+    VERCEL_PROJECT_PRODUCTION_URL: undefined,
+    VERCEL_URL: "preview-abc.vercel.app",
+    VERCEL_ENV: "preview",
     NODE_ENV: "production",
   },
   () => {
@@ -86,9 +70,22 @@ withEnv(
 withEnv(
   {
     APP_BASE_URL: undefined,
-    URL: undefined,
-    DEPLOY_PRIME_URL: undefined,
-    CONTEXT: undefined,
+    VERCEL_PROJECT_PRODUCTION_URL: undefined,
+    VERCEL_URL: "preview-abc.vercel.app",
+    VERCEL_ENV: undefined,
+    NODE_ENV: undefined,
+  },
+  () => {
+    assert.equal(getAppBaseUrl(request), "https://preview-abc.vercel.app");
+  },
+);
+
+withEnv(
+  {
+    APP_BASE_URL: undefined,
+    VERCEL_PROJECT_PRODUCTION_URL: undefined,
+    VERCEL_URL: undefined,
+    VERCEL_ENV: undefined,
     NODE_ENV: undefined,
   },
   () => {
