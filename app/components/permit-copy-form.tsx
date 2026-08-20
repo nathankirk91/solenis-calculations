@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   getFormProps,
   useForm,
@@ -17,8 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { Checkbox } from "~/components/ui/checkbox";
-import { Label } from "~/components/ui/label";
+
 import {
   createPermitCopyFormSchema,
   type CopyablePermitHeading,
@@ -41,7 +39,6 @@ export function PermitCopyForm({ headings, lastResult, error }: Props) {
     },
     shouldValidate: "onSubmit",
   });
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
   return (
     <Card>
@@ -60,47 +57,30 @@ export function PermitCopyForm({ headings, lastResult, error }: Props) {
               <legend className="text-sm font-medium">Headings to copy</legend>
               {headings.map((heading) => {
                 const inputId = `${fields.heading.id}-${heading.key}`;
-                const checked = selected.has(heading.key);
                 return (
-                  <div key={heading.key}>
-                    {checked ? (
-                      <input
-                        type="hidden"
-                        name={fields.heading.name}
-                        value={heading.key}
-                      />
-                    ) : null}
-                    <Label
-                      htmlFor={inputId}
-                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/70 bg-background/40 p-4 font-normal has-[[data-state=checked]]:border-brand/50 has-[[data-state=checked]]:bg-brand/10"
-                    >
-                      <Checkbox
-                        id={inputId}
-                        checked={checked}
-                        onCheckedChange={(nextChecked) => {
-                          setSelected((current) => {
-                            const next = new Set(current);
-                            if (nextChecked === true) {
-                              next.add(heading.key);
-                            } else {
-                              next.delete(heading.key);
-                            }
-                            return next;
-                          });
-                        }}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-medium text-brand-navy">
-                          {heading.title}
-                        </span>
-                        {heading.fieldLabels.length > 0 ? (
-                          <span className="mt-1 block text-sm text-muted-foreground">
-                            {heading.fieldLabels.join(" · ")}
-                          </span>
-                        ) : null}
+                  <label
+                    key={heading.key}
+                    htmlFor={inputId}
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/70 bg-background/40 p-4 has-[:checked]:border-brand/50 has-[:checked]:bg-brand/10"
+                  >
+                    <input
+                      type="checkbox"
+                      id={inputId}
+                      name={fields.heading.name}
+                      value={heading.key}
+                      className="mt-1 size-4 accent-[var(--brand-navy)]"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-brand-navy">
+                        {heading.title}
                       </span>
-                    </Label>
-                  </div>
+                      {heading.fieldLabels.length > 0 ? (
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          {heading.fieldLabels.join(" · ")}
+                        </span>
+                      ) : null}
+                    </span>
+                  </label>
                 );
               })}
             </fieldset>

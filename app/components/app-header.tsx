@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Form, Link, useLocation } from "react-router";
 import { ChevronDownIcon, MenuIcon } from "lucide-react";
 
@@ -21,6 +20,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetFooter,
@@ -169,54 +169,60 @@ function DesktopNavGroup({
 function MobileNavChildLink({
   child,
   location,
-  onNavigate,
 }: {
   child: NavGroupChild;
   location: { pathname: string; hash: string };
-  onNavigate: () => void;
 }) {
   return (
-    <Link
-      to={child.to}
-      onClick={onNavigate}
-      className={cn(
-        "block rounded-lg px-3 py-2.5 text-sm text-brand-navy no-underline hover:bg-muted hover:no-underline",
-        pathMatches(location, child.to) && "bg-muted font-medium",
-      )}
-    >
-      <span className="flex items-center justify-between gap-2">
-        <span>{child.label}</span>
-        <GroupBadge count={child.badge} />
-      </span>
-      {child.description ? (
-        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-          {child.description}
+    <SheetClose asChild>
+      <Link
+        to={child.to}
+        className={cn(
+          "block rounded-lg px-3 py-2.5 text-sm text-brand-navy no-underline hover:bg-muted hover:no-underline",
+          pathMatches(location, child.to) && "bg-muted font-medium",
+        )}
+      >
+        <span className="flex items-center justify-between gap-2">
+          <span>{child.label}</span>
+          <GroupBadge count={child.badge} />
         </span>
-      ) : null}
-    </Link>
+        {child.description ? (
+          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+            {child.description}
+          </span>
+        ) : null}
+      </Link>
+    </SheetClose>
   );
 }
 
 function MobileNavGroups({
   groups,
   location,
-  onNavigate,
 }: {
   groups: NavGroupItem[];
   location: { pathname: string; hash: string };
-  onNavigate: () => void;
 }) {
   const defaultOpen = groups
     .filter((group) => groupIsActive(location, group))
     .map((group) => group.id);
 
   return (
-    <Accordion type="multiple" defaultValue={defaultOpen} className="w-full">
+    <Accordion
+      key={defaultOpen.join("|")}
+      type="multiple"
+      defaultValue={defaultOpen}
+      className="w-full"
+    >
       {groups.map((group) => {
         const showSections = groupHasMultipleSections(group);
 
         return (
-          <AccordionItem key={group.id} value={group.id} className="border-border/70">
+          <AccordionItem
+            key={group.id}
+            value={group.id}
+            className="border-border/70"
+          >
             <AccordionTrigger className="px-1 text-brand-navy hover:no-underline">
               <span className="flex items-center gap-2">
                 {group.label}
@@ -233,11 +239,7 @@ function MobileNavGroups({
                         {child.section}
                       </p>
                     ) : null}
-                    <MobileNavChildLink
-                      child={child}
-                      location={location}
-                      onNavigate={onNavigate}
-                    />
+                    <MobileNavChildLink child={child} location={location} />
                   </div>
                 ))}
               </div>
@@ -251,7 +253,6 @@ function MobileNavGroups({
 
 export function AppHeader({ user, pendingCount = 0 }: Props) {
   const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const navItems = buildNavItems({
     signedIn: Boolean(user),
     canReview: user ? canReviewRuns(user.role) : false,
@@ -264,10 +265,8 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
   const groupItems = navItems.filter(
     (item): item is NavGroupItem => item.type === "group",
   );
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname, location.hash]);
+  // Remount closed when the route changes (back/forward, external links).
+  const sheetKey = `${location.pathname}${location.hash}`;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-white/95 backdrop-blur-sm">
@@ -337,7 +336,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
               <Link to="/login">Sign in</Link>
             </Button>
           ) : null}
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <Sheet key={sheetKey}>
             <SheetTrigger asChild>
               <Button
                 type="button"
@@ -365,26 +364,22 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
                 aria-label="Mobile"
               >
                 {linkItems.map((item) => (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-brand-navy hover:bg-muted",
-                      pathMatches(location, item.to) && "bg-muted",
-                    )}
-                  >
-                    <span>{item.label}</span>
-                    <GroupBadge count={item.badge} />
-                  </Link>
+                  <SheetClose asChild key={item.to}>
+                    <Link
+                      to={item.to}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-brand-navy hover:bg-muted",
+                        pathMatches(location, item.to) && "bg-muted",
+                      )}
+                    >
+                      <span>{item.label}</span>
+                      <GroupBadge count={item.badge} />
+                    </Link>
+                  </SheetClose>
                 ))}
 
                 {groupItems.length > 0 ? (
-                  <MobileNavGroups
-                    groups={groupItems}
-                    location={location}
-                    onNavigate={() => setMobileOpen(false)}
-                  />
+                  <MobileNavGroups groups={groupItems} location={location} />
                 ) : null}
               </nav>
 
