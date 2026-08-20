@@ -7,8 +7,10 @@ import { Button } from "~/components/ui/button";
 import { APP_NAME } from "~/lib/brand";
 import {
   buildNavItems,
+  findActiveNavGroupId,
   groupHasMultipleSections,
   groupIsActive,
+  nextExclusiveNavGroupId,
   pathMatches,
   type NavGroupChild,
   type NavGroupItem,
@@ -156,11 +158,16 @@ function GroupChildren({
 function DesktopNavGroup({
   group,
   location,
+  open,
+  onToggle,
+  onClose,
 }: {
   group: NavGroupItem;
   location: { pathname: string; hash: string };
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const active = groupIsActive(location, group);
@@ -172,23 +179,15 @@ function DesktopNavGroup({
 
     const onPointerDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
+        onClose();
       }
     };
 
     document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, onClose]);
 
   return (
     <div ref={rootRef} className="relative">
@@ -203,7 +202,7 @@ function DesktopNavGroup({
         aria-expanded={open}
         aria-controls={menuId}
         aria-haspopup="menu"
-        onClick={() => setOpen((value) => !value)}
+        onClick={onToggle}
       >
         {group.label}
         <GroupBadge count={group.badge} />
@@ -222,7 +221,7 @@ function DesktopNavGroup({
         >
           <GroupChildren
             group={group}
-            onNavigate={() => setOpen(false)}
+            onNavigate={onClose}
             linkClassName={(child) =>
               cn(
                 "block rounded-md px-3 py-2 text-sm text-brand-navy transition-colors hover:bg-muted",
@@ -239,13 +238,14 @@ function DesktopNavGroup({
 function MobileNavGroup({
   group,
   location,
-  defaultOpen,
+  open,
+  onToggle,
 }: {
   group: NavGroupItem;
   location: { pathname: string; hash: string };
-  defaultOpen: boolean;
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
 
   return (
@@ -255,7 +255,7 @@ function MobileNavGroup({
         className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-brand-navy hover:bg-muted"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((value) => !value)}
+        onClick={onToggle}
       >
         <span className="flex items-center gap-2">
           {group.label}
@@ -291,6 +291,7 @@ function MobileNavGroup({
 export function AppHeader({ user, pendingCount = 0 }: Props) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const menuId = useId();
   const navItems = buildNavItems({
     signedIn: Boolean(user),
@@ -300,33 +301,60 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
     canManageRoles: user ? canManageRoles(user.role) : false,
     pendingCount,
   });
+  const overlayOpen = open || openGroupId !== null;
+
+  const closeMenus = () => {
+    setOpen(false);
+    setOpenGroupId(null);
+  };
+
+  const toggleGroup = (groupId: string) => {
+    setOpenGroupId((current) => nextExclusiveNavGroupId(current, groupId));
+  };
+
+  const closeGroup = (groupId: string) => {
+    setOpenGroupId((current) => (current === groupId ? null : current));
+  };
+
+  const toggleMobileMenu = () => {
+    if (open) {
+      setOpen(false);
+      setOpenGroupId(null);
+      return;
+    }
+
+    setOpen(true);
+    setOpenGroupId(findActiveNavGroupId(navItems, location));
+  };
 
   useEffect(() => {
-    setOpen(false);
+    closeMenus();
   }, [location.pathname, location.hash]);
 
   useEffect(() => {
-    if (!open) {
+    if (!overlayOpen) {
       return;
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        closeMenus();
       }
     };
 
     document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
+    if (open) {
+      document.body.style.overflow = "hidden";
+    }
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
     };
-  }, [open]);
+  }, [open, overlayOpen]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+      <div className="relative z-40 mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
         <Link to="/" className="group flex min-w-0 items-center gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-brand-navy p-1.5 shadow-sm transition-transform group-hover:scale-[1.02]">
             <SolenisMark className="size-full" />
@@ -361,6 +389,9 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
                 key={item.id}
                 group={item}
                 location={location}
+                open={openGroupId === item.id}
+                onToggle={() => toggleGroup(item.id)}
+                onClose={() => closeGroup(item.id)}
               />
             ),
           )}
@@ -399,7 +430,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
             className="gap-2"
             aria-expanded={open}
             aria-controls={menuId}
-            onClick={() => setOpen((value) => !value)}
+            onClick={toggleMobileMenu}
           >
             {open ? (
               <XIcon className="size-4" />
@@ -414,7 +445,7 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
       <div
         id={menuId}
         className={cn(
-          "border-t border-border/60 bg-white lg:hidden",
+          "relative z-40 border-t border-border/60 bg-white lg:hidden",
           open ? "block" : "hidden",
         )}
       >
@@ -437,7 +468,8 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
                 key={item.id}
                 group={item}
                 location={location}
-                defaultOpen={groupIsActive(location, item)}
+                open={openGroupId === item.id}
+                onToggle={() => toggleGroup(item.id)}
               />
             ),
           )}
@@ -459,6 +491,15 @@ export function AppHeader({ user, pendingCount = 0 }: Props) {
           ) : null}
         </nav>
       </div>
+
+      {overlayOpen ? (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-30 bg-foreground/20"
+          onClick={closeMenus}
+        />
+      ) : null}
     </header>
   );
 }
