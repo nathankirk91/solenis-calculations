@@ -1,4 +1,5 @@
 import { getPrisma } from "~/lib/db.server";
+import { ensureInspectionSchema } from "~/lib/migrate.server";
 import {
   parsePendingRunLoads,
   type PendingRunLoads,
@@ -30,6 +31,7 @@ export type CalculationHistoryItem = {
 export async function listCalculationHistory(
   limit = 50,
 ): Promise<CalculationHistoryItem[]> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return [];
@@ -74,6 +76,7 @@ export async function listCalculationHistory(
 export async function getCalculationRunById(
   id: string,
 ): Promise<CalculationHistoryItem | null> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return null;

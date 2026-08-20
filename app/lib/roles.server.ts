@@ -170,6 +170,26 @@ export async function ensureRolesAndSignOffDefaults(): Promise<void> {
     });
   }
 
+  // Remove legacy built-in permit sign-off roles (now configured via Permit settings).
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM "permit_sign_off_slot_roles"
+    WHERE "role_id" IN (
+      SELECT "id" FROM "roles"
+      WHERE "slug" IN ('operations-rep', 'maintenance-rep', 'safe-work-coordinator')
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM "user_role_assignments"
+    WHERE "role_id" IN (
+      SELECT "id" FROM "roles"
+      WHERE "slug" IN ('operations-rep', 'maintenance-rep', 'safe-work-coordinator')
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM "roles"
+    WHERE "slug" IN ('operations-rep', 'maintenance-rep', 'safe-work-coordinator')
+  `);
+
   // Backfill assignments from legacy users.role when a user has none yet.
   const users = await prisma.user.findMany({
     select: {

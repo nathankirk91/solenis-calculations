@@ -1,4 +1,5 @@
 import { getPrisma } from "~/lib/db.server";
+import { ensureInspectionSchema } from "~/lib/migrate.server";
 import {
   parsePendingRunLoads,
   type PendingRunLoads,
@@ -25,6 +26,7 @@ export type PendingRunSummary = {
 };
 
 export async function countPendingRuns(): Promise<number> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return 0;
@@ -36,6 +38,7 @@ export async function countPendingRuns(): Promise<number> {
 }
 
 export async function listPendingRuns(): Promise<PendingRunSummary[]> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return [];
@@ -121,6 +124,7 @@ export async function createPendingCalculationRun(args: {
   inputs: unknown;
   outputs: unknown;
 }): Promise<{ id: string } | null> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return null;
