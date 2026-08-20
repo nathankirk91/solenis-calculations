@@ -11,8 +11,8 @@ datasource db {
 }
 
 enum UserRole {
-  OPERATOR
-  MANAGER
+  STANDARD
+  APPROVER
   ADMIN
 
   @@map("user_role")
@@ -65,8 +65,8 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   name         String?
-  /// Primary system access role (synced from Admin/Manager/Operator assignments).
-  role         UserRole @default(OPERATOR)
+  /// Primary access level (synced from Admin/Approver/Standard assignments).
+  role         UserRole @default(STANDARD)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -93,7 +93,7 @@ model Role {
   slug        String   @unique
   name        String
   description String   @default("")
-  /// Built-in roles (admin/manager/operator + default permit roles) cannot be deleted.
+  /// Built-in access levels (admin/approver/standard) and business roles cannot be deleted.
   isSystem    Boolean  @default(false) @map("is_system")
   isActive    Boolean  @default(true) @map("is_active")
   sortOrder   Int      @default(0) @map("sort_order")

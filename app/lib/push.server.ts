@@ -265,7 +265,7 @@ export async function notifyManagersPush(
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {
       user: {
-        role: { in: ["MANAGER", "ADMIN"] },
+        role: { in: ["APPROVER", "ADMIN"] },
         ...subscribedToTypeFilter(type),
       },
     },

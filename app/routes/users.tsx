@@ -17,7 +17,11 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireAdmin } from "~/lib/auth.server";
-import { listRoles } from "~/lib/roles.server";
+import { ACCESS_LEVEL_LABELS, type UserRole } from "~/lib/roles";
+import {
+  isAccessLevelRole,
+  listRoles,
+} from "~/lib/roles.server";
 import {
   createManagedUser,
   listManagedUsers,
@@ -36,20 +40,28 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireAdmin(request);
-  const [users, roles, pendingCount] = await Promise.all([
+  const [users, allRoles, pendingCount] = await Promise.all([
     listManagedUsers(),
     listRoles({ activeOnly: true }),
     countPendingRuns(),
   ]);
 
-  return { user, users, roles, pendingCount };
+  const accessLevels = allRoles.filter((role) => isAccessLevelRole(role.slug));
+  const businessRoles = allRoles.filter(
+    (role) => !isAccessLevelRole(role.slug),
+  );
+
+  return { user, users, accessLevels, businessRoles, pendingCount };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const admin = await requireAdmin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
-  const roleIds = formData.getAll("roleIds").map(String);
+  const roleIds = [
+    String(formData.get("accessLevelRoleId") ?? ""),
+    ...formData.getAll("roleIds").map(String),
+  ].filter(Boolean);
 
   try {
     if (intent === "add") {
@@ -101,7 +113,27 @@ export default function UsersPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { user, users, roles, pendingCount } = loaderData;
+  const { user, users, accessLevels, businessRoles, pendingCount } =
+    loaderData;
+
+  function accessLevelRoleIdFor(userRole: UserRole) {
+    const slug =
+      userRole === "ADMIN"
+        ? "admin"
+        : userRole === "APPROVER"
+          ? "approver"
+          : "standard";
+    return (
+      accessLevels.find(
+        (level) =>
+          level.slug === slug ||
+          (slug === "approver" && level.slug === "manager") ||
+          (slug === "standard" && level.slug === "operator"),
+      )?.id ??
+      accessLevels[0]?.id ??
+      ""
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -127,9 +159,8 @@ export default function UsersPage({
             Users
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Create accounts and assign one or more roles. System roles
-            (Admin / Manager / Operator) control app access; custom roles can
-            unlock permit sign-offs.
+            Create accounts, set an access level (Admin, Approver, or Standard
+            access), and assign business roles such as hSolenis Operator.
           </p>
           {actionData && "error" in actionData && actionData.error ? (
             <p className="mt-3 text-sm text-destructive">{actionData.error}</p>
@@ -186,24 +217,34 @@ export default function UsersPage({
                   />
                 </div>
                 <fieldset className="grid gap-2">
-                  <legend className="text-sm font-medium">Roles</legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {roles.map((role) => (
+                  <legend className="text-sm font-medium">Access level</legend>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {accessLevels.map((level) => (
                       <label
-                        key={role.id}
+                        key={level.id}
                         className="flex items-start gap-2 rounded-md border border-border/70 px-3 py-2 text-sm"
                       >
                         <input
-                          type="checkbox"
-                          name="roleIds"
-                          value={role.id}
+                          type="radio"
+                          name="accessLevelRoleId"
+                          value={level.id}
+                          defaultChecked={level.slug === "standard"}
+                          required
                           className="mt-1"
                         />
                         <span>
-                          <span className="font-medium">{role.name}</span>
-                          {role.description ? (
+                          <span className="font-medium">
+                            {ACCESS_LEVEL_LABELS[
+                              level.slug === "admin"
+                                ? "ADMIN"
+                                : level.slug === "approver"
+                                  ? "APPROVER"
+                                  : "STANDARD"
+                            ] ?? level.name}
+                          </span>
+                          {level.description ? (
                             <span className="mt-0.5 block text-xs text-muted-foreground">
-                              {role.description}
+                              {level.description}
                             </span>
                           ) : null}
                         </span>
@@ -211,6 +252,34 @@ export default function UsersPage({
                     ))}
                   </div>
                 </fieldset>
+                {businessRoles.length > 0 ? (
+                  <fieldset className="grid gap-2">
+                    <legend className="text-sm font-medium">Roles</legend>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {businessRoles.map((role) => (
+                        <label
+                          key={role.id}
+                          className="flex items-start gap-2 rounded-md border border-border/70 px-3 py-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            name="roleIds"
+                            value={role.id}
+                            className="mt-1"
+                          />
+                          <span>
+                            <span className="font-medium">{role.name}</span>
+                            {role.description ? (
+                              <span className="mt-0.5 block text-xs text-muted-foreground">
+                                {role.description}
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
                 <div className="flex justify-end">
                   <Button type="submit">Add user</Button>
                 </div>
@@ -235,8 +304,13 @@ export default function UsersPage({
               ) : (
                 <ul className="grid gap-4">
                   {users.map((managed) => {
-                    const assigned = new Set(
-                      managed.roles.map((role) => role.id),
+                    const assignedBusiness = new Set(
+                      managed.roles
+                        .filter((role) => !isAccessLevelRole(role.slug))
+                        .map((role) => role.id),
+                    );
+                    const accessLevelRoleId = accessLevelRoleIdFor(
+                      managed.role,
                     );
                     return (
                       <li
@@ -286,29 +360,63 @@ export default function UsersPage({
                           </div>
                           <fieldset className="grid gap-2">
                             <legend className="text-sm font-medium">
-                              Roles
-                              <span className="ml-2 font-normal text-muted-foreground">
-                                Access: {managed.role}
-                              </span>
+                              Access level
                             </legend>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              {roles.map((role) => (
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              {accessLevels.map((level) => (
                                 <label
-                                  key={role.id}
+                                  key={level.id}
                                   className="flex items-start gap-2 text-sm"
                                 >
                                   <input
-                                    type="checkbox"
-                                    name="roleIds"
-                                    value={role.id}
-                                    defaultChecked={assigned.has(role.id)}
+                                    type="radio"
+                                    name="accessLevelRoleId"
+                                    value={level.id}
+                                    defaultChecked={
+                                      level.id === accessLevelRoleId
+                                    }
+                                    required
                                     className="mt-1"
                                   />
-                                  <span>{role.name}</span>
+                                  <span>
+                                    {ACCESS_LEVEL_LABELS[
+                                      level.slug === "admin"
+                                        ? "ADMIN"
+                                        : level.slug === "approver"
+                                          ? "APPROVER"
+                                          : "STANDARD"
+                                    ] ?? level.name}
+                                  </span>
                                 </label>
                               ))}
                             </div>
                           </fieldset>
+                          {businessRoles.length > 0 ? (
+                            <fieldset className="grid gap-2">
+                              <legend className="text-sm font-medium">
+                                Roles
+                              </legend>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {businessRoles.map((role) => (
+                                  <label
+                                    key={role.id}
+                                    className="flex items-start gap-2 text-sm"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      name="roleIds"
+                                      value={role.id}
+                                      defaultChecked={assignedBusiness.has(
+                                        role.id,
+                                      )}
+                                      className="mt-1"
+                                    />
+                                    <span>{role.name}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </fieldset>
+                          ) : null}
                           <div className="flex justify-end">
                             <Button type="submit" variant="outline" size="sm">
                               Save user

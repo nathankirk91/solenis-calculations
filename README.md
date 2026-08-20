@@ -47,19 +47,19 @@ Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` 
 - `/login` — email/password form
 - `/logout` — clears the session cookie
 - Home and calculator routes require a signed-in user
-- `/approvals` — managers and admin review pending runs
+- `/approvals` — approvers and admin review pending runs
 - `/history` — calculation submission history and approval status
 - `/inspections` — inspection checklist catalog
 - `/inspections/history` — completed inspection records
-- `/settings` — managers and admin enable devices and choose which permit, inspection, and calculation alerts they receive
+- `/settings` — approvers and admin enable devices and choose which permit, inspection, and calculation alerts they receive
 
 Roles:
 
-| Role | Purpose |
+| Access level | Purpose |
 |---|---|
-| `OPERATOR` | Shared plant-floor login; submits calculations and inspections |
-| `MANAGER` | Personal email login; approves/rejects; manages forms and users |
-| `ADMIN` | One admin account; same review access as manager plus user/role management |
+| `STANDARD` | Standard access — submits calculations, inspections, and permits |
+| `APPROVER` | Approves/rejects runs and manages forms |
+| `ADMIN` | Full access including users and business roles |
 
 Seed credentials (override with env):
 

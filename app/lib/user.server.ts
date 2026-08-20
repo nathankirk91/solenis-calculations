@@ -17,7 +17,7 @@ export type AuthUser = {
   id: string;
   email: string;
   name: string | null;
-  /** Primary system access role (ADMIN / MANAGER / OPERATOR). */
+  /** Primary access level (ADMIN / APPROVER / STANDARD). */
   role: UserRole;
   /** All assigned roles (system + custom). */
   roles: AuthRoleSummary[];
@@ -105,7 +105,7 @@ export type ManagedManager = {
 export async function listManagers(): Promise<ManagedManager[]> {
   const users = await listManagedUsers();
   return users
-    .filter((user) => user.role === "MANAGER")
+    .filter((user) => user.role === "APPROVER")
     .map((user) => ({
       id: user.id,
       email: user.email,
@@ -374,7 +374,7 @@ export async function createManager(args: {
   }
   await ensureRolesAndSignOffDefaults();
   const managerRole = await prisma.role.findUnique({
-    where: { slug: "manager" },
+    where: { slug: "approver" },
     select: { id: true },
   });
   const created = await createManagedUser({

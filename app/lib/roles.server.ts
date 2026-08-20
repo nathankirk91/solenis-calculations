@@ -4,9 +4,19 @@ import { HSOLENIS_OPERATOR_ROLE_SLUG } from "~/lib/roles";
 
 export const SYSTEM_ROLE_SLUGS = {
   admin: "admin",
-  manager: "manager",
-  operator: "operator",
+  approver: "approver",
+  standard: "standard",
 } as const;
+
+/** Slugs for built-in access levels (not shown on the Roles page). */
+export const ACCESS_LEVEL_SLUGS = new Set<string>([
+  SYSTEM_ROLE_SLUGS.admin,
+  SYSTEM_ROLE_SLUGS.approver,
+  SYSTEM_ROLE_SLUGS.standard,
+  // Legacy slugs before rename
+  "manager",
+  "operator",
+]);
 
 export { HSOLENIS_OPERATOR_ROLE_SLUG };
 
@@ -56,16 +66,16 @@ const DEFAULT_ROLES: Array<{
   },
   {
     id: "role-manager",
-    slug: SYSTEM_ROLE_SLUGS.manager,
-    name: "Manager",
+    slug: SYSTEM_ROLE_SLUGS.approver,
+    name: "Approver",
     description: "Approvals and form management.",
     isSystem: true,
     sortOrder: 2,
   },
   {
     id: "role-operator",
-    slug: SYSTEM_ROLE_SLUGS.operator,
-    name: "Operator",
+    slug: SYSTEM_ROLE_SLUGS.standard,
+    name: "Standard access",
     description: "Plant-floor login for calculations, inspections, and permits.",
     isSystem: true,
     sortOrder: 3,
@@ -108,13 +118,62 @@ const DEFAULT_SLOTS: Array<{
 ];
 
 export function primarySystemRoleFromSlugs(slugs: string[]): UserRole {
-  if (slugs.includes(SYSTEM_ROLE_SLUGS.admin)) {
+  if (slugs.includes(SYSTEM_ROLE_SLUGS.admin) || slugs.includes("admin")) {
     return "ADMIN";
   }
-  if (slugs.includes(SYSTEM_ROLE_SLUGS.manager)) {
-    return "MANAGER";
+  if (
+    slugs.includes(SYSTEM_ROLE_SLUGS.approver) ||
+    slugs.includes("manager")
+  ) {
+    return "APPROVER";
   }
-  return "OPERATOR";
+  return "STANDARD";
+}
+
+async function ensureAccessLevelEnumAndRoleSlugs(): Promise<void> {
+  const prisma = getPrisma();
+  if (!prisma) {
+    return;
+  }
+
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        WHERE t.typname = 'user_role' AND e.enumlabel = 'OPERATOR'
+      ) THEN
+        ALTER TYPE "user_role" RENAME VALUE 'OPERATOR' TO 'STANDARD';
+      END IF;
+    END $$
+  `);
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        WHERE t.typname = 'user_role' AND e.enumlabel = 'MANAGER'
+      ) THEN
+        ALTER TYPE "user_role" RENAME VALUE 'MANAGER' TO 'APPROVER';
+      END IF;
+    END $$
+  `);
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'STANDARD'::"user_role"
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    UPDATE "roles"
+    SET slug = 'standard', name = 'Standard access',
+        description = 'Plant-floor login for calculations, inspections, and permits.'
+    WHERE slug = 'operator'
+  `);
+  await prisma.$executeRawUnsafe(`
+    UPDATE "roles"
+    SET slug = 'approver', name = 'Approver',
+        description = 'Approvals and form management.'
+    WHERE slug = 'manager'
+  `);
 }
 
 export async function ensureRolesAndSignOffDefaults(): Promise<void> {
@@ -122,6 +181,8 @@ export async function ensureRolesAndSignOffDefaults(): Promise<void> {
   if (!prisma) {
     return;
   }
+
+  await ensureAccessLevelEnumAndRoleSlugs();
 
   for (const role of DEFAULT_ROLES) {
     await prisma.role.upsert({
@@ -206,9 +267,9 @@ export async function ensureRolesAndSignOffDefaults(): Promise<void> {
     const slug =
       user.role === "ADMIN"
         ? SYSTEM_ROLE_SLUGS.admin
-        : user.role === "MANAGER"
-          ? SYSTEM_ROLE_SLUGS.manager
-          : SYSTEM_ROLE_SLUGS.operator;
+        : user.role === "APPROVER"
+          ? SYSTEM_ROLE_SLUGS.approver
+          : SYSTEM_ROLE_SLUGS.standard;
     const roleId = rolesBySlug[slug];
     if (!roleId) {
       continue;
@@ -219,8 +280,13 @@ export async function ensureRolesAndSignOffDefaults(): Promise<void> {
   }
 }
 
+export function isAccessLevelRole(slug: string): boolean {
+  return ACCESS_LEVEL_SLUGS.has(slug);
+}
+
 export async function listRoles(args?: {
   activeOnly?: boolean;
+  excludeAccessLevels?: boolean;
 }): Promise<RoleRecord[]> {
   const prisma = getPrisma();
   if (!prisma) {
@@ -231,7 +297,9 @@ export async function listRoles(args?: {
     where: args?.activeOnly ? { isActive: true } : undefined,
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
-  return rows.map((row) => ({
+  return rows
+    .filter((row) => !args?.excludeAccessLevels || !isAccessLevelRole(row.slug))
+    .map((row) => ({
     id: row.id,
     slug: row.slug,
     name: row.name,

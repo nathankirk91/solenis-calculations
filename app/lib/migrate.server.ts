@@ -573,7 +573,8 @@ export async function applyPendingMigrations(): Promise<AppliedMigration[]> {
       name.includes("_inspection_actions") ||
       name.includes("_inspection_run_signature") ||
       name.includes("_hsolenis_operator_users") ||
-      name.includes("_remove_permit_signoff_roles")
+      name.includes("_remove_permit_signoff_roles") ||
+      name.includes("_rename_access_levels")
     ) {
       const sqlPath = path.join(
         process.cwd(),

@@ -37,7 +37,7 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireAdmin(request, "/roles");
   const [roles, pendingCount] = await Promise.all([
-    listRoles(),
+    listRoles({ excludeAccessLevels: true }),
     countPendingRuns(),
   ]);
   return { user, roles, pendingCount };
@@ -108,8 +108,9 @@ export default function RolesPage({
             Roles
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Built-in roles control app access. Add custom roles for permit
-            sign-offs and other assignments.
+            Business roles assigned to users and permit sign-off slots. Access
+            levels (Admin, Approver, Standard access) are set on the Users
+            page.
           </p>
           {actionData && "error" in actionData && actionData.error ? (
             <p className="mt-3 text-sm text-destructive">{actionData.error}</p>
@@ -160,7 +161,7 @@ export default function RolesPage({
             <CardHeader>
               <CardTitle>Existing roles</CardTitle>
               <CardDescription>
-                System roles stay active and cannot be deleted.
+                System business roles stay active and cannot be deleted.
               </CardDescription>
             </CardHeader>
             <CardContent>

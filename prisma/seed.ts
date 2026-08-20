@@ -27,7 +27,7 @@ async function upsertUser(args: {
   email: string;
   password: string;
   name: string;
-  role: "OPERATOR" | "MANAGER" | "ADMIN";
+  role: "STANDARD" | "APPROVER" | "ADMIN";
 }) {
   const passwordHash = await bcrypt.hash(args.password, 10);
   const existing = await prisma.user.findUnique({
@@ -203,7 +203,7 @@ async function main() {
     email: operatorEmail,
     password: operatorPassword,
     name: "Plant Operator",
-    role: "OPERATOR",
+    role: "STANDARD",
   });
 
   const managerEmail = process.env.SEED_MANAGER_EMAIL?.toLowerCase();
@@ -212,8 +212,8 @@ async function main() {
     await upsertUser({
       email: managerEmail,
       password: managerPassword,
-      name: process.env.SEED_MANAGER_NAME ?? "Manager",
-      role: "MANAGER",
+      name: process.env.SEED_MANAGER_NAME ?? "Approver",
+      role: "APPROVER",
     });
   }
 
