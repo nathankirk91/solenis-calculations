@@ -4,6 +4,7 @@ import {
   type SubmissionResult,
 } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
+import { CopyIcon } from "lucide-react";
 import { Form, Link, useNavigation } from "react-router";
 import { data, redirect } from "react-router";
 
@@ -243,6 +244,14 @@ export default function PermitRunPage({
               ← Permits
             </Link>
             <DownloadPdfLink href={`/permits/runs/${run.id}/pdf`} />
+            {isClosed ? (
+              <Button asChild variant="secondary" size="sm">
+                <Link to={`/permits/runs/${run.id}/copy`}>
+                  <CopyIcon data-icon="inline-start" />
+                  Copy to new permit
+                </Link>
+              </Button>
+            ) : null}
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight">
             {run.inspectionTitle}

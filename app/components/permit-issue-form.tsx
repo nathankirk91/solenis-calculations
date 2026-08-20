@@ -36,6 +36,12 @@ type Props = {
   summary?: InspectionSummary | null;
   status?: InspectionSummary["status"] | null;
   formError?: string | null;
+  initialEquipmentRef?: string;
+  initialResponses?: Record<string, string>;
+  copiedFrom?: {
+    permitNumber: string | null;
+    headingTitles: string[];
+  } | null;
 };
 
 export function PermitIssueForm({
@@ -44,13 +50,19 @@ export function PermitIssueForm({
   summary,
   status,
   formError,
+  initialEquipmentRef,
+  initialResponses,
+  copiedFrom,
 }: Props) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state !== "idle";
   const schema = createPermitIssueFormSchema(definition);
   const sections = groupQuestionsBySection(definition.questions);
   const defaultResponses = Object.fromEntries(
-    definition.questions.map((question) => [question.id, ""]),
+    definition.questions.map((question) => [
+      question.id,
+      initialResponses?.[question.id] ?? "",
+    ]),
   );
 
   const [form, fields] = useForm({
@@ -61,7 +73,7 @@ export function PermitIssueForm({
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
     defaultValue: {
-      equipmentRef: "",
+      equipmentRef: initialEquipmentRef ?? "",
       authorizedPersonnel: [{ name: "", signature: "" }],
       responses: defaultResponses,
     },
@@ -87,6 +99,20 @@ export function PermitIssueForm({
         </CardHeader>
         <Form method="post" {...getFormProps(form)}>
           <CardContent className="grid gap-8">
+            {copiedFrom ? (
+              <section className="rounded-lg border border-brand/30 bg-brand/5 px-4 py-3 text-sm">
+                <p className="font-medium text-brand-navy">
+                  Copied from closed permit
+                  {copiedFrom.permitNumber ? ` #${copiedFrom.permitNumber}` : ""}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {copiedFrom.headingTitles.length > 0
+                    ? `Included: ${copiedFrom.headingTitles.join(", ")}. `
+                    : "No headings were selected. "}
+                  Signatures, dates, and times were left blank.
+                </p>
+              </section>
+            ) : null}
             {definition.instructionNotes ? (
               <section className="rounded-lg border border-border/70 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
                 {definition.instructionNotes}

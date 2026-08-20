@@ -9,7 +9,12 @@ import { Badge } from "~/components/ui/badge";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireUser } from "~/lib/auth.server";
 import { handlePermitIssueSubmit } from "~/lib/permit-action.server";
-import { getPermitDefinition } from "~/lib/permits.server";
+import {
+  copyPermitFieldValues,
+  headingTitleForKey,
+  parseCopyHeadingsFromSearchParams,
+} from "~/lib/permit-copy";
+import { getPermitDefinition, getPermitRunById } from "~/lib/permits.server";
 import { canReviewRuns } from "~/lib/roles";
 
 export function meta({}: Route.MetaArgs) {
@@ -33,7 +38,49 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     ? await countPendingRuns()
     : 0;
 
-  return { user, pendingCount, definition };
+  const url = new URL(request.url);
+  const copyFromId = url.searchParams.get("copyFrom")?.trim() || null;
+  const selectedHeadings = parseCopyHeadingsFromSearchParams(url.searchParams);
+
+  let copiedEquipmentRef = "";
+  let copiedResponses: Record<string, string> = {};
+  let copiedFrom: {
+    permitNumber: string | null;
+    headingTitles: string[];
+  } | null = null;
+
+  if (copyFromId) {
+    const source = await getPermitRunById(copyFromId);
+    if (
+      source &&
+      source.status === "CLOSED" &&
+      source.inspectionId === definition.id
+    ) {
+      const copied = copyPermitFieldValues({
+        sourceAnswers: source.answers,
+        sourceEquipmentRef: source.equipmentRef,
+        selectedHeadingKeys: selectedHeadings,
+        questions: definition.questions,
+      });
+      copiedEquipmentRef = copied.equipmentRef;
+      copiedResponses = copied.responses;
+      copiedFrom = {
+        permitNumber: source.permitNumber,
+        headingTitles: selectedHeadings.map((key) =>
+          headingTitleForKey(key, definition.equipmentLabel),
+        ),
+      };
+    }
+  }
+
+  return {
+    user,
+    pendingCount,
+    definition,
+    copiedEquipmentRef,
+    copiedResponses,
+    copiedFrom,
+  };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -50,7 +97,14 @@ export default function PermitPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { definition, user, pendingCount } = loaderData;
+  const {
+    definition,
+    user,
+    pendingCount,
+    copiedEquipmentRef,
+    copiedResponses,
+    copiedFrom,
+  } = loaderData;
 
   return (
     <div className="app-shell">
@@ -81,6 +135,9 @@ export default function PermitPage({
             summary={actionData?.summary}
             status={actionData?.status}
             formError={actionData?.formError}
+            initialEquipmentRef={copiedEquipmentRef}
+            initialResponses={copiedResponses}
+            copiedFrom={copiedFrom}
           />
         </div>
       </main>

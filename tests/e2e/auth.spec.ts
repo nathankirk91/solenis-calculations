@@ -28,6 +28,11 @@ test.describe("authentication gates", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  test("copy closed permit page redirects to login", async ({ page }) => {
+    await page.goto("/permits/runs/example/copy");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
   test("inspection PDF view redirects to login", async ({ page }) => {
     await page.goto("/inspections/submissions/example/pdf/view");
     await expect(page).toHaveURL(/\/login/);

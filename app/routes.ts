@@ -33,6 +33,7 @@ export default [
   route("permits/settings", "routes/permits-settings.tsx"),
   route("permits/runs/:permitRunId/pdf/view", "routes/permit-run-pdf-view.tsx"),
   route("permits/runs/:permitRunId/pdf", "routes/permit-run-pdf.tsx"),
+  route("permits/runs/:permitRunId/copy", "routes/permit-run-copy.tsx"),
   route("permits/runs/:permitRunId", "routes/permit-run.tsx"),
   route("permits/:permitId", "routes/permit-page.tsx"),
   route("inspections/history", "routes/inspections-history.tsx"),
