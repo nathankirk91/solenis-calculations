@@ -1,4 +1,5 @@
 import { getPrisma } from "~/lib/db.server";
+import { ensureInspectionSchema } from "~/lib/migrate.server";
 import {
   parsePendingRunLoads,
   type PendingRunLoads,
@@ -25,6 +26,7 @@ export type PendingRunSummary = {
 };
 
 export async function countPendingRuns(): Promise<number> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return 0;
@@ -36,6 +38,7 @@ export async function countPendingRuns(): Promise<number> {
 }
 
 export async function listPendingRuns(): Promise<PendingRunSummary[]> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return [];
@@ -46,7 +49,7 @@ export async function listPendingRuns(): Promise<PendingRunSummary[]> {
     orderBy: { createdAt: "asc" },
     include: {
       calculation: { select: { title: true, href: true } },
-      operator: { select: { name: true } },
+      operatorUser: { select: { name: true, email: true } },
       submittedBy: { select: { email: true } },
     },
   });
@@ -56,7 +59,10 @@ export async function listPendingRuns(): Promise<PendingRunSummary[]> {
     createdAt: row.createdAt,
     calculationTitle: row.calculation.title,
     calculationHref: row.calculation.href,
-    operatorName: row.operator?.name ?? null,
+    operatorName:
+      row.operatorUser?.name?.trim() ||
+      row.operatorUser?.email ||
+      null,
     submittedByEmail: row.submittedBy?.email ?? null,
     outputs: (row.outputs ?? {}) as PendingRunSummary["outputs"],
     loads: parsePendingRunLoads(row.inputs),
@@ -113,11 +119,12 @@ export async function rejectRun(
 
 export async function createPendingCalculationRun(args: {
   calculationId: string;
-  operatorId: string;
+  operatorUserId: string;
   submittedById: string;
   inputs: unknown;
   outputs: unknown;
 }): Promise<{ id: string } | null> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return null;
@@ -126,7 +133,7 @@ export async function createPendingCalculationRun(args: {
   return prisma.calculationRun.create({
     data: {
       calculationId: args.calculationId,
-      operatorId: args.operatorId,
+      operatorUserId: args.operatorUserId,
       submittedById: args.submittedById,
       status: "PENDING",
       inputs: args.inputs as object,

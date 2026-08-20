@@ -1,11 +1,14 @@
 import { getPrisma } from "~/lib/db.server";
 import type { UserRole } from "~/lib/roles";
+import { HSOLENIS_OPERATOR_ROLE_SLUG } from "~/lib/roles";
 
 export const SYSTEM_ROLE_SLUGS = {
   admin: "admin",
   manager: "manager",
   operator: "operator",
 } as const;
+
+export { HSOLENIS_OPERATOR_ROLE_SLUG };
 
 export const PERMIT_SLOT_CODES = {
   operationsRep: "operations_rep",
@@ -55,7 +58,7 @@ const DEFAULT_ROLES: Array<{
     id: "role-manager",
     slug: SYSTEM_ROLE_SLUGS.manager,
     name: "Manager",
-    description: "Approvals, operators, and form management.",
+    description: "Approvals and form management.",
     isSystem: true,
     sortOrder: 2,
   },
@@ -68,31 +71,13 @@ const DEFAULT_ROLES: Array<{
     sortOrder: 3,
   },
   {
-    id: "role-operations-rep",
-    slug: "operations-rep",
-    name: "Operations representative / Account manager",
+    id: "role-hsolenis-operator",
+    slug: HSOLENIS_OPERATOR_ROLE_SLUG,
+    name: "hSolenis Operator",
     description:
-      "Knows the equipment; can sign Operations authorisation on Safe Work Permits.",
+      "Shown in calculation operator dropdowns when assigned to a user.",
     isSystem: true,
-    sortOrder: 10,
-  },
-  {
-    id: "role-maintenance-rep",
-    slug: "maintenance-rep",
-    name: "Maintenance representative / Account technician",
-    description:
-      "Person performing the work or lead for a group; can sign Maintenance authorisation.",
-    isSystem: true,
-    sortOrder: 11,
-  },
-  {
-    id: "role-safe-work-coordinator",
-    slug: "safe-work-coordinator",
-    name: "Safe work coordinator",
-    description:
-      "Knows the equipment and SWP process; can sign Safe work coordinator authorisation.",
-    isSystem: true,
-    sortOrder: 12,
+    sortOrder: 4,
   },
 ];
 
@@ -101,28 +86,24 @@ const DEFAULT_SLOTS: Array<{
   code: PermitSlotCode;
   label: string;
   sortOrder: number;
-  defaultRoleSlug: string;
 }> = [
   {
     id: "slot-operations-rep",
     code: PERMIT_SLOT_CODES.operationsRep,
     label: "Operations representative / Account manager",
     sortOrder: 1,
-    defaultRoleSlug: "operations-rep",
   },
   {
     id: "slot-maintenance-rep",
     code: PERMIT_SLOT_CODES.maintenanceRep,
     label: "Maintenance representative / Account technician",
     sortOrder: 2,
-    defaultRoleSlug: "maintenance-rep",
   },
   {
     id: "slot-safe-work-coordinator",
     code: PERMIT_SLOT_CODES.safeWorkCoordinator,
     label: "Safe work coordinator",
     sortOrder: 3,
-    defaultRoleSlug: "safe-work-coordinator",
   },
 ];
 
@@ -189,30 +170,25 @@ export async function ensureRolesAndSignOffDefaults(): Promise<void> {
     });
   }
 
-  const slots = await prisma.permitSignOffSlot.findMany({
-    where: { code: { in: DEFAULT_SLOTS.map((slot) => slot.code) } },
-    select: {
-      id: true,
-      code: true,
-      allowedRoles: { select: { roleId: true } },
-    },
-  });
-
-  for (const slot of slots) {
-    const defaults = DEFAULT_SLOTS.find((item) => item.code === slot.code);
-    if (!defaults) {
-      continue;
-    }
-    const roleId = rolesBySlug[defaults.defaultRoleSlug];
-    if (!roleId) {
-      continue;
-    }
-    if (slot.allowedRoles.length === 0) {
-      await prisma.permitSignOffSlotRole.create({
-        data: { slotId: slot.id, roleId },
-      });
-    }
-  }
+  // Remove legacy built-in permit sign-off roles (now configured via Permit settings).
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM "permit_sign_off_slot_roles"
+    WHERE "role_id" IN (
+      SELECT "id" FROM "roles"
+      WHERE "slug" IN ('operations-rep', 'maintenance-rep', 'safe-work-coordinator')
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM "user_role_assignments"
+    WHERE "role_id" IN (
+      SELECT "id" FROM "roles"
+      WHERE "slug" IN ('operations-rep', 'maintenance-rep', 'safe-work-coordinator')
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM "roles"
+    WHERE "slug" IN ('operations-rep', 'maintenance-rep', 'safe-work-coordinator')
+  `);
 
   // Backfill assignments from legacy users.role when a user has none yet.
   const users = await prisma.user.findMany({

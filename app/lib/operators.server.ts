@@ -1,14 +1,15 @@
 import { getPrisma } from "~/lib/db.server";
+import { HSOLENIS_OPERATOR_ROLE_SLUG } from "~/lib/roles";
+import { ensureRolesAndSignOffDefaults } from "~/lib/roles.server";
 
 export type OperatorOption = {
   id: string;
   name: string;
 };
 
-export type ManagedOperator = OperatorOption & {
-  isActive: boolean;
-  sortOrder: number;
-};
+function displayName(user: { name: string | null; email: string }): string {
+  return user.name?.trim() || user.email;
+}
 
 export async function listActiveOperators(): Promise<OperatorOption[]> {
   const prisma = getPrisma();
@@ -16,24 +17,28 @@ export async function listActiveOperators(): Promise<OperatorOption[]> {
     return [];
   }
 
-  return prisma.operator.findMany({
-    where: { isActive: true },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true, name: true },
-  });
-}
+  await ensureRolesAndSignOffDefaults();
 
-export async function listManagedOperators(): Promise<ManagedOperator[]> {
-  const prisma = getPrisma();
-  if (!prisma) {
+  const role = await prisma.role.findUnique({
+    where: { slug: HSOLENIS_OPERATOR_ROLE_SLUG },
+    select: { id: true },
+  });
+  if (!role) {
     return [];
   }
 
-  return prisma.operator.findMany({
-    where: { isActive: true },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, isActive: true, sortOrder: true },
+  const users = await prisma.user.findMany({
+    where: {
+      roleAssignments: { some: { roleId: role.id } },
+    },
+    orderBy: [{ name: "asc" }, { email: "asc" }],
+    select: { id: true, name: true, email: true },
   });
+
+  return users.map((user) => ({
+    id: user.id,
+    name: displayName(user),
+  }));
 }
 
 export async function getActiveOperatorById(
@@ -44,78 +49,30 @@ export async function getActiveOperatorById(
     return null;
   }
 
-  return prisma.operator.findFirst({
-    where: { id, isActive: true },
-    select: { id: true, name: true },
-  });
-}
+  await ensureRolesAndSignOffDefaults();
 
-export async function createOperator(name: string): Promise<OperatorOption> {
-  const prisma = getPrisma();
-  if (!prisma) {
-    throw new Error("Database is not configured.");
-  }
-
-  const trimmed = name.trim();
-  if (!trimmed) {
-    throw new Error("Operator name is required.");
-  }
-
-  const existingActive = await prisma.operator.findFirst({
-    where: {
-      name: { equals: trimmed, mode: "insensitive" },
-      isActive: true,
-    },
+  const role = await prisma.role.findUnique({
+    where: { slug: HSOLENIS_OPERATOR_ROLE_SLUG },
     select: { id: true },
   });
-
-  if (existingActive) {
-    throw new Error("An active operator with that name already exists.");
+  if (!role) {
+    return null;
   }
 
-  const inactive = await prisma.operator.findFirst({
+  const user = await prisma.user.findFirst({
     where: {
-      name: { equals: trimmed, mode: "insensitive" },
-      isActive: false,
+      id,
+      roleAssignments: { some: { roleId: role.id } },
     },
-    select: { id: true },
+    select: { id: true, name: true, email: true },
   });
 
-  if (inactive) {
-    const restored = await prisma.operator.update({
-      where: { id: inactive.id },
-      data: { isActive: true, name: trimmed },
-      select: { id: true, name: true },
-    });
-    return restored;
+  if (!user) {
+    return null;
   }
 
-  const maxSort = await prisma.operator.aggregate({
-    _max: { sortOrder: true },
-  });
-
-  return prisma.operator.create({
-    data: {
-      name: trimmed,
-      isActive: true,
-      sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
-    },
-    select: { id: true, name: true },
-  });
-}
-
-export async function removeOperator(id: string): Promise<void> {
-  const prisma = getPrisma();
-  if (!prisma) {
-    throw new Error("Database is not configured.");
-  }
-
-  const updated = await prisma.operator.updateMany({
-    where: { id, isActive: true },
-    data: { isActive: false },
-  });
-
-  if (updated.count === 0) {
-    throw new Error("Operator not found or already removed.");
-  }
+  return {
+    id: user.id,
+    name: displayName(user),
+  };
 }

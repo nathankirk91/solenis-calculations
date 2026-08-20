@@ -70,7 +70,7 @@ export async function handlePolymerAdipicDetaSubmit(args: {
   try {
     const run = await createPendingCalculationRun({
       calculationId: product.id,
-      operatorId: operator.id,
+      operatorUserId: operator.id,
       submittedById: user.id,
       inputs: submission.value,
       outputs,

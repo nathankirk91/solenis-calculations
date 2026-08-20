@@ -121,7 +121,7 @@ const settings = findNavGroup(adminNav, "settings");
 assert.ok(settings);
 assert.deepEqual(
   settings.children.map((child) => child.label),
-  ["Notifications", "Operators", "Users", "Roles"],
+  ["Notifications", "Users", "Roles"],
 );
 
 console.log("nav tests passed");

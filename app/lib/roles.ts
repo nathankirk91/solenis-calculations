@@ -2,6 +2,9 @@ export const USER_ROLES = ["OPERATOR", "MANAGER", "ADMIN"] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 
+/** Users with this role slug appear in calculation operator dropdowns. */
+export const HSOLENIS_OPERATOR_ROLE_SLUG = "hsolenis-operator";
+
 export function isManagerOrAdmin(role: UserRole): boolean {
   return role === "MANAGER" || role === "ADMIN";
 }

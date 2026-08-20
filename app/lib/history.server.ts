@@ -1,4 +1,5 @@
 import { getPrisma } from "~/lib/db.server";
+import { ensureInspectionSchema } from "~/lib/migrate.server";
 import {
   parsePendingRunLoads,
   type PendingRunLoads,
@@ -30,6 +31,7 @@ export type CalculationHistoryItem = {
 export async function listCalculationHistory(
   limit = 50,
 ): Promise<CalculationHistoryItem[]> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return [];
@@ -47,7 +49,7 @@ export async function listCalculationHistory(
       outputs: true,
       inputs: true,
       calculation: { select: { title: true, href: true } },
-      operator: { select: { name: true } },
+      operatorUser: { select: { name: true, email: true } },
       reviewedBy: { select: { name: true, email: true } },
     },
   });
@@ -60,7 +62,10 @@ export async function listCalculationHistory(
     reviewNote: row.reviewNote,
     calculationTitle: row.calculation.title,
     calculationHref: row.calculation.href,
-    operatorName: row.operator?.name ?? null,
+    operatorName:
+      row.operatorUser?.name?.trim() ||
+      row.operatorUser?.email ||
+      null,
     reviewedByName: row.reviewedBy?.name ?? null,
     reviewedByEmail: row.reviewedBy?.email ?? null,
     outputs: (row.outputs ?? {}) as CalculationHistoryItem["outputs"],
@@ -71,6 +76,7 @@ export async function listCalculationHistory(
 export async function getCalculationRunById(
   id: string,
 ): Promise<CalculationHistoryItem | null> {
+  await ensureInspectionSchema();
   const prisma = getPrisma();
   if (!prisma) {
     return null;
@@ -80,7 +86,7 @@ export async function getCalculationRunById(
     where: { id },
     include: {
       calculation: { select: { title: true, href: true } },
-      operator: { select: { name: true } },
+      operatorUser: { select: { name: true, email: true } },
       reviewedBy: { select: { name: true, email: true } },
     },
   });
@@ -97,7 +103,10 @@ export async function getCalculationRunById(
     reviewNote: row.reviewNote,
     calculationTitle: row.calculation.title,
     calculationHref: row.calculation.href,
-    operatorName: row.operator?.name ?? null,
+    operatorName:
+      row.operatorUser?.name?.trim() ||
+      row.operatorUser?.email ||
+      null,
     reviewedByName: row.reviewedBy?.name ?? null,
     reviewedByEmail: row.reviewedBy?.email ?? null,
     outputs: (row.outputs ?? {}) as CalculationHistoryItem["outputs"],

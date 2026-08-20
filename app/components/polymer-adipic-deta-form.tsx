@@ -113,8 +113,8 @@ export function PolymerAdipicDetaForm({
               ) : null}
               {operators.length === 0 ? (
                 <p className="text-sm text-amber-700 dark:text-amber-400">
-                  No active operators are configured. Ask an admin to seed the
-                  operator list.
+                  No hSolenis Operators are assigned yet. Ask an admin to
+                  assign the hSolenis Operator role on the Users page.
                 </p>
               ) : null}
             </section>

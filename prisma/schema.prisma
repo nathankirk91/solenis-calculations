@@ -72,7 +72,9 @@ model User {
 
   submittedRuns              CalculationRun[]  @relation("SubmittedBy")
   reviewedRuns               CalculationRun[]  @relation("ReviewedBy")
+  operatorCalculationRuns    CalculationRun[]  @relation("CalculationOperator")
   submittedInspectionRuns    InspectionRun[]   @relation("InspectionSubmittedBy")
+  operatorInspectionRuns     InspectionRun[]   @relation("InspectionOperator")
   submittedPermitRuns        PermitRun[]       @relation("PermitSubmittedBy")
   closedPermitRuns           PermitRun[]       @relation("PermitClosedBy")
   inspectionVersions         InspectionVersion[] @relation("InspectionVersionChangedBy")
@@ -147,20 +149,6 @@ model PermitSignOffSlotRole {
   @@map("permit_sign_off_slot_roles")
 }
 
-model Operator {
-  id             String   @id @default(cuid())
-  name           String
-  isActive       Boolean  @default(true) @map("is_active")
-  sortOrder      Int      @default(0) @map("sort_order")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  runs           CalculationRun[]
-  inspectionRuns InspectionRun[]
-  inspectionActions InspectionAction[]
-
-  @@index([isActive, sortOrder])
-  @@map("operators")
-}
 
 model Calculation {
   id          String   @id
@@ -181,8 +169,8 @@ model CalculationRun {
   id               String                @id @default(cuid())
   calculationId    String                @map("calculation_id")
   calculation      Calculation           @relation(fields: [calculationId], references: [id], onDelete: Cascade)
-  operatorId       String?               @map("operator_id")
-  operator         Operator?             @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  operatorUserId   String?               @map("operator_user_id")
+  operatorUser     User?                 @relation("CalculationOperator", fields: [operatorUserId], references: [id], onDelete: SetNull)
   submittedById    String?               @map("submitted_by_id")
   submittedBy      User?                 @relation("SubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   status           CalculationRunStatus  @default(PENDING)
@@ -281,8 +269,8 @@ model InspectionRun {
   id                 String               @id @default(cuid())
   inspectionId       String               @map("inspection_id")
   inspection         Inspection           @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  operatorId         String?              @map("operator_id")
-  operator           Operator?            @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  operatorUserId     String?              @map("operator_user_id")
+  operatorUser       User?                @relation("InspectionOperator", fields: [operatorUserId], references: [id], onDelete: SetNull)
   submittedById      String?              @map("submitted_by_id")
   submittedBy        User?                @relation("InspectionSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   status             InspectionRunStatus
@@ -311,8 +299,6 @@ model InspectionAction {
   equipmentRef        String?                @map("equipment_ref")
   description         String
   status              InspectionActionStatus @default(OPEN)
-  createdByOperatorId String?                @map("created_by_operator_id")
-  createdByOperator   Operator?              @relation(fields: [createdByOperatorId], references: [id], onDelete: SetNull)
   createdByUserId     String?                @map("created_by_user_id")
   createdByUser       User?                  @relation("InspectionActionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   closedAt            DateTime?              @map("closed_at") @db.Timestamptz(6)

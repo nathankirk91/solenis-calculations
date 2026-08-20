@@ -52,15 +52,14 @@ Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` 
 - `/inspections` — inspection checklist catalog
 - `/inspections/history` — completed inspection records
 - `/settings` — managers and admin enable devices and choose which permit, inspection, and calculation alerts they receive
-- `/operators` — managers and admin add/remove operator names
 
 Roles:
 
 | Role | Purpose |
 |---|---|
 | `OPERATOR` | Shared plant-floor login; submits calculations and inspections |
-| `MANAGER` | Personal email login; approves/rejects; manages operator names |
-| `ADMIN` | One admin account; same review and operator management as manager |
+| `MANAGER` | Personal email login; approves/rejects; manages forms and users |
+| `ADMIN` | One admin account; same review access as manager plus user/role management |
 
 Seed credentials (override with env):
 
@@ -68,11 +67,11 @@ Seed credentials (override with env):
 - `SEED_OPERATOR_EMAIL` / `SEED_OPERATOR_PASSWORD` (shared operator login)
 - Optional `SEED_MANAGER_EMAIL` / `SEED_MANAGER_PASSWORD` / `SEED_MANAGER_NAME`
 
-Seed also creates placeholder operator names (`Operator A`–`D`) for the calculator dropdown. Managers can add/remove operators at `/operators`.
+Assign the **hSolenis Operator** role to users who should appear in calculation operator dropdowns (via **Users** or **Roles**).
 
 ### Approval workflow
 
-1. Operator selects who is running the batch, enters weights, and clicks **Submit for approval**.
+1. Operator selects who is running the batch from users with the hSolenis Operator role, enters weights, and clicks **Submit for approval**.
 2. The run is stored as `PENDING`.
 3. A manager/admin opens **Approvals**, reviews the numbers, and **Approves** or **Rejects**.
 4. Managers/admin can enable **phone push notifications** on **Settings** (requires VAPID env keys) and choose which permit, inspection, and calculation alerts they receive.
@@ -169,7 +168,7 @@ Permits live on `/permits`, with their own records and management (separate from
 | Permit sign-off settings | `/permits/settings` |
 | Safe Work Permit (Form 42801) | `/permits/safe-work-permit` |
 
-Issuing a permit assigns a shared **YYMMXXX** permit number (e.g. `2608002`) used across Safe Work, Hot Work, and Line Break forms, and submits it as **pending authorization**. Duration is calculated from start and end time and cannot exceed **12 hours**. The first authorized person must sign on issue; additional authorized people may sign optionally. Eligible Operations representative / Account manager, Maintenance representative / Account technician, and Safe work coordinator users get a push notification (one per person even with multiple roles). Approvers must confirm a job-site visual inspection before signing. The same person cannot sign more than one role. Once **two different people** have signed, the permit becomes **open**; a third signature can still be added afterward. Close out with date, time, and operator/maintenance initials when work is finished. Retain closed permits for at least one year.
+Issuing a permit assigns a shared **YYMMXXX** permit number (e.g. `2608002`) used across Safe Work, Hot Work, and Line Break forms, and submits it as **pending authorization**. Duration is calculated from start and end time and cannot exceed **12 hours**. The first authorized person must sign on issue; additional authorized people may sign optionally. Users whose roles are configured for a sign-off slot on **Permits → Settings** get a push notification when a permit needs authorisation (one per person even with multiple roles). Approvers must confirm a job-site visual inspection before signing. The same person cannot sign more than one slot. Once **two different people** have signed, the permit becomes **open**; a third signature can still be added afterward. Close out with date, time, and operator/maintenance initials when work is finished. Retain closed permits for at least one year.
 
 Each permit record has **View PDF**. The PDF includes every form field, calculated duration, authorized personnel signatures, authorisation slot signatures (including unsigned slots), and close-out initials when present. From the viewer you can share, download, or close the PDF.
 
