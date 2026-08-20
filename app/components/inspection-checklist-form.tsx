@@ -18,8 +18,11 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
+import { Textarea } from "~/components/ui/textarea";
 import { SignaturePad } from "~/components/signature-pad";
 import { createInspectionFormSchema } from "~/lib/inspection.schema";
 import {
@@ -336,13 +339,12 @@ export function InspectionChecklistForm({
 
                         {question.type === "TEXT" ? (
                           <div className="mt-3">
-                            <textarea
+                            <Textarea
                               id={fieldId}
                               name={fieldName}
                               key={fieldKey}
                               defaultValue={value}
                               rows={3}
-                              className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
                               placeholder="Enter details…"
                               aria-invalid={Boolean(fieldErrors)}
                             />
@@ -402,20 +404,19 @@ export function InspectionChecklistForm({
                                     key={option}
                                     htmlFor={optionId}
                                     className={cn(
-                                      "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[:checked]:border-brand/50 has-[:checked]:bg-brand/10",
+                                      "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[[data-state=checked]]:border-brand/50 has-[[data-state=checked]]:bg-brand/10",
                                       flagsAttention &&
-                                        "has-[:checked]:border-amber-500/50 has-[:checked]:bg-amber-50",
+                                        "has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-50",
                                     )}
                                   >
-                                    <input
-                                      type="checkbox"
+                                    <Checkbox
                                       id={optionId}
                                       checked={checked}
-                                      onChange={(event) => {
+                                      onCheckedChange={(nextChecked) => {
                                         const next = new Set(
                                           checkboxSelected ?? [],
                                         );
-                                        if (event.target.checked) {
+                                        if (nextChecked === true) {
                                           next.add(option);
                                         } else {
                                           next.delete(option);
@@ -428,7 +429,6 @@ export function InspectionChecklistForm({
                                           validated: false,
                                         });
                                       }}
-                                      className="size-4 accent-[var(--brand-navy)]"
                                     />
                                     {option}
                                   </label>
@@ -439,7 +439,23 @@ export function InspectionChecklistForm({
                         ) : (
                           <fieldset className="mt-3">
                             <legend className="sr-only">{question.label}</legend>
-                            <div className="flex flex-wrap gap-2">
+                            <input type="hidden" name={fieldName} value={value} />
+                            <RadioGroup
+                              value={value || undefined}
+                              onValueChange={(option) => {
+                                if (isShiftField) {
+                                  updateSearchParam("shift", option);
+                                } else {
+                                  form.update({
+                                    name: fieldName,
+                                    value: option,
+                                    validated: false,
+                                  });
+                                }
+                              }}
+                              className="flex flex-wrap gap-2"
+                              aria-invalid={Boolean(fieldErrors)}
+                            >
                               {choices.map((option) => {
                                 const optionId = `${fieldId}-${option}`;
                                 const flagsAttention =
@@ -449,35 +465,20 @@ export function InspectionChecklistForm({
                                     key={option}
                                     htmlFor={optionId}
                                     className={cn(
-                                      "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[:checked]:border-brand/50 has-[:checked]:bg-brand/10",
+                                      "inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[[data-state=checked]]:border-brand/50 has-[[data-state=checked]]:bg-brand/10",
                                       flagsAttention &&
-                                        "has-[:checked]:border-amber-500/50 has-[:checked]:bg-amber-50",
+                                        "has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-50",
                                     )}
                                   >
-                                    <input
-                                      type="radio"
+                                    <RadioGroupItem
                                       id={optionId}
-                                      name={fieldName}
                                       value={option}
-                                      checked={value === option}
-                                      onChange={() => {
-                                        if (isShiftField) {
-                                          updateSearchParam("shift", option);
-                                        } else {
-                                          form.update({
-                                            name: fieldName,
-                                            value: option,
-                                            validated: false,
-                                          });
-                                        }
-                                      }}
-                                      className="size-4 accent-[var(--brand-navy)]"
                                     />
                                     {option}
                                   </label>
                                 );
                               })}
-                            </div>
+                            </RadioGroup>
                           </fieldset>
                         )}
 
@@ -566,7 +567,7 @@ export function InspectionChecklistForm({
                         </button>
                       ) : null}
                     </div>
-                    <textarea
+                    <Textarea
                       id={field.id}
                       name={field.name}
                       key={field.key}
@@ -576,7 +577,6 @@ export function InspectionChecklistForm({
                           : ""
                       }
                       rows={2}
-                      className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
                       placeholder="Describe the action that needs completing…"
                     />
                   </div>
@@ -586,7 +586,7 @@ export function InspectionChecklistForm({
 
             <section className="grid gap-2">
               <Label htmlFor={fields.notes.id}>Notes (optional)</Label>
-              <textarea
+              <Textarea
                 id={fields.notes.id}
                 name={fields.notes.name}
                 key={fields.notes.key}
@@ -596,7 +596,6 @@ export function InspectionChecklistForm({
                     : ""
                 }
                 rows={3}
-                className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
                 placeholder="Defects, follow-up, or other comments…"
                 aria-invalid={Boolean(fields.notes.errors)}
               />

@@ -6,6 +6,7 @@ import {
 import { parseWithZod } from "@conform-to/zod/v4";
 import { Form, useNavigation } from "react-router";
 
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -15,8 +16,11 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { createPermitCopyFormSchema } from "~/lib/permit-copy";
-import type { CopyablePermitHeading } from "~/lib/permit-copy";
+
+import {
+  createPermitCopyFormSchema,
+  type CopyablePermitHeading,
+} from "~/lib/permit-copy";
 
 type Props = {
   headings: CopyablePermitHeading[];
@@ -88,13 +92,21 @@ export function PermitCopyForm({ headings, lastResult, error }: Props) {
             </p>
           )}
           {fields.heading.errors ? (
-            <p className="text-sm text-destructive">
-              {fields.heading.errors.join(" ")}
-            </p>
+            <Alert variant="destructive">
+              <AlertDescription>
+                {fields.heading.errors.join(" ")}
+              </AlertDescription>
+            </Alert>
           ) : null}
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
           {form.errors ? (
-            <p className="text-sm text-destructive">{form.errors.join(" ")}</p>
+            <Alert variant="destructive">
+              <AlertDescription>{form.errors.join(" ")}</AlertDescription>
+            </Alert>
           ) : null}
         </CardContent>
         <CardFooter>

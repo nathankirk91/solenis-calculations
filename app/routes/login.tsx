@@ -11,6 +11,7 @@ import {
   createUserSession,
   getUser,
 } from "~/lib/auth.server";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -98,9 +99,9 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
         <Form method="post" {...getFormProps(form)}>
           <CardContent className="grid gap-4">
             {actionData?.error ? (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {actionData.error}
-              </p>
+              <Alert variant="destructive">
+                <AlertDescription>{actionData.error}</AlertDescription>
+              </Alert>
             ) : null}
 
             <div className="grid gap-2">

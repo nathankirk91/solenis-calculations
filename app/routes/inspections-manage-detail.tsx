@@ -16,6 +16,7 @@ import {
 } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireOperatorManager } from "~/lib/auth.server";
 import {
@@ -353,12 +354,11 @@ function QuestionFields({
       {questionType === "RADIO" || questionType === "CHECKBOX" ? (
         <div className="grid gap-2">
           <Label>Options (one per line, or comma-separated)</Label>
-          <textarea
+          <Textarea
             name="options"
             rows={4}
             value={radioOptions}
             onChange={(event) => setRadioOptions(event.target.value)}
-            className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             required
           />
         </div>
@@ -859,12 +859,11 @@ export default function InspectionsManageDetailPage({
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="description">Description</Label>
-                  <textarea
+                  <Textarea
                     id="description"
                     name="description"
                     rows={2}
                     defaultValue={inspection.description}
-                    className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1099,13 +1098,12 @@ export default function InspectionsManageDetailPage({
                       <Label htmlFor="changeComment-publish">
                         Revision comment (required)
                       </Label>
-                      <textarea
+                      <Textarea
                         id="changeComment-publish"
                         name="changeComment"
                         rows={3}
                         required
                         placeholder="Summarise what changed in this checklist revision and why"
-                        className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                       />
                       <p className="text-xs text-muted-foreground">
                         This creates version {inspection.version + 1} and stores
