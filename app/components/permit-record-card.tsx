@@ -1,7 +1,9 @@
+import { CopyIcon } from "lucide-react";
 import { Link } from "react-router";
 
 import { DownloadPdfLink } from "~/components/download-pdf-link";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { formatMelbourneDateTime } from "~/lib/datetime";
 import { permitRecordHeading, permitStatusLabel } from "~/lib/permit-display";
 import type { PermitRunListItem } from "~/lib/permits.server";
@@ -68,7 +70,17 @@ export function PermitRecordCard({ run, statusBadge }: PermitRecordCardProps) {
             </p>
           ) : null}
         </Link>
-        <DownloadPdfLink href={`/permits/runs/${run.id}/pdf`} />
+        <div className="flex flex-col items-end gap-2">
+          <DownloadPdfLink href={`/permits/runs/${run.id}/pdf`} />
+          {run.status === "CLOSED" ? (
+            <Button asChild variant="secondary" size="sm">
+              <Link to={`/permits/runs/${run.id}/copy`}>
+                <CopyIcon data-icon="inline-start" />
+                Copy to new permit
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
     </li>
   );
