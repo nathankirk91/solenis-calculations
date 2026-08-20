@@ -103,6 +103,25 @@ export function findNavGroup(items: NavItem[], id: string) {
   );
 }
 
+export function findActiveNavGroupId(
+  items: NavItem[],
+  location: PathLocation,
+) {
+  const group = items.find(
+    (item): item is NavGroupItem =>
+      item.type === "group" && groupIsActive(location, item),
+  );
+  return group?.id ?? null;
+}
+
+/** Only one nav section can be open; clicking the open section closes it. */
+export function nextExclusiveNavGroupId(
+  currentId: string | null,
+  clickedId: string,
+) {
+  return currentId === clickedId ? null : clickedId;
+}
+
 export function buildNavItems({
   signedIn,
   canReview,
