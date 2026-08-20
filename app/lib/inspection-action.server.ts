@@ -97,7 +97,7 @@ export async function handleInspectionSubmit(args: {
     await ensureInspectionSchema();
     const run = await createInspectionRun({
       inspectionId: definition.id,
-      operatorId: operator.id,
+      operatorUserId: operator.id,
       submittedById: user.id,
       equipmentRef,
       notes,
@@ -112,7 +112,6 @@ export async function handleInspectionSubmit(args: {
         inspectionId: definition.id,
         equipmentRef,
         descriptions: actions,
-        createdByOperatorId: operator.id,
         createdByUserId: user.id,
       });
     }

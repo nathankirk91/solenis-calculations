@@ -226,15 +226,6 @@ export function buildNavItems({
           label: "Notifications",
           description: "Devices and alert types for this account",
         },
-        ...(canManageOperators
-          ? [
-              {
-                to: "/operators",
-                label: "Operators",
-                description: "Names shown on forms",
-              },
-            ]
-          : []),
         ...(canManageUsers
           ? [
               {

@@ -231,7 +231,7 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
     `CREATE TABLE IF NOT EXISTS "inspection_runs" (
       "id" TEXT NOT NULL,
       "inspection_id" TEXT NOT NULL,
-      "operator_id" TEXT,
+      "operator_user_id" TEXT,
       "submitted_by_id" TEXT,
       "status" "inspection_run_status" NOT NULL,
       "equipment_ref" TEXT,
@@ -242,7 +242,8 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
       "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "inspection_runs_pkey" PRIMARY KEY ("id")
     )`,
-    `ALTER TABLE "inspection_runs" ADD COLUMN IF NOT EXISTS "inspection_version" INTEGER`,
+    `ALTER TABLE "inspection_runs" ADD COLUMN IF NOT EXISTS "operator_user_id" TEXT`,
+    `ALTER TABLE "inspection_runs" DROP COLUMN IF EXISTS "operator_id"`,
     `ALTER TABLE "inspection_runs" ADD COLUMN IF NOT EXISTS "signature" TEXT`,
     `CREATE INDEX IF NOT EXISTS "inspection_runs_inspection_id_idx" ON "inspection_runs"("inspection_id")`,
     `CREATE INDEX IF NOT EXISTS "inspection_runs_status_created_at_idx" ON "inspection_runs"("status", "created_at" DESC)`,
@@ -255,8 +256,8 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `DO $$ BEGIN
       ALTER TABLE "inspection_runs"
-        ADD CONSTRAINT "inspection_runs_operator_id_fkey"
-        FOREIGN KEY ("operator_id") REFERENCES "operators"("id")
+        ADD CONSTRAINT "inspection_runs_operator_user_id_fkey"
+        FOREIGN KEY ("operator_user_id") REFERENCES "users"("id")
         ON DELETE SET NULL ON UPDATE CASCADE;
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `DO $$ BEGIN
@@ -301,7 +302,6 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
       "equipment_ref" TEXT,
       "description" TEXT NOT NULL,
       "status" "inspection_action_status" NOT NULL DEFAULT 'OPEN',
-      "created_by_operator_id" TEXT,
       "created_by_user_id" TEXT,
       "closed_at" TIMESTAMPTZ(6),
       "closed_by_id" TEXT,
@@ -328,12 +328,7 @@ async function ensureInspectionSchemaOnce(): Promise<void> {
         FOREIGN KEY ("inspection_id") REFERENCES "inspections"("id")
         ON DELETE CASCADE ON UPDATE CASCADE;
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
-    `DO $$ BEGIN
-      ALTER TABLE "inspection_actions"
-        ADD CONSTRAINT "inspection_actions_created_by_operator_id_fkey"
-        FOREIGN KEY ("created_by_operator_id") REFERENCES "operators"("id")
-        ON DELETE SET NULL ON UPDATE CASCADE;
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `ALTER TABLE "inspection_actions" DROP COLUMN IF EXISTS "created_by_operator_id"`,
     `DO $$ BEGIN
       ALTER TABLE "inspection_actions"
         ADD CONSTRAINT "inspection_actions_created_by_user_id_fkey"

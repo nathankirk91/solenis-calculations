@@ -1634,7 +1634,7 @@ export async function moveInspectionQuestion(args: {
 
 export async function createInspectionRun(args: {
   inspectionId: string;
-  operatorId: string;
+  operatorUserId: string;
   submittedById: string;
   equipmentRef: string | null;
   notes: string | null;
@@ -1662,7 +1662,7 @@ export async function createInspectionRun(args: {
   return prisma.inspectionRun.create({
     data: {
       inspectionId: args.inspectionId,
-      operatorId: args.operatorId,
+      operatorUserId: args.operatorUserId,
       submittedById: args.submittedById,
       status: args.summary.status,
       equipmentRef: args.equipmentRef,
@@ -1784,7 +1784,7 @@ export async function listInspectionHistory(
       notes: true,
       summary: true,
       inspection: { select: { id: true, title: true, href: true } },
-      operator: { select: { name: true } },
+      operatorUser: { select: { name: true, email: true } },
       _count: { select: { actions: true } },
     },
   });
@@ -1798,7 +1798,8 @@ export async function listInspectionHistory(
       inspectionTitle: row.inspection.title,
       inspectionHref: row.inspection.href,
       inspectionId: row.inspection.id,
-      operatorName: row.operator?.name ?? null,
+      operatorName:
+        row.operatorUser?.name?.trim() || row.operatorUser?.email || null,
       equipmentRef: row.equipmentRef,
       notes: row.notes,
       signature: null,
@@ -1859,7 +1860,7 @@ export async function listForkliftChecksForDay(
       createdAt: true,
       equipmentRef: true,
       summary: true,
-      operator: { select: { name: true } },
+      operatorUser: { select: { name: true, email: true } },
       _count: { select: { actions: true } },
     },
   });
@@ -1887,7 +1888,8 @@ export async function listForkliftChecksForDay(
       id: row.id,
       status: row.status,
       createdAt: row.createdAt,
-      operatorName: row.operator?.name ?? null,
+      operatorName:
+        row.operatorUser?.name?.trim() || row.operatorUser?.email || null,
       attentionCount: summary.attentionCount,
       actionCount: row._count.actions,
     });
@@ -2103,7 +2105,7 @@ export async function getInspectionRunById(
     where: { id },
     include: {
       inspection: { select: { id: true, title: true, href: true } },
-      operator: { select: { name: true } },
+      operatorUser: { select: { name: true, email: true } },
     },
   });
 
@@ -2116,7 +2118,11 @@ export async function getInspectionRunById(
     prisma.inspectionAction.findMany({
       where: { createdOnRunId: id },
       include: {
-        createdByOperator: { select: { name: true } },
+        createdOnRun: {
+          select: {
+            operatorUser: { select: { name: true, email: true } },
+          },
+        },
         closedBy: { select: { name: true } },
       },
       orderBy: { createdAt: "asc" },
@@ -2130,7 +2136,8 @@ export async function getInspectionRunById(
     inspectionTitle: row.inspection.title,
     inspectionHref: row.inspection.href,
     inspectionId: row.inspection.id,
-    operatorName: row.operator?.name ?? null,
+    operatorName:
+      row.operatorUser?.name?.trim() || row.operatorUser?.email || null,
     equipmentRef: row.equipmentRef,
     notes: row.notes,
     signature: row.signature ?? null,
@@ -2150,7 +2157,9 @@ function mapInspectionAction(row: {
   inspectionId: string;
   createdOnRunId: string;
   createdAt: Date;
-  createdByOperator: { name: string | null } | null;
+  createdOnRun: {
+    operatorUser: { name: string | null; email: string } | null;
+  };
   closedAt: Date | null;
   closedBy: { name: string | null } | null;
   completionComment: string | null;
@@ -2163,7 +2172,10 @@ function mapInspectionAction(row: {
     inspectionId: row.inspectionId,
     createdOnRunId: row.createdOnRunId,
     createdAt: row.createdAt,
-    createdByOperatorName: row.createdByOperator?.name ?? null,
+    createdByOperatorName:
+      row.createdOnRun.operatorUser?.name?.trim() ||
+      row.createdOnRun.operatorUser?.email ||
+      null,
     closedAt: row.closedAt,
     closedByName: row.closedBy?.name ?? null,
     completionComment: row.completionComment,
@@ -2202,7 +2214,11 @@ export async function listOpenInspectionActions(args: {
           OR: [{ equipmentRef: null }, { equipmentRef: "" }],
         },
     include: {
-      createdByOperator: { select: { name: true } },
+      createdOnRun: {
+        select: {
+          operatorUser: { select: { name: true, email: true } },
+        },
+      },
       closedBy: { select: { name: true } },
     },
     orderBy: { createdAt: "asc" },
@@ -2216,7 +2232,6 @@ export async function createInspectionActions(args: {
   inspectionId: string;
   equipmentRef?: string | null;
   descriptions: string[];
-  createdByOperatorId?: string | null;
   createdByUserId?: string | null;
 }): Promise<number> {
   const { ensureInspectionSchema } = await import("~/lib/migrate.server");
@@ -2241,7 +2256,6 @@ export async function createInspectionActions(args: {
       equipmentRef: args.equipmentRef?.trim() || null,
       description,
       status: "OPEN",
-      createdByOperatorId: args.createdByOperatorId ?? null,
       createdByUserId: args.createdByUserId ?? null,
     })),
   });

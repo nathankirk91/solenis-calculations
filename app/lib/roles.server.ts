@@ -1,11 +1,14 @@
 import { getPrisma } from "~/lib/db.server";
 import type { UserRole } from "~/lib/roles";
+import { HSOLENIS_OPERATOR_ROLE_SLUG } from "~/lib/roles";
 
 export const SYSTEM_ROLE_SLUGS = {
   admin: "admin",
   manager: "manager",
   operator: "operator",
 } as const;
+
+export { HSOLENIS_OPERATOR_ROLE_SLUG };
 
 export const PERMIT_SLOT_CODES = {
   operationsRep: "operations_rep",
@@ -55,7 +58,7 @@ const DEFAULT_ROLES: Array<{
     id: "role-manager",
     slug: SYSTEM_ROLE_SLUGS.manager,
     name: "Manager",
-    description: "Approvals, operators, and form management.",
+    description: "Approvals and form management.",
     isSystem: true,
     sortOrder: 2,
   },
@@ -66,6 +69,15 @@ const DEFAULT_ROLES: Array<{
     description: "Plant-floor login for calculations, inspections, and permits.",
     isSystem: true,
     sortOrder: 3,
+  },
+  {
+    id: "role-hsolenis-operator",
+    slug: HSOLENIS_OPERATOR_ROLE_SLUG,
+    name: "hSolenis Operator",
+    description:
+      "Shown in calculation operator dropdowns when assigned to a user.",
+    isSystem: true,
+    sortOrder: 4,
   },
   {
     id: "role-operations-rep",

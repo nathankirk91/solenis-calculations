@@ -97,7 +97,7 @@ export async function requireReviewer(
 
 export async function requireOperatorManager(
   request: Request,
-  returnTo = "/operators",
+  returnTo = "/inspections/manage",
 ): Promise<AuthUser> {
   const user = await requireUser(request, returnTo);
   if (!canManageOperators(user.role)) {

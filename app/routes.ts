@@ -5,7 +5,6 @@ export default [
   route("login", "routes/login.tsx"),
   route("logout", "routes/logout.tsx"),
   route("approvals", "routes/approvals.tsx"),
-  route("operators", "routes/operators.tsx"),
   route("users", "routes/users.tsx"),
   route("roles", "routes/roles.tsx"),
   route("managers", "routes/managers.tsx"),

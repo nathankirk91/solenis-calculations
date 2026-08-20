@@ -8,6 +8,10 @@ import {
   questionTypeStoresOptions,
 } from "../app/lib/inspections";
 import { POLYMER_ADIPIC_DETA_PRODUCTS } from "../app/lib/polymer-adipic-deta";
+import {
+  ensureRolesAndSignOffDefaults,
+  HSOLENIS_OPERATOR_ROLE_SLUG,
+} from "../app/lib/roles.server";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -18,13 +22,6 @@ if (!connectionString) {
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
-
-const DEFAULT_OPERATORS = [
-  "Operator A",
-  "Operator B",
-  "Operator C",
-  "Operator D",
-];
 
 async function upsertUser(args: {
   email: string;
@@ -220,39 +217,38 @@ async function main() {
     });
   }
 
-  for (const [index, name] of DEFAULT_OPERATORS.entries()) {
-    const existing = await prisma.operator.findFirst({
-      where: { name },
-      select: { id: true },
-    });
-
-    if (existing) {
-      await prisma.operator.update({
-        where: { id: existing.id },
-        data: { isActive: true, sortOrder: index + 1 },
-      });
-    } else {
-      await prisma.operator.create({
-        data: {
-          name,
-          isActive: true,
-          sortOrder: index + 1,
-        },
-      });
-    }
-  }
-
   console.log(`Seeded ${POLYMER_ADIPIC_DETA_PRODUCTS.length} calculations`);
   console.log(
     `Seeded ${INSPECTION_DEFINITIONS.length} inspections with questions`,
   );
-  console.log(`Seeded ${DEFAULT_OPERATORS.length} operators`);
 
-  // Role catalog + backfill user_role_assignments from legacy users.role
-  const { ensureRolesAndSignOffDefaults } = await import(
-    "../app/lib/roles.server"
-  );
   await ensureRolesAndSignOffDefaults();
+
+  const hsolenisOperatorRole = await prisma.role.findUnique({
+    where: { slug: HSOLENIS_OPERATOR_ROLE_SLUG },
+    select: { id: true },
+  });
+  const operatorUser = await prisma.user.findUnique({
+    where: { email: operatorEmail },
+    select: { id: true },
+  });
+  if (hsolenisOperatorRole && operatorUser) {
+    await prisma.userRoleAssignment.upsert({
+      where: {
+        userId_roleId: {
+          userId: operatorUser.id,
+          roleId: hsolenisOperatorRole.id,
+        },
+      },
+      update: {},
+      create: {
+        userId: operatorUser.id,
+        roleId: hsolenisOperatorRole.id,
+      },
+    });
+    console.log(`Assigned hSolenis Operator role to ${operatorEmail}`);
+  }
+
   console.log("Ensured default roles and permit sign-off slots");
 }
 

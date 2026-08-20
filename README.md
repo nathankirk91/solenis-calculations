@@ -52,15 +52,14 @@ Prisma Client is generated to `generated/prisma` (gitignored) via `postinstall` 
 - `/inspections` — inspection checklist catalog
 - `/inspections/history` — completed inspection records
 - `/settings` — managers and admin enable devices and choose which permit, inspection, and calculation alerts they receive
-- `/operators` — managers and admin add/remove operator names
 
 Roles:
 
 | Role | Purpose |
 |---|---|
 | `OPERATOR` | Shared plant-floor login; submits calculations and inspections |
-| `MANAGER` | Personal email login; approves/rejects; manages operator names |
-| `ADMIN` | One admin account; same review and operator management as manager |
+| `MANAGER` | Personal email login; approves/rejects; manages forms and users |
+| `ADMIN` | One admin account; same review access as manager plus user/role management |
 
 Seed credentials (override with env):
 
@@ -68,11 +67,11 @@ Seed credentials (override with env):
 - `SEED_OPERATOR_EMAIL` / `SEED_OPERATOR_PASSWORD` (shared operator login)
 - Optional `SEED_MANAGER_EMAIL` / `SEED_MANAGER_PASSWORD` / `SEED_MANAGER_NAME`
 
-Seed also creates placeholder operator names (`Operator A`–`D`) for the calculator dropdown. Managers can add/remove operators at `/operators`.
+Assign the **hSolenis Operator** role to users who should appear in calculation operator dropdowns (via **Users** or **Roles**).
 
 ### Approval workflow
 
-1. Operator selects who is running the batch, enters weights, and clicks **Submit for approval**.
+1. Operator selects who is running the batch from users with the hSolenis Operator role, enters weights, and clicks **Submit for approval**.
 2. The run is stored as `PENDING`.
 3. A manager/admin opens **Approvals**, reviews the numbers, and **Approves** or **Rejects**.
 4. Managers/admin can enable **phone push notifications** on **Settings** (requires VAPID env keys) and choose which permit, inspection, and calculation alerts they receive.
