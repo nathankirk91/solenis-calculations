@@ -15,6 +15,7 @@ import {
 } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
 import { countPendingRuns } from "~/lib/approvals.server";
 import { requireOperatorManager } from "~/lib/auth.server";
 import { seedDefaultInspections, setInspectionAvailability } from "~/lib/inspections.server";
@@ -190,11 +191,10 @@ export default function PermitsManagePage({
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="description">Description</Label>
-                  <textarea
+                  <Textarea
                     id="description"
                     name="description"
                     rows={2}
-                    className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                     placeholder="Short explanation shown on the Permits page"
                   />
                 </div>

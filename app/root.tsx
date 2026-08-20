@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 
+import { Button } from "~/components/ui/button";
 import { APP_NAME } from "~/lib/brand";
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -93,13 +94,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       </h1>
       <p className="mt-2 text-muted-foreground">{details}</p>
       {isChunkError ? (
-        <button
-          type="button"
-          className="mt-6 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-          onClick={() => window.location.reload()}
-        >
+        <Button type="button" className="mt-6" onClick={() => window.location.reload()}>
           Reload now
-        </button>
+        </Button>
       ) : null}
       {stack ? (
         <pre className="mt-6 w-full overflow-x-auto rounded-lg bg-muted p-4 text-sm">

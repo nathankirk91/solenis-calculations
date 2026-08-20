@@ -17,8 +17,11 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
+import { Textarea } from "~/components/ui/textarea";
 import { createPermitIssueFormSchema } from "~/lib/permit.schema";
 import {
   YES_NO_OPTIONS,
@@ -201,13 +204,12 @@ export function PermitIssueForm({
 
                         {question.type === "TEXT" ? (
                           <div className="mt-3">
-                            <textarea
+                            <Textarea
                               id={fieldId}
                               name={fieldName}
                               key={fieldKey}
                               defaultValue={value}
                               rows={3}
-                              className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                               placeholder="Enter details…"
                               aria-invalid={Boolean(fieldErrors)}
                             />
@@ -263,17 +265,16 @@ export function PermitIssueForm({
                                   <label
                                     key={option}
                                     htmlFor={optionId}
-                                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[:checked]:border-brand/50 has-[:checked]:bg-brand/10"
+                                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[[data-state=checked]]:border-brand/50 has-[[data-state=checked]]:bg-brand/10"
                                   >
-                                    <input
-                                      type="checkbox"
+                                    <Checkbox
                                       id={optionId}
                                       checked={checked}
-                                      onChange={(event) => {
+                                      onCheckedChange={(nextChecked) => {
                                         const next = new Set(
                                           checkboxSelected ?? [],
                                         );
-                                        if (event.target.checked) {
+                                        if (nextChecked === true) {
                                           next.add(option);
                                         } else {
                                           next.delete(option);
@@ -286,7 +287,6 @@ export function PermitIssueForm({
                                           validated: false,
                                         });
                                       }}
-                                      className="size-4 accent-[var(--brand-navy)]"
                                     />
                                     {option}
                                   </label>
@@ -297,35 +297,36 @@ export function PermitIssueForm({
                         ) : (
                           <fieldset className="mt-3">
                             <legend className="sr-only">{question.label}</legend>
-                            <div className="flex flex-wrap gap-2">
+                            <RadioGroup
+                              value={value || undefined}
+                              onValueChange={(option) => {
+                                form.update({
+                                  name: fieldName,
+                                  value: option,
+                                  validated: false,
+                                });
+                              }}
+                              className="flex flex-wrap gap-2"
+                              aria-invalid={Boolean(fieldErrors)}
+                            >
                               {choices.map((option) => {
                                 const optionId = `${fieldId}-${option}`;
                                 return (
                                   <label
                                     key={option}
                                     htmlFor={optionId}
-                                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[:checked]:border-brand/50 has-[:checked]:bg-brand/10"
+                                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-[[data-state=checked]]:border-brand/50 has-[[data-state=checked]]:bg-brand/10"
                                   >
-                                    <input
-                                      type="radio"
+                                    <RadioGroupItem
                                       id={optionId}
-                                      name={fieldName}
                                       value={option}
-                                      checked={value === option}
-                                      onChange={() => {
-                                        form.update({
-                                          name: fieldName,
-                                          value: option,
-                                          validated: false,
-                                        });
-                                      }}
-                                      className="size-4 accent-[var(--brand-navy)]"
                                     />
                                     {option}
                                   </label>
                                 );
                               })}
-                            </div>
+                            </RadioGroup>
+                            <input type="hidden" name={fieldName} value={value} />
                           </fieldset>
                         )}
 
