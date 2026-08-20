@@ -34,9 +34,6 @@ export function PermitCopyForm({ headings, lastResult, error }: Props) {
       return parseWithZod(formData, { schema });
     },
     shouldValidate: "onSubmit",
-    defaultValue: {
-      heading: [],
-    },
   });
 
   return (
