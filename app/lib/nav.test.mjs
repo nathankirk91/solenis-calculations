@@ -2,12 +2,10 @@ import assert from "node:assert/strict";
 
 const {
   buildNavItems,
-  findActiveNavGroupId,
   findNavGroup,
   groupHasMultipleSections,
   groupIsActive,
   navLabels,
-  nextExclusiveNavGroupId,
   pathMatches,
 } = await import("./nav.ts");
 
@@ -125,25 +123,5 @@ assert.deepEqual(
   settings.children.map((child) => child.label),
   ["Notifications", "Users", "Roles"],
 );
-
-assert.equal(
-  findActiveNavGroupId(managerNav, { pathname: "/permits", hash: "" }),
-  "permits",
-);
-assert.equal(
-  findActiveNavGroupId(managerNav, {
-    pathname: "/inspections/history",
-    hash: "",
-  }),
-  "inspections",
-);
-assert.equal(
-  findActiveNavGroupId(managerNav, { pathname: "/", hash: "" }),
-  null,
-);
-
-assert.equal(nextExclusiveNavGroupId(null, "permits"), "permits");
-assert.equal(nextExclusiveNavGroupId("permits", "inspections"), "inspections");
-assert.equal(nextExclusiveNavGroupId("permits", "permits"), null);
 
 console.log("nav tests passed");
