@@ -5,6 +5,26 @@ export type UserRole = (typeof USER_ROLES)[number];
 /** Users with this role slug appear in calculation operator dropdowns. */
 export const HSOLENIS_OPERATOR_ROLE_SLUG = "hsolenis-operator";
 
+export const SYSTEM_ACCESS_LEVEL_SLUGS = {
+  admin: "admin",
+  approver: "approver",
+  standard: "standard",
+} as const;
+
+/** Role slugs for built-in access levels (not listed on the Roles page). */
+export const ACCESS_LEVEL_SLUGS = new Set<string>([
+  SYSTEM_ACCESS_LEVEL_SLUGS.admin,
+  SYSTEM_ACCESS_LEVEL_SLUGS.approver,
+  SYSTEM_ACCESS_LEVEL_SLUGS.standard,
+  // Legacy slugs before rename
+  "manager",
+  "operator",
+]);
+
+export function isAccessLevelRole(slug: string): boolean {
+  return ACCESS_LEVEL_SLUGS.has(slug);
+}
+
 export const ACCESS_LEVEL_LABELS: Record<UserRole, string> = {
   ADMIN: "Admin",
   APPROVER: "Approver",

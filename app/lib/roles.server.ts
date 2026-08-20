@@ -1,6 +1,9 @@
 import { getPrisma } from "~/lib/db.server";
 import type { UserRole } from "~/lib/roles";
-import { HSOLENIS_OPERATOR_ROLE_SLUG } from "~/lib/roles";
+import {
+  HSOLENIS_OPERATOR_ROLE_SLUG,
+  isAccessLevelRole,
+} from "~/lib/roles";
 
 export const SYSTEM_ROLE_SLUGS = {
   admin: "admin",
@@ -8,17 +11,7 @@ export const SYSTEM_ROLE_SLUGS = {
   standard: "standard",
 } as const;
 
-/** Slugs for built-in access levels (not shown on the Roles page). */
-export const ACCESS_LEVEL_SLUGS = new Set<string>([
-  SYSTEM_ROLE_SLUGS.admin,
-  SYSTEM_ROLE_SLUGS.approver,
-  SYSTEM_ROLE_SLUGS.standard,
-  // Legacy slugs before rename
-  "manager",
-  "operator",
-]);
-
-export { HSOLENIS_OPERATOR_ROLE_SLUG };
+export { HSOLENIS_OPERATOR_ROLE_SLUG, isAccessLevelRole };
 
 export const PERMIT_SLOT_CODES = {
   operationsRep: "operations_rep",
@@ -278,10 +271,6 @@ export async function ensureRolesAndSignOffDefaults(): Promise<void> {
       data: { userId: user.id, roleId },
     });
   }
-}
-
-export function isAccessLevelRole(slug: string): boolean {
-  return ACCESS_LEVEL_SLUGS.has(slug);
 }
 
 export async function listRoles(args?: {
