@@ -88,7 +88,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         title: String(formData.get("title") ?? ""),
         description: String(formData.get("description") ?? ""),
         category: PERMIT_CATEGORY,
-        equipmentLabel: String(formData.get("equipmentLabel") ?? ""),
+        // Category and equipment labels are inspection manage fields; permits
+        // keep a fixed category and leave any existing equipment label as-is.
+        equipmentLabel: existing.equipmentLabel ?? "",
         isAvailable: String(formData.get("isAvailable") ?? "") === "on",
         requiredSignerCount: Number(formData.get("requiredSignerCount") ?? 2),
       });
@@ -353,29 +355,6 @@ export default function PermitsManageDetailPage({
                     defaultValue={inspection.description}
                   />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      name="category"
-                      value={PERMIT_CATEGORY}
-                      readOnly
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Permit forms always use the Permits category.
-                    </p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="equipmentLabel">Equipment ID label</Label>
-                    <Input
-                      id="equipmentLabel"
-                      name="equipmentLabel"
-                      defaultValue={inspection.equipmentLabel ?? ""}
-                      placeholder="Leave blank if not needed"
-                    />
-                  </div>
-                </div>
                 <div className="grid gap-2">
                   <Label htmlFor="requiredSignerCount">
                     Signatures required to open
@@ -418,12 +397,12 @@ export default function PermitsManageDetailPage({
             <CardHeader>
               <CardTitle>Add question</CardTitle>
               <CardDescription>
-                Choose yes/no, number, date, a text box, or radio options. Mark
-                which answers should flag “needs attention”. Optionally mark
-                start time, end time, or area for duration and dashboard rules.
-                Shift and first-of-week limits apply only to inspections, not
-                permits. Question edits go live right away; publish one revision
-                when the whole batch is ready.
+                Choose yes/no, number, date, a text box, or radio options.
+                Optionally mark start time, end time, or area for duration and
+                dashboard rules. Attention flags, required/optional, show last
+                value, and shift rules are inspection-only. Question edits go
+                live right away; publish one revision when the whole batch is
+                ready.
               </CardDescription>
             </CardHeader>
             <CardContent>
