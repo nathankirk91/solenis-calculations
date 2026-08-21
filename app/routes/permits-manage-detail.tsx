@@ -88,7 +88,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         title: String(formData.get("title") ?? ""),
         description: String(formData.get("description") ?? ""),
         category: PERMIT_CATEGORY,
-        equipmentLabel: String(formData.get("equipmentLabel") ?? ""),
+        // Category and equipment labels are inspection manage fields; permits
+        // keep a fixed category and leave any existing equipment label as-is.
+        equipmentLabel: existing.equipmentLabel ?? "",
         isAvailable: String(formData.get("isAvailable") ?? "") === "on",
         requiredSignerCount: Number(formData.get("requiredSignerCount") ?? 2),
       });
@@ -352,29 +354,6 @@ export default function PermitsManageDetailPage({
                     rows={2}
                     defaultValue={inspection.description}
                   />
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      name="category"
-                      value={PERMIT_CATEGORY}
-                      readOnly
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Permit forms always use the Permits category.
-                    </p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="equipmentLabel">Equipment ID label</Label>
-                    <Input
-                      id="equipmentLabel"
-                      name="equipmentLabel"
-                      defaultValue={inspection.equipmentLabel ?? ""}
-                      placeholder="Leave blank if not needed"
-                    />
-                  </div>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="requiredSignerCount">

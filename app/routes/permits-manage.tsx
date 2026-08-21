@@ -76,7 +76,6 @@ export async function action({ request }: Route.ActionArgs) {
       const created = await createManagedPermit({
         title: String(formData.get("title") ?? ""),
         description: String(formData.get("description") ?? ""),
-        equipmentLabel: String(formData.get("equipmentLabel") ?? ""),
         requiredSignerCount: Number(formData.get("requiredSignerCount") ?? 2),
       });
       throw redirect(`/permits/manage/${created.id}`);
@@ -196,17 +195,6 @@ export default function PermitsManagePage({
                     name="description"
                     rows={2}
                     placeholder="Short explanation shown on the Permits page"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="equipmentLabel">
-                    Equipment ID label (optional)
-                  </Label>
-                  <Input
-                    id="equipmentLabel"
-                    name="equipmentLabel"
-                    placeholder="e.g. Equipment number"
-                    autoComplete="off"
                   />
                 </div>
                 <div className="grid gap-2">
