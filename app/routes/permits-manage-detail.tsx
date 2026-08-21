@@ -418,12 +418,12 @@ export default function PermitsManageDetailPage({
             <CardHeader>
               <CardTitle>Add question</CardTitle>
               <CardDescription>
-                Choose yes/no, number, date, a text box, or radio options. Mark
-                which answers should flag “needs attention”. Optionally mark
-                start time, end time, or area for duration and dashboard rules.
-                Shift and first-of-week limits apply only to inspections, not
-                permits. Question edits go live right away; publish one revision
-                when the whole batch is ready.
+                Choose yes/no, number, date, a text box, or radio options.
+                Optionally mark start time, end time, or area for duration and
+                dashboard rules. Attention flags, required/optional, show last
+                value, and shift rules are inspection-only. Question edits go
+                live right away; publish one revision when the whole batch is
+                ready.
               </CardDescription>
             </CardHeader>
             <CardContent>

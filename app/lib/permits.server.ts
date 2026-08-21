@@ -235,16 +235,10 @@ export async function duplicateManagedPermit(args: {
         type: question.type,
         options:
           question.options.length > 0 ? question.options : Prisma.DbNull,
-        attentionValues:
-          question.type === "TEXT" ||
-          question.type === "NUMBER" ||
-          question.type === "DATE" ||
-          question.type === "TIME"
-            ? Prisma.DbNull
-            : question.attentionValues,
-        required: question.required,
-        showLastValue: question.showLastValue,
-        // Permits are not shift checklists — never copy inspection-only rules.
+        // Permits are not plant checklists — never copy inspection-only rules.
+        attentionValues: Prisma.DbNull,
+        required: true,
+        showLastValue: false,
         applicableEquipmentRefs: Prisma.DbNull,
         applicableShifts: Prisma.DbNull,
         firstOfWeekOnly: false,

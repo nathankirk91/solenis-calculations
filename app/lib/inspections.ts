@@ -561,6 +561,11 @@ export function parseChecklistQuestionFormData(
   if (kind === "permit") {
     return {
       ...base,
+      // Permits are not plant checklists — no attention flags, optional items,
+      // or "show last value" (those stay on inspections only).
+      attentionValues: [],
+      required: true,
+      showLastValue: false,
       applicableEquipmentRefs: [],
       applicableShifts: [],
       firstOfWeekOnly: false,

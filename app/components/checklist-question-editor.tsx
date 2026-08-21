@@ -59,16 +59,12 @@ export function ChecklistQuestionFields({
     .filter(Boolean);
 
   const attentionChoices =
-    questionType === "YES_NO"
+    kind === "inspection" && questionType === "YES_NO"
       ? [...YES_NO_OPTIONS]
-      : questionType === "RADIO" || questionType === "CHECKBOX"
+      : kind === "inspection" &&
+          (questionType === "RADIO" || questionType === "CHECKBOX")
         ? radioOptionList
         : [];
-
-  const attentionHint =
-    kind === "permit"
-      ? "Leave all unchecked if no answer should flag the permit."
-      : "Leave all unchecked if no answer should flag the inspection.";
 
   return (
     <>
@@ -164,65 +160,65 @@ export function ChecklistQuestionFields({
         <input type="hidden" name="options" value="" />
       )}
 
-      {attentionChoices.length > 0 ? (
-        <fieldset key={`${questionType}-attention`} className="grid gap-2">
-          <legend className="text-sm font-medium">
-            Flag as needs attention when answer is
-          </legend>
-          <p className="text-xs text-muted-foreground">{attentionHint}</p>
-          <div className="flex flex-wrap gap-3">
-            {attentionChoices.map((option) => (
-              <label
-                key={option}
-                className="inline-flex items-center gap-2 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  name="attentionValues"
-                  value={option}
-                  defaultChecked={
-                    defaults?.attentionValues
-                      ? defaults.attentionValues.includes(option)
-                      : questionType === "YES_NO"
-                        ? option === "No"
-                        : looksLikeAttentionOption(option)
-                  }
-                  className="size-4 accent-[var(--brand-navy)]"
-                />
-                {option}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          name="required"
-          defaultChecked={defaults?.required ?? true}
-          className="size-4 accent-[var(--brand-navy)]"
-        />
-        Required
-      </label>
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          name="showLastValue"
-          defaultChecked={defaults?.showLastValue ?? false}
-          className="mt-0.5 size-4 accent-[var(--brand-navy)]"
-        />
-        <span>
-          Show last value
-          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-            Operators see the prior report’s answer when one exists (useful for
-            service date).
-          </span>
-        </span>
-      </label>
-
       {kind === "inspection" ? (
         <>
+          {attentionChoices.length > 0 ? (
+            <fieldset key={`${questionType}-attention`} className="grid gap-2">
+              <legend className="text-sm font-medium">
+                Flag as needs attention when answer is
+              </legend>
+              <p className="text-xs text-muted-foreground">
+                Leave all unchecked if no answer should flag the inspection.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {attentionChoices.map((option) => (
+                  <label
+                    key={option}
+                    className="inline-flex items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      name="attentionValues"
+                      value={option}
+                      defaultChecked={
+                        defaults?.attentionValues
+                          ? defaults.attentionValues.includes(option)
+                          : questionType === "YES_NO"
+                            ? option === "No"
+                            : looksLikeAttentionOption(option)
+                      }
+                      className="size-4 accent-[var(--brand-navy)]"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="required"
+              defaultChecked={defaults?.required ?? true}
+              className="size-4 accent-[var(--brand-navy)]"
+            />
+            Required
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="showLastValue"
+              defaultChecked={defaults?.showLastValue ?? false}
+              className="mt-0.5 size-4 accent-[var(--brand-navy)]"
+            />
+            <span>
+              Show last value
+              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                Operators see the prior report’s answer when one exists (useful
+                for service date).
+              </span>
+            </span>
+          </label>
           <fieldset className="grid gap-2">
             <legend className="text-sm font-medium">Applies to shifts</legend>
             <p className="text-xs text-muted-foreground">
@@ -382,10 +378,10 @@ export function ChecklistQuestionEditor({
                 {PERMIT_FIELD_ROLE_LABELS[fieldRole]}
               </Badge>
             ) : null}
-            {!question.required ? (
+            {kind === "inspection" && !question.required ? (
               <Badge variant="outline">Optional</Badge>
             ) : null}
-            {question.showLastValue ? (
+            {kind === "inspection" && question.showLastValue ? (
               <Badge variant="outline">Shows last value</Badge>
             ) : null}
             {kind === "inspection" &&
@@ -415,7 +411,7 @@ export function ChecklistQuestionEditor({
               Options: {question.options.join(", ")}
             </p>
           ) : null}
-          {question.attentionValues.length > 0 ? (
+          {kind === "inspection" && question.attentionValues.length > 0 ? (
             <p className="mt-1 text-sm text-amber-800">
               Flags attention: {question.attentionValues.join(", ")}
             </p>
