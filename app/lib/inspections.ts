@@ -508,6 +508,85 @@ export function isPermitInspection(item: {
   return (item.category ?? "").trim().toLowerCase() === "permits";
 }
 
+export type ChecklistQuestionKind = "inspection" | "permit";
+
+export type ChecklistQuestionPayload = {
+  label: string;
+  helpText: string;
+  sectionTitle: string;
+  type: InspectionQuestionType;
+  options: string[];
+  attentionValues: string[];
+  required: boolean;
+  showLastValue: boolean;
+  applicableEquipmentRefs: string[];
+  applicableShifts: string[];
+  firstOfWeekOnly: boolean;
+  permitFieldRole: PermitFieldRole | null;
+};
+
+/**
+ * Parse question form fields. Inspection kind keeps shift / unit / first-of-week
+ * applicability; permit kind never persists those (permits are not shift checklists).
+ */
+export function parseChecklistQuestionFormData(
+  formData: FormData,
+  kind: ChecklistQuestionKind,
+): ChecklistQuestionPayload | { error: string } {
+  const type = String(
+    formData.get("type") ?? "YES_NO",
+  ) as InspectionQuestionType;
+  if (!INSPECTION_QUESTION_TYPES.includes(type)) {
+    return { error: "Invalid question type." };
+  }
+
+  const optionsRaw = String(formData.get("options") ?? "");
+  const options = optionsRaw
+    .split(/\n|,/)
+    .map((option) => option.trim())
+    .filter(Boolean);
+
+  const attentionRaw = formData.getAll("attentionValues").map(String);
+  const base = {
+    label: String(formData.get("label") ?? ""),
+    helpText: String(formData.get("helpText") ?? ""),
+    sectionTitle: String(formData.get("sectionTitle") ?? ""),
+    type,
+    options,
+    attentionValues: attentionRaw,
+    required: String(formData.get("required") ?? "") === "on",
+    showLastValue: String(formData.get("showLastValue") ?? "") === "on",
+  };
+
+  if (kind === "permit") {
+    return {
+      ...base,
+      applicableEquipmentRefs: [],
+      applicableShifts: [],
+      firstOfWeekOnly: false,
+      permitFieldRole: parsePermitFieldRole(
+        String(formData.get("permitFieldRole") ?? "") || null,
+      ),
+    };
+  }
+
+  return {
+    ...base,
+    applicableEquipmentRefs: formData
+      .getAll("applicableEquipmentRefs")
+      .map(String)
+      .map((value) => value.trim())
+      .filter(Boolean),
+    applicableShifts: formData
+      .getAll("applicableShifts")
+      .map(String)
+      .map((value) => value.trim())
+      .filter(Boolean),
+    firstOfWeekOnly: String(formData.get("firstOfWeekOnly") ?? "") === "on",
+    permitFieldRole: null,
+  };
+}
+
 /** ADAPT-A-LIFT unit numbers on Form 78 (6 forklifts, checked each shift). */
 export const FORKLIFT_UNITS = [
   {
