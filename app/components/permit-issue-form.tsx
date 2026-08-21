@@ -236,7 +236,6 @@ export function PermitIssueForm({
                               key={fieldKey}
                               type="date"
                               defaultValue={value}
-                              className="max-w-xs"
                               aria-invalid={Boolean(fieldErrors)}
                             />
                           </div>
@@ -248,7 +247,6 @@ export function PermitIssueForm({
                               key={fieldKey}
                               type="time"
                               defaultValue={value}
-                              className="max-w-xs"
                               aria-invalid={Boolean(fieldErrors)}
                             />
                           </div>
