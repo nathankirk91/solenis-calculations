@@ -133,7 +133,7 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
               autoComplete="email"
               placeholder="Enter your email address"
               className={cn(
-                "h-9 rounded-md border-0 bg-white px-3.5 text-sm shadow-none ring-1 ring-inset ring-zinc-300 hover:ring-zinc-400 focus-visible:border-0 focus-visible:ring-[1.5px] focus-visible:ring-zinc-950",
+                "h-9 rounded-md border-0 bg-white px-3.5 text-base shadow-none ring-1 ring-inset ring-zinc-300 hover:ring-zinc-400 focus-visible:border-0 focus-visible:ring-[1.5px] focus-visible:ring-zinc-950 md:text-sm",
                 fields.email.errors && "ring-red-400 focus-visible:ring-red-400",
               )}
             />
@@ -156,7 +156,7 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
               autoComplete="current-password"
               placeholder="Enter your password"
               className={cn(
-                "h-9 rounded-md border-0 bg-white px-3.5 text-sm shadow-none ring-1 ring-inset ring-zinc-300 hover:ring-zinc-400 focus-visible:border-0 focus-visible:ring-[1.5px] focus-visible:ring-zinc-950",
+                "h-9 rounded-md border-0 bg-white px-3.5 text-base shadow-none ring-1 ring-inset ring-zinc-300 hover:ring-zinc-400 focus-visible:border-0 focus-visible:ring-[1.5px] focus-visible:ring-zinc-950 md:text-sm",
                 fields.password.errors &&
                   "ring-red-400 focus-visible:ring-red-400",
               )}
