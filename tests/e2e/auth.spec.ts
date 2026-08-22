@@ -4,12 +4,12 @@ test.describe("authentication gates", () => {
   test("login page renders sign-in form", async ({ page }) => {
     await page.goto("/login");
 
-    await expect(page.getByText("Hercules 1612 sign in")).toBeVisible();
+    await expect(page.getByText("Sign in to Hercules 1612")).toBeVisible();
     await expect(page.getByText("Hercules 1612")).toBeVisible();
     await expect(page.locator('input[name="email"]')).toBeVisible();
     await expect(page.locator('input[name="password"]')).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /sign in/i }),
+      page.getByRole("button", { name: /continue/i }),
     ).toBeVisible();
   });
 
@@ -49,7 +49,7 @@ test.describe("authentication gates", () => {
     page,
   }) => {
     await page.goto("/login");
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: /continue/i }).click();
 
     await expect(page.getByText(/valid email|email/i).first()).toBeVisible();
   });
